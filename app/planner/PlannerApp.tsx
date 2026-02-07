@@ -31,6 +31,7 @@ export function PlannerApp() {
     beginSlotItemDrag,
     handleSlotDragOver,
     handleSlotDrop,
+    handleViewportDropFallback,
     handleLibraryDragOver,
     handleLibraryDrop,
     clearSlot,
@@ -76,6 +77,7 @@ export function PlannerApp() {
           onPointerEnd={handlePointerEnd}
           onSlotDragOver={handleSlotDragOver}
           onSlotDrop={handleSlotDrop}
+          onViewportDropFallback={handleViewportDropFallback}
           onSlotItemDragStart={beginSlotItemDrag}
           onAnyDragEnd={clearDragState}
           onClearSlot={clearSlot}

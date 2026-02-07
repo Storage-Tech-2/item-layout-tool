@@ -39,6 +39,7 @@ type UseLayoutAssignmentsResult = {
   ) => void;
   handleSlotDragOver: (event: DragEvent<HTMLElement>, slotId: string) => void;
   handleSlotDrop: (event: DragEvent<HTMLElement>, slotId: string) => void;
+  handleViewportDropFallback: (event: DragEvent<HTMLElement>) => void;
   handleLibraryDragOver: (event: DragEvent<HTMLElement>) => void;
   handleLibraryDrop: (event: DragEvent<HTMLElement>) => void;
   clearSlot: (slotId: string) => void;
@@ -301,6 +302,40 @@ export function useLayoutAssignments({
     clearDragState();
   }
 
+  function handleViewportDropFallback(event: DragEvent<HTMLElement>): void {
+    event.preventDefault();
+
+    const payload = getPayloadFromDragEvent(event);
+    if (!payload) {
+      clearDragState();
+      return;
+    }
+
+    const anchorSlotId = dragPreviews.find((placement) => placement.kind === "place")?.slotId;
+    if (!anchorSlotId) {
+      clearDragState();
+      return;
+    }
+
+    const placements = buildPlacements({
+      anchorSlotId,
+      payload,
+      assignments: activeSlotAssignments,
+      context: placementContext,
+    });
+
+    if (placements.length === 0) {
+      clearDragState();
+      return;
+    }
+
+    placePayload(anchorSlotId, payload);
+    if (payload.source === "layout") {
+      setSelectedSlotIdsState(placements.map((placement) => placement.slotId));
+    }
+    clearDragState();
+  }
+
   function handleLibraryDragOver(event: DragEvent<HTMLElement>): void {
     event.preventDefault();
     event.dataTransfer.dropEffect = activeDragPayload?.source === "layout" ? "move" : "copy";
@@ -367,6 +402,7 @@ export function useLayoutAssignments({
     beginSlotItemDrag,
     handleSlotDragOver,
     handleSlotDrop,
+    handleViewportDropFallback,
     handleLibraryDragOver,
     handleLibraryDrop,
     clearSlot,

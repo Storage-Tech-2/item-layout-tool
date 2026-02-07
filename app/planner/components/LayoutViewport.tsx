@@ -36,6 +36,7 @@ type LayoutViewportProps = {
   onPointerEnd: (event: PointerEvent<HTMLDivElement>) => void;
   onSlotDragOver: (event: DragEvent<HTMLElement>, slotId: string) => void;
   onSlotDrop: (event: DragEvent<HTMLElement>, slotId: string) => void;
+  onViewportDropFallback: (event: DragEvent<HTMLElement>) => void;
   onSlotItemDragStart: (
     event: DragEvent<HTMLElement>,
     slotId: string,
@@ -61,6 +62,7 @@ export function LayoutViewport({
   onPointerEnd,
   onSlotDragOver,
   onSlotDrop,
+  onViewportDropFallback,
   onSlotItemDragStart,
   onAnyDragEnd,
   onClearSlot,
@@ -222,7 +224,11 @@ export function LayoutViewport({
       <button
         key={slotId}
         type="button"
-        className={`relative grid h-[34px] w-[34px] cursor-pointer place-items-center overflow-hidden rounded-[0.45rem] border p-0 transition hover:-translate-y-px hover:shadow-[0_3px_8px_rgba(57,47,30,0.22)] ${
+        className={`relative grid h-[34px] w-[34px] cursor-pointer place-items-center overflow-hidden rounded-[0.45rem] border p-0 transition hover:-translate-y-px ${
+          isSelected
+            ? "hover:shadow-[0_0_0_2px_rgba(37,99,235,0.55)]"
+            : "hover:shadow-[0_3px_8px_rgba(57,47,30,0.22)]"
+        } ${
           assignedItem
             ? "border-[rgba(40,102,110,0.62)] bg-[linear-gradient(145deg,rgba(237,253,249,0.95)_0%,rgba(205,235,226,0.95)_100%)]"
             : "border-[rgba(108,89,62,0.35)] bg-[linear-gradient(145deg,rgba(245,233,216,0.95)_0%,rgba(231,212,184,0.95)_100%)]"
@@ -460,6 +466,12 @@ export function LayoutViewport({
       ref={viewportRef}
       className="relative min-h-0 flex-1 cursor-grab select-none overflow-hidden touch-none active:cursor-grabbing"
       style={viewportBackgroundStyle}
+      onDragOver={(event) => {
+        event.preventDefault();
+      }}
+      onDrop={(event) => {
+        onViewportDropFallback(event);
+      }}
       onPointerDown={(event) => {
         const didStartPan = onPointerDown(event);
         if (didStartPan || event.button !== 0 || !event.shiftKey) {
@@ -632,12 +644,14 @@ export function LayoutViewport({
                   if (event.target !== event.currentTarget) {
                     return;
                   }
+                  event.stopPropagation();
                   onSlotDragOver(event, hallFirstSlot);
                 }}
                 onDrop={(event) => {
                   if (event.target !== event.currentTarget) {
                     return;
                   }
+                  event.stopPropagation();
                   onSlotDrop(event, hallFirstSlot);
                 }}
               >
