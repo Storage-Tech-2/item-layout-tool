@@ -23,6 +23,7 @@ type ModelFaceDef = {
   texture: string;
   uv: [number, number, number, number];
   rotation: 0 | 90 | 180 | 270;
+  tintIndex: number | null;
 };
 
 type ModelElementRotation = {
@@ -46,6 +47,7 @@ type ResolvedModelDefinition = {
 type Candidate = {
   kind: "model" | "texture";
   ref: string;
+  tintDefs: unknown[] | null;
 };
 
 type OutputItem = {
@@ -92,6 +94,12 @@ type RgbaImage = {
 };
 
 type ModelRenderView = "front" | "back";
+
+type RgbColor = {
+  r: number;
+  g: number;
+  b: number;
+};
 
 type AnimationMeta = {
   animation?: {
@@ -532,12 +540,21 @@ function parseModelFace(value: unknown): ModelFaceDef | null {
     rotationRaw === 90 || rotationRaw === 180 || rotationRaw === 270 ? rotationRaw : 0;
 
   const uvRaw = value.uv;
+  const tintIndexRaw = value.tintindex;
+  const tintIndex =
+    typeof tintIndexRaw === "number" &&
+    Number.isFinite(tintIndexRaw) &&
+    Number.isInteger(tintIndexRaw) &&
+    tintIndexRaw >= 0
+      ? tintIndexRaw
+      : null;
   const uvDefault: [number, number, number, number] = [0, 0, 16, 16];
   if (!Array.isArray(uvRaw)) {
     return {
       texture: value.texture,
       uv: uvDefault,
       rotation,
+      tintIndex,
     };
   }
 
@@ -549,6 +566,7 @@ function parseModelFace(value: unknown): ModelFaceDef | null {
       texture: value.texture,
       uv: uvDefault,
       rotation,
+      tintIndex,
     };
   }
 
@@ -556,6 +574,7 @@ function parseModelFace(value: unknown): ModelFaceDef | null {
     texture: value.texture,
     uv: [uvRaw[0], uvRaw[1], uvRaw[2], uvRaw[3]],
     rotation,
+    tintIndex,
   };
 }
 
@@ -1017,10 +1036,14 @@ async function fetchItemIndex(): Promise<ItemIndex> {
   return itemIndex;
 }
 
-function collectCandidates(node: unknown, out: Candidate[]): void {
+function collectCandidates(
+  node: unknown,
+  out: Candidate[],
+  inheritedTintDefs: unknown[] | null = null,
+): void {
   if (Array.isArray(node)) {
     for (const value of node) {
-      collectCandidates(value, out);
+      collectCandidates(value, out, inheritedTintDefs);
     }
     return;
   }
@@ -1029,15 +1052,16 @@ function collectCandidates(node: unknown, out: Candidate[]): void {
     return;
   }
 
+  const localTintDefs = Array.isArray(node.tints) ? node.tints : inheritedTintDefs;
   const typeValue = typeof node.type === "string" ? node.type : null;
   if (typeValue === "minecraft:model" && typeof node.model === "string") {
-    out.push({ kind: "model", ref: node.model });
+    out.push({ kind: "model", ref: node.model, tintDefs: localTintDefs });
   }
   if (typeValue === "minecraft:special" && typeof node.base === "string") {
-    out.push({ kind: "model", ref: node.base });
+    out.push({ kind: "model", ref: node.base, tintDefs: localTintDefs });
   }
   if (typeof node.texture === "string") {
-    out.push({ kind: "texture", ref: node.texture });
+    out.push({ kind: "texture", ref: node.texture, tintDefs: localTintDefs });
   }
 
   const preferredKeyOrder = [
@@ -1054,7 +1078,7 @@ function collectCandidates(node: unknown, out: Candidate[]): void {
   for (const key of preferredKeyOrder) {
     if (key in node) {
       traversedKeys.add(key);
-      collectCandidates(node[key], out);
+      collectCandidates(node[key], out, localTintDefs);
     }
   }
 
@@ -1062,7 +1086,7 @@ function collectCandidates(node: unknown, out: Candidate[]): void {
     if (traversedKeys.has(key) || key === "type" || key === "texture") {
       continue;
     }
-    collectCandidates(value, out);
+    collectCandidates(value, out, localTintDefs);
   }
 }
 
@@ -1071,7 +1095,8 @@ function dedupeCandidates(candidates: Candidate[]): Candidate[] {
   const seen = new Set<string>();
 
   for (const candidate of candidates) {
-    const signature = `${candidate.kind}:${candidate.ref}`;
+    const tintSignature = candidate.tintDefs ? JSON.stringify(candidate.tintDefs) : "";
+    const signature = `${candidate.kind}:${candidate.ref}:${tintSignature}`;
     if (seen.has(signature)) {
       continue;
     }
@@ -1287,6 +1312,110 @@ async function readTextureRgba(textureRef: string): Promise<RgbaImage | null> {
 
   textureRgbaCache.set(textureRef, promise);
   return promise;
+}
+
+function intColorToRgb(value: number): RgbColor {
+  const unsigned = value >>> 0;
+  return {
+    r: (unsigned >> 16) & 0xff,
+    g: (unsigned >> 8) & 0xff,
+    b: unsigned & 0xff,
+  };
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+async function sampleColorFromColormap(
+  textureRef: string,
+  temperature: number,
+  downfall: number,
+  fallbackColor: number,
+): Promise<number> {
+  const image = await readTextureRgba(textureRef);
+  if (!image || image.width <= 0 || image.height <= 0) {
+    return fallbackColor;
+  }
+
+  const t = clamp01(temperature);
+  const d = clamp01(downfall) * t;
+  const x = Math.max(0, Math.min(image.width - 1, Math.floor((1 - t) * (image.width - 1))));
+  const y = Math.max(0, Math.min(image.height - 1, Math.floor((1 - d) * (image.height - 1))));
+  const offset = (y * image.width + x) * 4;
+  return (
+    ((image.data[offset] & 0xff) << 16) |
+    ((image.data[offset + 1] & 0xff) << 8) |
+    (image.data[offset + 2] & 0xff)
+  );
+}
+
+async function resolveTintColorFromDefinition(tintDef: unknown): Promise<number | null> {
+  if (!isRecord(tintDef) || typeof tintDef.type !== "string") {
+    return null;
+  }
+
+  if (tintDef.type === "minecraft:constant" && typeof tintDef.value === "number") {
+    return tintDef.value;
+  }
+
+  if (tintDef.type === "minecraft:grass") {
+    const temperature =
+      typeof tintDef.temperature === "number" && Number.isFinite(tintDef.temperature)
+        ? tintDef.temperature
+        : 0.5;
+    const downfall =
+      typeof tintDef.downfall === "number" && Number.isFinite(tintDef.downfall)
+        ? tintDef.downfall
+        : 1.0;
+    return sampleColorFromColormap("minecraft:colormap/grass", temperature, downfall, 0x7fb238);
+  }
+
+  if (tintDef.type === "minecraft:foliage") {
+    const temperature =
+      typeof tintDef.temperature === "number" && Number.isFinite(tintDef.temperature)
+        ? tintDef.temperature
+        : 0.5;
+    const downfall =
+      typeof tintDef.downfall === "number" && Number.isFinite(tintDef.downfall)
+        ? tintDef.downfall
+        : 1.0;
+    return sampleColorFromColormap(
+      "minecraft:colormap/foliage",
+      temperature,
+      downfall,
+      0x48b518,
+    );
+  }
+
+  return null;
+}
+
+async function resolveTintPalette(tintDefs: unknown[] | null): Promise<Array<RgbColor | null>> {
+  if (!tintDefs || tintDefs.length === 0) {
+    return [];
+  }
+
+  const colors = await Promise.all(tintDefs.map((def) => resolveTintColorFromDefinition(def)));
+  return colors.map((color) => (color === null ? null : intColorToRgb(color)));
+}
+
+function applyTintToImage(image: RgbaImage, tintColor: RgbColor): RgbaImage {
+  const out = Buffer.from(image.data);
+  for (let i = 0; i < out.length; i += 4) {
+    const alpha = out[i + 3];
+    if (alpha === 0) {
+      continue;
+    }
+    out[i] = Math.round((out[i] * tintColor.r) / 255);
+    out[i + 1] = Math.round((out[i + 1] * tintColor.g) / 255);
+    out[i + 2] = Math.round((out[i + 2] * tintColor.b) / 255);
+  }
+  return {
+    width: image.width,
+    height: image.height,
+    data: out,
+  };
 }
 
 function projectModelPoint(x: number, y: number, z: number): { x: number; y: number } {
@@ -1581,6 +1710,7 @@ function drawTexturedTriangle(
   v0: ScreenVertex,
   v1: ScreenVertex,
   v2: ScreenVertex,
+  tintColor: RgbColor | null,
 ): void {
   const minX = Math.max(0, Math.floor(Math.min(v0.x, v1.x, v2.x)) - 1);
   const maxX = Math.min(target.width - 1, Math.ceil(Math.max(v0.x, v1.x, v2.x)) + 1);
@@ -1617,14 +1747,17 @@ function drawTexturedTriangle(
       if (alpha === 0) {
         continue;
       }
+      const tintedR = tintColor ? Math.round((sampled.r * tintColor.r) / 255) : sampled.r;
+      const tintedG = tintColor ? Math.round((sampled.g * tintColor.g) / 255) : sampled.g;
+      const tintedB = tintColor ? Math.round((sampled.b * tintColor.b) / 255) : sampled.b;
 
       const dstOffset = (py * target.width + px) * 4;
       alphaBlendPixel(
         target.data,
         dstOffset,
-        sampled.r,
-        sampled.g,
-        sampled.b,
+        tintedR,
+        tintedG,
+        tintedB,
         alpha,
       );
     }
@@ -1633,8 +1766,12 @@ function drawTexturedTriangle(
 
 async function renderTextureFromModel(
   modelRef: string,
+  tintPalette: Array<RgbColor | null>,
 ): Promise<{ textureRef: string; bytes: Buffer } | null> {
-  const cached = renderedModelTextureCache.get(modelRef);
+  const renderKey = `${modelRef}|${
+    tintPalette.map((color) => (color ? `${color.r},${color.g},${color.b}` : "null")).join(";")
+  }`;
+  const cached = renderedModelTextureCache.get(renderKey);
   if (cached) {
     return cached;
   }
@@ -1650,6 +1787,7 @@ async function renderTextureFromModel(
       uvCorners: Array<{ u: number; v: number }>;
       textureRef: string;
       depth: number;
+      tintColor: RgbColor | null;
     }> = [];
     const viewDirection = normalizeVec3(
       MODEL_RENDER_VIEW === "back"
@@ -1726,6 +1864,7 @@ async function renderTextureFromModel(
           uvCorners,
           textureRef,
           depth,
+          tintColor: face.tintIndex === null ? null : (tintPalette[face.tintIndex] ?? null),
         });
       }
     }
@@ -1777,8 +1916,22 @@ async function renderTextureFromModel(
         { ...mapped[3], u: face.uvCorners[3].u, v: face.uvCorners[3].v },
       ];
 
-      drawTexturedTriangle(output, texture, vertices[0], vertices[1], vertices[2]);
-      drawTexturedTriangle(output, texture, vertices[0], vertices[2], vertices[3]);
+      drawTexturedTriangle(
+        output,
+        texture,
+        vertices[0],
+        vertices[1],
+        vertices[2],
+        face.tintColor,
+      );
+      drawTexturedTriangle(
+        output,
+        texture,
+        vertices[0],
+        vertices[2],
+        vertices[3],
+        face.tintColor,
+      );
     }
 
     let hasOpaquePixel = false;
@@ -1804,7 +1957,7 @@ async function renderTextureFromModel(
     };
   })();
 
-  renderedModelTextureCache.set(modelRef, promise);
+  renderedModelTextureCache.set(renderKey, promise);
   return promise;
 }
 
@@ -1817,15 +1970,29 @@ async function resolveItemTexture(
   const candidates = dedupeCandidates(rawCandidates);
 
   for (const candidate of candidates) {
+    const tintPalette = await resolveTintPalette(candidate.tintDefs);
+    const primaryTint = tintPalette[0] ?? null;
+
     if (candidate.kind === "texture") {
       const bytes = await readTextureBuffer(candidate.ref);
       if (bytes) {
-        return { textureRef: candidate.ref, sourceModel: null, bytes };
+        if (!primaryTint) {
+          return { textureRef: candidate.ref, sourceModel: null, bytes };
+        }
+        const textureImage = decodePngToRgbaImage(bytes);
+        if (!textureImage) {
+          return { textureRef: candidate.ref, sourceModel: null, bytes };
+        }
+        return {
+          textureRef: candidate.ref,
+          sourceModel: null,
+          bytes: encodeRgbaImageToPng(applyTintToImage(textureImage, primaryTint)),
+        };
       }
       continue;
     }
 
-    const rendered = await renderTextureFromModel(candidate.ref);
+    const rendered = await renderTextureFromModel(candidate.ref, tintPalette);
     if (rendered) {
       return {
         textureRef: rendered.textureRef,
@@ -1841,10 +2008,25 @@ async function resolveItemTexture(
 
     const bytes = await readTextureBuffer(resolvedTexture);
     if (bytes) {
+      if (!primaryTint) {
+        return {
+          textureRef: resolvedTexture,
+          sourceModel: candidate.ref,
+          bytes,
+        };
+      }
+      const textureImage = decodePngToRgbaImage(bytes);
+      if (!textureImage) {
+        return {
+          textureRef: resolvedTexture,
+          sourceModel: candidate.ref,
+          bytes,
+        };
+      }
       return {
         textureRef: resolvedTexture,
         sourceModel: candidate.ref,
-        bytes,
+        bytes: encodeRgbaImageToPng(applyTintToImage(textureImage, primaryTint)),
       };
     }
   }
