@@ -164,6 +164,7 @@ export function ItemLibraryPanel({
                           width={22}
                           height={22}
                           className="pointer-events-none"
+                          style={{ imageRendering: "pixelated" }}
                           draggable={false}
                           unoptimized
                         />

@@ -104,7 +104,7 @@ const ITEMS_DIRECTORY_ASSET_PATH = "assets/minecraft/items";
 const OUTPUT_ROOT = path.resolve(process.cwd(), "public/items");
 const OUTPUT_TEXTURE_ROOT = path.join(OUTPUT_ROOT, "textures");
 const OUTPUT_INDEX_PATH = path.join(OUTPUT_ROOT, "items.json");
-const MODEL_RENDER_SIZE = Number(process.env.ITEMFETCH_MODEL_RENDER_SIZE ?? "128");
+const MODEL_RENDER_SIZE = Number(process.env.ITEMFETCH_MODEL_RENDER_SIZE ?? "64");
 const MODEL_RENDER_SUPERSAMPLE = Math.max(
   1,
   Number(process.env.ITEMFETCH_MODEL_RENDER_SUPERSAMPLE ?? "2"),

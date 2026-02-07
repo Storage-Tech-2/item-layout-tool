@@ -458,6 +458,7 @@ export function LayoutViewport({
             width={22}
             height={22}
             className="pointer-events-none relative z-[1]"
+            style={{ imageRendering: "pixelated" }}
             draggable={false}
             unoptimized
           />
@@ -471,6 +472,7 @@ export function LayoutViewport({
             className={`pointer-events-none absolute inset-0 z-[2] m-auto ${
               showAssignedItem ? "opacity-40" : "opacity-[0.72]"
             }`}
+            style={{ imageRendering: "pixelated" }}
             draggable={false}
             unoptimized
           />
@@ -666,6 +668,7 @@ export function LayoutViewport({
                               alt={item.id}
                               width={16}
                               height={16}
+                              style={{ imageRendering: "pixelated" }}
                               draggable={false}
                               unoptimized
                             />
