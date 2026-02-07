@@ -43,6 +43,56 @@ export function startsWithVariantPrefix(
   return null;
 }
 
+type CustomCategoryMatch = {
+  id: string;
+  label: string;
+  dragLabel: string;
+};
+
+function matchCustomMaterialCategory(itemId: string): CustomCategoryMatch | null {
+  if (/(^|_)nether_brick(s)?($|_)/.test(itemId)) {
+    return {
+      id: "collection:nether_bricks",
+      label: "Nether Brick",
+      dragLabel: "nether brick set",
+    };
+  }
+
+  if (/(^|_)sandstone($|_)/.test(itemId)) {
+    return {
+      id: "collection:sandstone",
+      label: "Sandstone",
+      dragLabel: "sandstone set",
+    };
+  }
+
+  if (/(^|_)ice($|_)/.test(itemId)) {
+    return {
+      id: "collection:ice",
+      label: "Ice",
+      dragLabel: "ice set",
+    };
+  }
+
+  // if (/(^|_)bamboo($|_)/.test(itemId)) {
+  //   return {
+  //     id: "collection:bamboo",
+  //     label: "Bamboo",
+  //     dragLabel: "bamboo set",
+  //   };
+  // }
+
+  if (/(^|_)copper($|_)/.test(itemId)) {
+    return {
+      id: "collection:copper",
+      label: "Copper",
+      dragLabel: "copper set",
+    };
+  }
+
+  return null;
+}
+
 export function nonMisSlotId(
   hallId: HallId,
   slice: number,
@@ -181,6 +231,21 @@ export function buildCategories(items: CatalogItem[]): Category[] {
   const groupedItemIds = new Set<string>();
 
   for (const item of items) {
+    const customCategory = matchCustomMaterialCategory(item.id);
+    if (customCategory) {
+      if (!grouped.has(customCategory.id)) {
+        grouped.set(customCategory.id, {
+          label: customCategory.label,
+          dragLabel: customCategory.dragLabel,
+          items: [],
+          sortMode: "alpha",
+        });
+      }
+      grouped.get(customCategory.id)?.items.push(item);
+      groupedItemIds.add(item.id);
+      continue;
+    }
+
     const colorPrefix = startsWithVariantPrefix(item.id, COLOR_PREFIXES);
     if (colorPrefix) {
       const base = item.id.slice(colorPrefix.length + 1);
@@ -215,20 +280,6 @@ export function buildCategories(items: CatalogItem[]): Category[] {
       continue;
     }
 
-    if (item.id.endsWith("_spawn_egg")) {
-      const key = "collection:spawn_eggs";
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          label: "Spawn Eggs",
-          dragLabel: "spawn eggs",
-          items: [],
-          sortMode: "alpha",
-        });
-      }
-      grouped.get(key)?.items.push(item);
-      groupedItemIds.add(item.id);
-      continue;
-    }
   }
 
   const categories: Category[] = [];
@@ -258,28 +309,28 @@ export function buildCategories(items: CatalogItem[]): Category[] {
     });
   }
 
-  const singlesByLetter = new Map<string, CatalogItem[]>();
+  const singlesByCreativeTab = new Map<string, CatalogItem[]>();
   for (const item of items) {
     if (groupedItemIds.has(item.id)) {
       continue;
     }
 
-    const letter = item.id.charAt(0).toUpperCase();
-    const bucket = /^[A-Z]$/.test(letter) ? letter : "#";
-    if (!singlesByLetter.has(bucket)) {
-      singlesByLetter.set(bucket, []);
+    const primaryCreativeTab = item.creativeTabs[0] ?? "uncategorized";
+    if (!singlesByCreativeTab.has(primaryCreativeTab)) {
+      singlesByCreativeTab.set(primaryCreativeTab, []);
     }
-    singlesByLetter.get(bucket)?.push(item);
+    singlesByCreativeTab.get(primaryCreativeTab)?.push(item);
   }
 
   const singleCategories: Category[] = [];
-  for (const [letter, letterItems] of singlesByLetter.entries()) {
-    letterItems.sort((a, b) => a.id.localeCompare(b.id));
+  for (const [tabId, tabItems] of singlesByCreativeTab.entries()) {
+    tabItems.sort((a, b) => a.id.localeCompare(b.id));
+    const tabLabel = tabId === "uncategorized" ? "Uncategorized" : toTitle(tabId);
     singleCategories.push({
-      id: `letter:${letter}`,
-      label: `Other ${letter}`,
-      items: letterItems,
-      dragLabel: `Other ${letter}`,
+      id: `tab:${tabId}`,
+      label: tabLabel,
+      items: tabItems,
+      dragLabel: tabLabel,
     });
   }
 

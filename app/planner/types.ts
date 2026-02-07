@@ -15,11 +15,15 @@ export type HallConfig = {
 export type CatalogItem = {
   id: string;
   texturePath: string;
+  creativeTabs: string[];
 };
 
 export type RawCatalogItem = {
   id: string;
   texturePath: string | null;
+  maxStackSize?: unknown;
+  blockLoot?: unknown;
+  creativeTabs?: unknown;
 };
 
 export type CatalogResponse = {
