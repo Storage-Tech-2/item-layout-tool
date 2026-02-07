@@ -1,0 +1,63 @@
+export type VersionManifestList = {
+  latest: {
+    release: string;
+    snapshot: string;
+  };
+  versions: VersionListEntry[];
+};
+
+export type VersionListEntry = {
+  id: string;
+  url: string;
+  releaseTime: string;
+  type: string;
+  sha1: string;
+};
+
+export type DownloadEntry = {
+  url: string;
+  sha1?: string;
+};
+
+export type VersionManifest = {
+  id?: string;
+  downloads?: Record<string, DownloadEntry>;
+};
+
+export type BlockLootBehavior = {
+  behavior: "default" | "no_loot_table" | "override_loot_table";
+  noLootTable: boolean;
+  overrideLootTable: string | null;
+  overrideLootSourceBlock: string | null;
+  propertiesExpression: string | null;
+  helperMethod: string | null;
+  copyFrom: string | null;
+};
+
+export type ParsedBlock = {
+  fieldName: string;
+  id: string;
+  loot: BlockLootBehavior;
+};
+
+export type ParsedItem = {
+  fieldName: string;
+  id: string;
+  registration: "block" | "item" | "spawn_egg" | "other";
+  blockField: string | null;
+  itemFactory: string | null;
+  propertiesExpression: string | null;
+  maxStackSize: number;
+  maxDamage: number | null;
+  rarity: string | null;
+  fireResistant: boolean;
+  foodReference: string | null;
+  propertyCalls: Array<{ name: string; args: string[] }>;
+  blockLoot: BlockLootBehavior | null;
+};
+
+export type LoadedJavaSources = {
+  itemsJavaSource: string;
+  blocksJavaSource: string;
+  sourceInfo: Record<string, unknown>;
+};

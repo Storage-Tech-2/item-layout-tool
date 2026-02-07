@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "fetch:items": "node --experimental-strip-types itemfetch/fetch-items.ts"
+    "fetch:items": "tsx itemfetch/fetch-items.ts",
+    "fetch:item-code": "tsx itemfetch/fetch-item-code.ts"
   },
   "dependencies": {
+    "tsx": "^4.20.5",
     "next": "^16.1.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"

@@ -357,9 +357,7 @@ export function LayoutViewport({
     const preview = previewBySlot.get(slotId);
     const previewItemId = preview?.itemId;
     const previewItem = previewItemId ? itemById.get(previewItemId) : undefined;
-    const allowPreviewOnDraggedSource = preview?.kind === "swap";
-    const showPreviewItem =
-      Boolean(previewItem) && (!isDraggedSource || allowPreviewOnDraggedSource);
+    const showPreviewItem = Boolean(previewItem);
     const isDropTarget = showPreviewItem;
     const isSwapPreview = preview?.kind === "swap";
     const showAssignedItem = Boolean(assignedItem) && !showPreviewItem && !isDraggedSource;
