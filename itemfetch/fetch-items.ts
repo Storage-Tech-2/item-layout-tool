@@ -29,30 +29,23 @@ type OutputItem = {
   sourceTexture: string | null;
   sourceModel: string | null;
   registration: ParsedItem["registration"] | null;
-  blockField: string | null;
-  itemFactory: string | null;
-  propertiesExpression: string | null;
   maxStackSize: number | null;
   maxDamage: number | null;
   rarity: string | null;
   fireResistant: boolean | null;
-  foodReference: string | null;
   creativeTabs: string[];
   food: {
     id: string;
-    fieldName: string;
-    reference: string;
     nutrition: number | null;
     saturationModifier: number | null;
     alwaysEdible: boolean;
-    usingConvertsTo: string | null;
-    effects: Array<{
-      effect: string;
-      probability: number | null;
-    }>;
+    effectCount: number;
   } | null;
-  propertyCalls: Array<{ name: string; args: string[] }>;
-  blockLoot: BlockLootBehavior | null;
+  blockLoot: {
+    behavior: BlockLootBehavior["behavior"];
+    noLootTable: boolean;
+    overrideLootSourceBlock: string | null;
+  } | null;
 };
 
 type ParsedPng = {
@@ -981,29 +974,27 @@ function toOutputItem(
     sourceTexture: texture.sourceTexture,
     sourceModel: texture.sourceModel,
     registration: parsedItem?.registration ?? null,
-    blockField: parsedItem?.blockField ?? null,
-    itemFactory: parsedItem?.itemFactory ?? null,
-    propertiesExpression: parsedItem?.propertiesExpression ?? null,
     maxStackSize: parsedItem?.maxStackSize ?? null,
     maxDamage: parsedItem?.maxDamage ?? null,
     rarity: parsedItem?.rarity ?? null,
     fireResistant: parsedItem?.fireResistant ?? null,
-    foodReference: parsedItem?.foodReference ?? null,
     creativeTabs,
     food: parsedFood
       ? {
           id: parsedFood.id,
-          fieldName: parsedFood.fieldName,
-          reference: parsedFood.reference,
           nutrition: parsedFood.nutrition,
           saturationModifier: parsedFood.saturationModifier,
           alwaysEdible: parsedFood.alwaysEdible,
-          usingConvertsTo: parsedFood.usingConvertsTo,
-          effects: parsedFood.effects,
+          effectCount: parsedFood.effects.length,
         }
       : null,
-    propertyCalls: parsedItem?.propertyCalls ?? [],
-    blockLoot: parsedItem?.blockLoot ?? null,
+    blockLoot: parsedItem?.blockLoot
+      ? {
+          behavior: parsedItem.blockLoot.behavior,
+          noLootTable: parsedItem.blockLoot.noLootTable,
+          overrideLootSourceBlock: parsedItem.blockLoot.overrideLootSourceBlock,
+        }
+      : null,
   };
 }
 
@@ -1045,6 +1036,32 @@ function resolveParsedFood(
   }
 
   return null;
+}
+
+function omitNullOrFalseProperties(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => omitNullOrFalseProperties(entry));
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    if (raw === null || raw === false) {
+      continue;
+    }
+
+    const nested = omitNullOrFalseProperties(raw);
+    if (nested === null || nested === false) {
+      continue;
+    }
+
+    cleaned[key] = nested;
+  }
+
+  return cleaned;
 }
 
 async function main(): Promise<void> {
@@ -1170,13 +1187,6 @@ async function main(): Promise<void> {
 
   const output = {
     generatedAt: new Date().toISOString(),
-    source: {
-      ...sourceInfo,
-      mode: "official-jar",
-      assetRoot: activeAssetsRoot,
-      itemIndexAssetPath: ITEM_INDEX_ASSET_PATH,
-      itemDefinitionsDirectoryAssetPath: ITEMS_DIRECTORY_ASSET_PATH,
-    },
     counts: {
       itemCount: itemIds.length,
       texturedItemCount: texturedCount,
@@ -1189,7 +1199,7 @@ async function main(): Promise<void> {
         (block) => block.loot.overrideLootTable !== null,
       ).length,
       foodDefinitionCount: parsedFoods.length,
-      itemsWithFoodReferenceCount: outputItems.filter((item) => item.foodReference !== null).length,
+      itemsWithFoodReferenceCount: parsedItems.filter((item) => item.foodReference !== null).length,
       itemsWithFoodDataCount: outputItems.filter((item) => item.food !== null).length,
       creativeTabCount: parsedCreativeTabs.length,
       creativeTabsWithItemsCount: parsedCreativeTabs.filter((tab) => tab.itemFields.length > 0)
@@ -1200,7 +1210,8 @@ async function main(): Promise<void> {
     items: outputItems,
   };
 
-  await writeFile(OUTPUT_INDEX_PATH, `${JSON.stringify(output, null, 2)}\n`, "utf8");
+  const cleanedOutput = omitNullOrFalseProperties(output);
+  await writeFile(OUTPUT_INDEX_PATH, `${JSON.stringify(cleanedOutput, null, 2)}\n`, "utf8");
 
   console.log(`Wrote ${OUTPUT_INDEX_PATH}`);
   console.log(`Wrote ${texturedCount} textures to ${OUTPUT_TEXTURE_ROOT}`);
