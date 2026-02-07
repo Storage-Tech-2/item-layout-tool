@@ -134,6 +134,14 @@ function matchCustomMaterialCategory(itemId: string): CustomCategoryMatch | null
   return null;
 }
 
+function resolvePrimaryCreativeTab(item: CatalogItem): string {
+  if (item.id.endsWith("sculk_sensor") && item.creativeTabs.includes("redstone_blocks")) {
+    return "redstone_blocks";
+  }
+
+  return item.creativeTabs[0] ?? "uncategorized";
+}
+
 export function nonMisSlotId(
   hallId: HallId,
   slice: number,
@@ -359,7 +367,7 @@ export function buildCategories(items: CatalogItem[]): Category[] {
       continue;
     }
 
-    const primaryCreativeTab = item.creativeTabs[0] ?? "uncategorized";
+    const primaryCreativeTab = resolvePrimaryCreativeTab(item);
     if (!singlesByCreativeTab.has(primaryCreativeTab)) {
       singlesByCreativeTab.set(primaryCreativeTab, []);
     }
