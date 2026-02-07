@@ -215,6 +215,7 @@ export function LayoutViewport({
     const previewItem = previewItemId ? itemById.get(previewItemId) : undefined;
     const isDropTarget = Boolean(previewItem);
     const isSwapPreview = preview?.kind === "swap";
+    const showAssignedItem = Boolean(assignedItem) && !previewItem;
     const isSelected = selectedSlotIds.has(slotId) && Boolean(assignedItem);
 
     return (
@@ -274,7 +275,7 @@ export function LayoutViewport({
             : "Drop item here"
         }
       >
-        {assignedItem ? (
+        {showAssignedItem && assignedItem ? (
           <Image
             src={assignedItem.texturePath}
             alt={assignedItem.id}
@@ -292,19 +293,11 @@ export function LayoutViewport({
             width={22}
             height={22}
             className={`pointer-events-none absolute inset-0 z-[2] m-auto ${
-              assignedItem ? "opacity-40" : "opacity-[0.55]"
+              showAssignedItem ? "opacity-40" : "opacity-[0.72]"
             }`}
-            style={{
-              filter: isSwapPreview
-                ? "sepia(1) saturate(2.2) hue-rotate(-18deg)"
-                : undefined,
-            }}
             draggable={false}
             unoptimized
           />
-        ) : null}
-        {previewItem && isSwapPreview ? (
-          <div className="pointer-events-none absolute inset-0 z-[3] bg-[rgba(245,158,11,0.28)]" />
         ) : null}
       </button>
     );
