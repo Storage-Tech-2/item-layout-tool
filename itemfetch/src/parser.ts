@@ -1074,6 +1074,18 @@ function computeItemProperties(calls: MethodCall[]): {
   };
 }
 
+function isUnstackableItemFactory(itemFactory: string | null): boolean {
+  if (!itemFactory) {
+    return false;
+  }
+
+  // Some tools are created via factory lambdas without explicit properties chains.
+  // Example: "(Item.Properties p) -> new AxeItem(..., p)"
+  return /new\s+(?:[A-Za-z0-9_$.]+\.)?(?:AxeItem|HoeItem|ShovelItem)\s*\(/.test(
+    itemFactory,
+  );
+}
+
 export function parseItems(itemsSource: string, blockMap: Map<string, ParsedBlock>): ParsedItem[] {
   const fields = extractStaticFieldInitializers(itemsSource, "Item");
   const items: ParsedItem[] = [];
@@ -1125,6 +1137,9 @@ export function parseItems(itemsSource: string, blockMap: Map<string, ParsedBloc
 
     const propertyCalls = propertiesExpression ? extractMethodCalls(propertiesExpression) : [];
     const computedProperties = computeItemProperties(propertyCalls);
+    if (isUnstackableItemFactory(itemFactory) && computedProperties.maxStackSize > 1) {
+      computedProperties.maxStackSize = 1;
+    }
     const blockLoot = blockField ? blockMap.get(blockField)?.loot ?? null : null;
 
     items.push({

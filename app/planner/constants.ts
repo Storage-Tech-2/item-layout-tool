@@ -109,13 +109,10 @@ export const WOOD_PREFIXES = [
   "spruce",
   "jungle",
   "cherry",
-  "bamboo",
   "crimson",
   "warped",
   "birch",
   "oak",
-  "bamboo_mosaic",
-  "bamboo",
 ] as const;
 
 export const COLOR_INDEX = new Map<string, number>(

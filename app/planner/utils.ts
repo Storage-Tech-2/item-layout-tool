@@ -35,8 +35,9 @@ export function startsWithVariantPrefix(
   id: string,
   prefixes: readonly string[],
 ): string | null {
-  for (const prefix of prefixes) {
-    if (id.startsWith(`${prefix}_`)) {
+  const ordered = [...prefixes].sort((a, b) => b.length - a.length);
+  for (const prefix of ordered) {
+    if (id === prefix || id.startsWith(`${prefix}_`)) {
       return prefix;
     }
   }
@@ -74,19 +75,59 @@ function matchCustomMaterialCategory(itemId: string): CustomCategoryMatch | null
     };
   }
 
-  // if (/(^|_)bamboo($|_)/.test(itemId)) {
-  //   return {
-  //     id: "collection:bamboo",
-  //     label: "Bamboo",
-  //     dragLabel: "bamboo set",
-  //   };
-  // }
+  if (/(^|_)bamboo($|_)/.test(itemId)) {
+    return {
+      id: "collection:bamboo",
+      label: "Bamboo",
+      dragLabel: "bamboo set",
+    };
+  }
 
   if (/(^|_)copper($|_)/.test(itemId)) {
     return {
       id: "collection:copper",
       label: "Copper",
       dragLabel: "copper set",
+    };
+  }
+
+  if (/(^|_)ore(s)?($|_)/.test(itemId)) {
+    return {
+      id: "collection:ores",
+      label: "Ore",
+      dragLabel: "ore set",
+    };
+  }
+
+  if (/(^|_)dead_.*coral(s)?($|_)/.test(itemId)) {
+    return {
+      id: "collection:dead_coral",
+      label: "Dead Coral",
+      dragLabel: "dead coral set",
+    };
+  }
+
+  if (/(^|_)coral(s)?($|_)/.test(itemId)) {
+    return {
+      id: "collection:coral",
+      label: "Coral",
+      dragLabel: "coral set",
+    };
+  }
+
+  if (/(^|_)flowering_azalea($|_)/.test(itemId)) {
+    return {
+      id: "collection:flowering_azalea",
+      label: "Flowering Azalea",
+      dragLabel: "flowering azalea set",
+    };
+  }
+
+  if (/(^|_)azalea($|_)/.test(itemId)) {
+    return {
+      id: "collection:azalea",
+      label: "Azalea",
+      dragLabel: "azalea set",
     };
   }
 
@@ -267,10 +308,13 @@ export function buildCategories(items: CatalogItem[]): Category[] {
     if (woodPrefix) {
       const base = item.id.slice(woodPrefix.length + 1);
       const key = `wood:${base}`;
+      const baseTitle = toTitle(base);
+      const label = baseTitle === "Wood" ? "Wood Variants" : `${baseTitle} Wood Variants`;
+      const dragLabel = baseTitle === "Wood" ? "wood set" : `${baseTitle.toLowerCase()} wood set`;
       if (!grouped.has(key)) {
         grouped.set(key, {
-          label: `${toTitle(base)} Wood Variants`,
-          dragLabel: `${toTitle(base)} wood set`,
+          label,
+          dragLabel,
           items: [],
           sortMode: "wood",
         });
