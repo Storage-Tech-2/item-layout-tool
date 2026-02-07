@@ -62,6 +62,45 @@ type LayoutViewportProps = {
   onSelectionChange: (slotIds: string[]) => void;
 };
 
+type DeferredNumberInputProps = {
+  value: number;
+  min: number;
+  max: number;
+  className: string;
+  onCommit: (value: string) => void;
+};
+
+function DeferredNumberInput({
+  value,
+  min,
+  max,
+  className,
+  onCommit,
+}: DeferredNumberInputProps) {
+  const [draftValue, setDraftValue] = useState(String(value));
+
+  useEffect(() => {
+    setDraftValue(String(value));
+  }, [value]);
+
+  return (
+    <input
+      className={className}
+      type="number"
+      min={min}
+      max={max}
+      value={draftValue}
+      onChange={(event) => setDraftValue(event.target.value)}
+      onBlur={() => onCommit(draftValue)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
 export function LayoutViewport({
   hallConfigs,
   slotAssignments,
@@ -887,39 +926,36 @@ export function LayoutViewport({
                     </select>
                     <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
                       <span>S</span>
-                      <input
+                      <DeferredNumberInput
                         className="w-[2.2rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
-                        type="number"
                         min={1}
                         max={200}
                         value={hall.slices}
-                        onChange={(event) => onHallSlicesChange(hallId, event.target.value)}
+                        onCommit={(nextValue) => onHallSlicesChange(hallId, nextValue)}
                       />
                     </label>
                     {hall.type === "mis" ? (
                       <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
                         <span>C</span>
-                        <input
+                        <DeferredNumberInput
                           className="w-[2.55rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
-                          type="number"
                           min={1}
                           max={54}
                           value={hall.misSlotsPerSlice}
-                          onChange={(event) =>
-                            onHallMisCapacityChange(hallId, event.target.value)
+                          onCommit={(nextValue) =>
+                            onHallMisCapacityChange(hallId, nextValue)
                           }
                         />
                       </label>
                     ) : (
                       <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
                         <span>R</span>
-                        <input
+                        <DeferredNumberInput
                           className="w-[2rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
-                          type="number"
                           min={1}
                           max={9}
                           value={hall.rowsPerSide}
-                          onChange={(event) => onHallRowsChange(hallId, event.target.value)}
+                          onCommit={(nextValue) => onHallRowsChange(hallId, nextValue)}
                         />
                       </label>
                     )}

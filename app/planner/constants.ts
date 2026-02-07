@@ -64,7 +64,7 @@ export const DEFAULT_HALLS: Record<HallId, HallConfig> = {
 export const DRAG_DATA_KEY = "application/x-item-layout";
 
 export const STAGE_SIZE = 2200;
-export const CORE_SIZE = 170;
+export const CORE_SIZE = 250;
 export const HALL_GAP = 42;
 export const SLOT_SIZE = 34;
 export const SLOT_GAP = 4;
