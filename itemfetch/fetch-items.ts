@@ -1,6 +1,10 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
+import { parseBlocks, parseItems } from "./src/parser";
+import { loadJavaSources } from "./src/source-loader";
+import type { BlockLootBehavior, ParsedItem } from "./src/types";
+import { pathExists, runExec } from "./src/utils";
 
 type ItemIndex = Record<string, Record<string, unknown>>;
 
@@ -19,6 +23,17 @@ type OutputItem = {
   texturePath: string | null;
   sourceTexture: string | null;
   sourceModel: string | null;
+  registration: ParsedItem["registration"] | null;
+  blockField: string | null;
+  itemFactory: string | null;
+  propertiesExpression: string | null;
+  maxStackSize: number | null;
+  maxDamage: number | null;
+  rarity: string | null;
+  fireResistant: boolean | null;
+  foodReference: string | null;
+  propertyCalls: Array<{ name: string; args: string[] }>;
+  blockLoot: BlockLootBehavior | null;
 };
 
 type ParsedPng = {
@@ -41,14 +56,13 @@ type AnimationMeta = {
   };
 };
 
-const SOURCE_REPOSITORY = "InventivetalentDev/minecraft-assets";
-const SOURCE_REF = process.env.MINECRAFT_ASSETS_REF ?? "1.21.11";
-const RAW_BASE_URL = `https://raw.githubusercontent.com/${SOURCE_REPOSITORY}/${SOURCE_REF}`;
-const LOCAL_ASSETS_ROOT = process.env.MINECRAFT_ASSETS_LOCAL_DIR
-  ? path.resolve(process.cwd(), process.env.MINECRAFT_ASSETS_LOCAL_DIR)
+const LOCAL_ASSETS_ROOT_OVERRIDE = process.env.ITEMFETCH_ASSETS_LOCAL_DIR
+  ? path.resolve(process.cwd(), process.env.ITEMFETCH_ASSETS_LOCAL_DIR)
   : null;
+let activeAssetsRoot: string | null = LOCAL_ASSETS_ROOT_OVERRIDE;
 
 const ITEM_INDEX_ASSET_PATH = "assets/minecraft/items/_all.json";
+const ITEMS_DIRECTORY_ASSET_PATH = "assets/minecraft/items";
 
 const OUTPUT_ROOT = path.resolve(process.cwd(), "public/items");
 const OUTPUT_TEXTURE_ROOT = path.join(OUTPUT_ROOT, "textures");
@@ -131,61 +145,39 @@ function textureRefToAssetPath(textureRef: string): string {
 }
 
 async function readTextAssetOptional(assetPath: string): Promise<string | null> {
-  if (LOCAL_ASSETS_ROOT) {
-    const absolutePath = path.join(LOCAL_ASSETS_ROOT, assetPath);
-    try {
-      return await readFile(absolutePath, "utf8");
-    } catch (error) {
-      if (error && typeof error === "object" && "code" in error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          return null;
-        }
+  if (!activeAssetsRoot) {
+    throw new Error("Asset root is not initialized");
+  }
+
+  const absolutePath = path.join(activeAssetsRoot, assetPath);
+  try {
+    return await readFile(absolutePath, "utf8");
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return null;
       }
-      throw error;
     }
+    throw error;
   }
-
-  const response = await fetch(`${RAW_BASE_URL}/${assetPath}`);
-  if (response.status === 404) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch ${assetPath} (${response.status} ${response.statusText})`,
-    );
-  }
-
-  return response.text();
 }
 
 async function readBinaryAssetOptional(assetPath: string): Promise<Buffer | null> {
-  if (LOCAL_ASSETS_ROOT) {
-    const absolutePath = path.join(LOCAL_ASSETS_ROOT, assetPath);
-    try {
-      return await readFile(absolutePath);
-    } catch (error) {
-      if (error && typeof error === "object" && "code" in error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-          return null;
-        }
+  if (!activeAssetsRoot) {
+    throw new Error("Asset root is not initialized");
+  }
+
+  const absolutePath = path.join(activeAssetsRoot, assetPath);
+  try {
+    return await readFile(absolutePath);
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return null;
       }
-      throw error;
     }
+    throw error;
   }
-
-  const response = await fetch(`${RAW_BASE_URL}/${assetPath}`);
-  if (response.status === 404) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch ${assetPath} (${response.status} ${response.statusText})`,
-    );
-  }
-
-  return Buffer.from(await response.arrayBuffer());
 }
 
 async function readRequiredTextAsset(assetPath: string): Promise<string> {
@@ -613,12 +605,43 @@ async function normalizeTextureBytes(textureRef: string, textureBytes: Buffer): 
 }
 
 async function fetchItemIndex(): Promise<ItemIndex> {
-  const raw = await readRequiredTextAsset(ITEM_INDEX_ASSET_PATH);
-  const parsed: unknown = JSON.parse(raw);
-  if (!isRecord(parsed)) {
-    throw new Error("Item index did not decode to an object");
+  const aggregatedRaw = await readTextAssetOptional(ITEM_INDEX_ASSET_PATH);
+  if (aggregatedRaw !== null) {
+    const parsed: unknown = JSON.parse(aggregatedRaw);
+    if (!isRecord(parsed)) {
+      throw new Error("Item index did not decode to an object");
+    }
+    return parsed as ItemIndex;
   }
-  return parsed as ItemIndex;
+
+  if (!activeAssetsRoot) {
+    throw new Error("Asset root is not initialized");
+  }
+
+  const itemsDirectoryPath = path.join(activeAssetsRoot, ITEMS_DIRECTORY_ASSET_PATH);
+  const entries = await readdir(itemsDirectoryPath, { withFileTypes: true });
+
+  const itemIndex: ItemIndex = {};
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) {
+      continue;
+    }
+
+    const itemId = entry.name.slice(0, -".json".length);
+    const jsonPath = path.join(ITEMS_DIRECTORY_ASSET_PATH, entry.name);
+    const raw = await readRequiredTextAsset(jsonPath);
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) {
+      continue;
+    }
+    itemIndex[itemId] = parsed;
+  }
+
+  if (Object.keys(itemIndex).length === 0) {
+    throw new Error(`No item definitions were found in ${itemsDirectoryPath}`);
+  }
+
+  return itemIndex;
 }
 
 function collectCandidates(node: unknown, out: Candidate[]): void {
@@ -899,15 +922,83 @@ async function mapWithConcurrency<T>(
   );
 }
 
+async function ensureAssetsExtractedFromJar(
+  jarPath: string,
+  cacheVersionRoot: string,
+): Promise<string> {
+  const assetsRoot = path.join(cacheVersionRoot, "assets-extracted");
+  const extractedItemsDirectoryPath = path.join(assetsRoot, ITEMS_DIRECTORY_ASSET_PATH);
+
+  if (await pathExists(extractedItemsDirectoryPath)) {
+    return assetsRoot;
+  }
+
+  await mkdir(assetsRoot, { recursive: true });
+  console.log(`Extracting assets/ from ${jarPath}...`);
+  await runExec("jar", ["xf", jarPath, "assets"], {
+    cwd: assetsRoot,
+    maxBuffer: 256 * 1024 * 1024,
+  });
+
+  if (!(await pathExists(extractedItemsDirectoryPath))) {
+    throw new Error(
+      `Assets were extracted, but ${ITEMS_DIRECTORY_ASSET_PATH} was not found in ${assetsRoot}`,
+    );
+  }
+
+  return assetsRoot;
+}
+
+function toOutputItem(
+  itemId: string,
+  texture: { texturePath: string | null; sourceTexture: string | null; sourceModel: string | null },
+  parsedItem: ParsedItem | null,
+): OutputItem {
+  return {
+    id: itemId,
+    texturePath: texture.texturePath,
+    sourceTexture: texture.sourceTexture,
+    sourceModel: texture.sourceModel,
+    registration: parsedItem?.registration ?? null,
+    blockField: parsedItem?.blockField ?? null,
+    itemFactory: parsedItem?.itemFactory ?? null,
+    propertiesExpression: parsedItem?.propertiesExpression ?? null,
+    maxStackSize: parsedItem?.maxStackSize ?? null,
+    maxDamage: parsedItem?.maxDamage ?? null,
+    rarity: parsedItem?.rarity ?? null,
+    fireResistant: parsedItem?.fireResistant ?? null,
+    foodReference: parsedItem?.foodReference ?? null,
+    propertyCalls: parsedItem?.propertyCalls ?? [],
+    blockLoot: parsedItem?.blockLoot ?? null,
+  };
+}
+
 async function main(): Promise<void> {
-  console.log(
-    LOCAL_ASSETS_ROOT
-      ? `Using local asset source: ${LOCAL_ASSETS_ROOT}`
-      : `Fetching live assets from ${SOURCE_REPOSITORY}@${SOURCE_REF}`,
-  );
+  const { itemsJavaSource, blocksJavaSource, sourceInfo, jarPath, cacheVersionRoot } =
+    await loadJavaSources();
+
+  if (!activeAssetsRoot) {
+    if (!jarPath || !cacheVersionRoot) {
+      throw new Error(
+        "Jar-backed asset extraction requires decompiled source mode (local Java overrides are unsupported for fetch:items).",
+      );
+    }
+    activeAssetsRoot = await ensureAssetsExtractedFromJar(jarPath, cacheVersionRoot);
+  }
+
+  console.log(`Using local assets from ${activeAssetsRoot}`);
+
+  const parsedBlocks = parseBlocks(blocksJavaSource);
+  const blockMap = new Map(parsedBlocks.map((block) => [block.fieldName, block]));
+  const parsedItems = parseItems(itemsJavaSource, blockMap);
+  const parsedItemById = new Map(parsedItems.map((item) => [item.id, item]));
 
   const itemIndex = await fetchItemIndex();
-  let itemIds = Object.keys(itemIndex).sort();
+  const itemIdsSet = new Set<string>([
+    ...Object.keys(itemIndex),
+    ...parsedItemById.keys(),
+  ]);
+  let itemIds = Array.from(itemIdsSet).sort();
   if (ITEM_LIMIT > 0) {
     itemIds = itemIds.slice(0, ITEM_LIMIT);
   }
@@ -923,27 +1014,34 @@ async function main(): Promise<void> {
   let texturedCount = 0;
 
   await mapWithConcurrency(itemIds, CONCURRENCY, async (itemId, index) => {
-    const definition = itemIndex[itemId];
+    const definition = itemIndex[itemId] ?? {};
     const resolved = await resolveItemTexture(itemId, definition);
+    const parsedItem = parsedItemById.get(itemId) ?? null;
 
     if (resolved) {
       const textureFilename = `${itemId}.png`;
       await writeFile(path.join(OUTPUT_TEXTURE_ROOT, textureFilename), resolved.bytes);
 
-      outputItems[index] = {
-        id: itemId,
-        texturePath: `/items/textures/${textureFilename}`,
-        sourceTexture: resolved.textureRef,
-        sourceModel: resolved.sourceModel,
-      };
+      outputItems[index] = toOutputItem(
+        itemId,
+        {
+          texturePath: `/items/textures/${textureFilename}`,
+          sourceTexture: resolved.textureRef,
+          sourceModel: resolved.sourceModel,
+        },
+        parsedItem,
+      );
       texturedCount += 1;
     } else {
-      outputItems[index] = {
-        id: itemId,
-        texturePath: null,
-        sourceTexture: null,
-        sourceModel: null,
-      };
+      outputItems[index] = toOutputItem(
+        itemId,
+        {
+          texturePath: null,
+          sourceTexture: null,
+          sourceModel: null,
+        },
+        parsedItem,
+      );
       missingTextureItems.push(itemId);
     }
 
@@ -956,14 +1054,24 @@ async function main(): Promise<void> {
   const output = {
     generatedAt: new Date().toISOString(),
     source: {
-      repository: SOURCE_REPOSITORY,
-      ref: SOURCE_REF,
+      ...sourceInfo,
+      mode: "official-jar",
+      assetRoot: activeAssetsRoot,
       itemIndexAssetPath: ITEM_INDEX_ASSET_PATH,
-      mode: LOCAL_ASSETS_ROOT ? "local-test" : "live",
+      itemDefinitionsDirectoryAssetPath: ITEMS_DIRECTORY_ASSET_PATH,
     },
-    itemCount: itemIds.length,
-    texturedItemCount: texturedCount,
-    missingTextureItemCount: missingTextureItems.length,
+    counts: {
+      itemCount: itemIds.length,
+      texturedItemCount: texturedCount,
+      missingTextureItemCount: missingTextureItems.length,
+      codeItemCount: parsedItems.length,
+      itemsWithCodeDataCount: outputItems.filter((item) => item.registration !== null).length,
+      blockCount: parsedBlocks.length,
+      noLootTableBlockCount: parsedBlocks.filter((block) => block.loot.noLootTable).length,
+      overrideLootTableBlockCount: parsedBlocks.filter(
+        (block) => block.loot.overrideLootTable !== null,
+      ).length,
+    },
     items: outputItems,
   };
 

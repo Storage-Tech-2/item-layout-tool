@@ -7,8 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "fetch:items": "tsx itemfetch/fetch-items.ts",
-    "fetch:item-code": "tsx itemfetch/fetch-item-code.ts"
+    "fetch:items": "tsx itemfetch/fetch-items.ts"
   },
   "dependencies": {
     "tsx": "^4.20.5",

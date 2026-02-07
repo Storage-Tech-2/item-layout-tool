@@ -234,6 +234,9 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
     return {
       itemsJavaSource,
       blocksJavaSource,
+      jarPath: null,
+      cacheVersionRoot: null,
+      minecraftVersion: null,
       sourceInfo: {
         mode: "local-java",
         itemsJavaPath: LOCAL_ITEMS_JAVA_PATH,
@@ -276,6 +279,9 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
   return {
     itemsJavaSource: itemsResult.javaSource,
     blocksJavaSource: blocksResult.javaSource,
+    jarPath,
+    cacheVersionRoot: versionRoot,
+    minecraftVersion: versionSource.selectedVersion,
     sourceInfo: {
       mode: "decompiled",
       selectedVersion: versionSource.selectedVersion,

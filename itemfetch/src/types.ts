@@ -59,5 +59,8 @@ export type ParsedItem = {
 export type LoadedJavaSources = {
   itemsJavaSource: string;
   blocksJavaSource: string;
+  jarPath: string | null;
+  cacheVersionRoot: string | null;
+  minecraftVersion: string | null;
   sourceInfo: Record<string, unknown>;
 };
