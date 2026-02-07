@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "fetch:items": "node --experimental-strip-types itemfetch/fetch-items.ts"
   },
   "dependencies": {
     "next": "^16.1.6",
