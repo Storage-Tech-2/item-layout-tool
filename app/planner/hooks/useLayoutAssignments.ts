@@ -27,6 +27,7 @@ type UseLayoutAssignmentsResult = {
   activeSlotAssignments: Record<string, string>;
   usedItemIds: Set<string>;
   selectedSlotIdSet: Set<string>;
+  draggedSourceSlotIdSet: Set<string>;
   dragPreviews: PreviewPlacement[];
   clearLayout: () => void;
   clearDragState: () => void;
@@ -95,6 +96,26 @@ export function useLayoutAssignments({
   }, [activeSlotAssignments]);
 
   const selectedSlotIdSet = useMemo(() => new Set(selectedSlotIds), [selectedSlotIds]);
+  const draggedSourceSlotIdSet = useMemo(() => {
+    if (activeDragPayload?.source !== "layout") {
+      return new Set<string>();
+    }
+
+    const slotIds = activeDragPayload.sourceSlotIds ?? [];
+    if (slotIds.length === 0 && activeDragPayload.originSlotId) {
+      return orderedSlotIdSet.has(activeDragPayload.originSlotId)
+        ? new Set([activeDragPayload.originSlotId])
+        : new Set<string>();
+    }
+
+    const next = new Set<string>();
+    for (const slotId of slotIds) {
+      if (orderedSlotIdSet.has(slotId)) {
+        next.add(slotId);
+      }
+    }
+    return next;
+  }, [activeDragPayload, orderedSlotIdSet]);
 
   const selectedSlotsInOrder = useMemo(
     () =>
@@ -167,20 +188,10 @@ export function useLayoutAssignments({
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData(DRAG_DATA_KEY, JSON.stringify(payload));
     setActiveDragPayload(payload);
-
-    if (isMultiMove) {
-      setDragPreviews(
-        selectedSlotsInOrder.map((selectedSlotId, index) => ({
-          slotId: selectedSlotId,
-          itemId: selectedItemIds[index] ?? itemId,
-          kind: "place",
-        })),
-      );
-      return;
+    setDragPreviews([]);
+    if (!isMultiMove) {
+      setSelectedSlotIdsState([slotId]);
     }
-
-    setDragPreviews([{ slotId, itemId, kind: "place" }]);
-    setSelectedSlotIdsState([slotId]);
   }
 
   function buildPreviewSet(anchorSlotId: string, payload: DragPayload): PreviewPlacement[] {
@@ -394,6 +405,7 @@ export function useLayoutAssignments({
     activeSlotAssignments,
     usedItemIds,
     selectedSlotIdSet,
+    draggedSourceSlotIdSet,
     dragPreviews,
     clearLayout,
     clearDragState,

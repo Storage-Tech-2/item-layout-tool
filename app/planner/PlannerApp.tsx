@@ -23,6 +23,7 @@ export function PlannerApp() {
     activeSlotAssignments,
     usedItemIds,
     selectedSlotIdSet,
+    draggedSourceSlotIdSet,
     dragPreviews,
     clearLayout,
     clearDragState,
@@ -81,6 +82,7 @@ export function PlannerApp() {
           onSlotItemDragStart={beginSlotItemDrag}
           onAnyDragEnd={clearDragState}
           onClearSlot={clearSlot}
+          draggedSourceSlotIds={draggedSourceSlotIdSet}
           dragPreviewPlacements={dragPreviews}
           selectedSlotIds={selectedSlotIdSet}
           onSelectionChange={setSelectedSlotIds}

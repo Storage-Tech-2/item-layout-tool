@@ -44,6 +44,7 @@ type LayoutViewportProps = {
   ) => void;
   onAnyDragEnd: () => void;
   onClearSlot: (slotId: string) => void;
+  draggedSourceSlotIds: Set<string>;
   dragPreviewPlacements: PreviewPlacement[];
   selectedSlotIds: Set<string>;
   onSelectionChange: (slotIds: string[]) => void;
@@ -66,6 +67,7 @@ export function LayoutViewport({
   onSlotItemDragStart,
   onAnyDragEnd,
   onClearSlot,
+  draggedSourceSlotIds,
   dragPreviewPlacements,
   selectedSlotIds,
   onSelectionChange,
@@ -212,12 +214,16 @@ export function LayoutViewport({
   function renderSlot(slotId: string): ReactNode {
     const assignedItemId = slotAssignments[slotId];
     const assignedItem = assignedItemId ? itemById.get(assignedItemId) : undefined;
+    const isDraggedSource = draggedSourceSlotIds.has(slotId);
     const preview = previewBySlot.get(slotId);
     const previewItemId = preview?.itemId;
     const previewItem = previewItemId ? itemById.get(previewItemId) : undefined;
-    const isDropTarget = Boolean(previewItem);
+    const allowPreviewOnDraggedSource = preview?.kind === "swap";
+    const showPreviewItem =
+      Boolean(previewItem) && (!isDraggedSource || allowPreviewOnDraggedSource);
+    const isDropTarget = showPreviewItem;
     const isSwapPreview = preview?.kind === "swap";
-    const showAssignedItem = Boolean(assignedItem) && !previewItem;
+    const showAssignedItem = Boolean(assignedItem) && !showPreviewItem && !isDraggedSource;
     const isSelected = selectedSlotIds.has(slotId) && Boolean(assignedItem);
 
     return (
@@ -241,6 +247,11 @@ export function LayoutViewport({
         } ${isSelected ? "shadow-[0_0_0_2px_rgba(37,99,235,0.55)]" : ""}`}
         draggable={Boolean(assignedItem)}
         onPointerDown={(event) => {
+          if (event.shiftKey) {
+            event.preventDefault();
+            return;
+          }
+
           if (event.button === 2) {
             event.preventDefault();
             event.stopPropagation();
@@ -254,11 +265,33 @@ export function LayoutViewport({
           }
         }}
         onDragStart={(event) => {
-          if (!assignedItemId) {
+          if (event.shiftKey || !assignedItemId) {
             event.preventDefault();
             return;
           }
           onSlotItemDragStart(event, slotId, assignedItemId);
+        }}
+        onClick={(event) => {
+          if (event.shiftKey) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+
+          if (selectedSlotIds.size === 0) {
+            return;
+          }
+
+          if (isSelected) {
+            const nextSelection = Array.from(selectedSlotIds).filter(
+              (selectedSlotId) => selectedSlotId !== slotId,
+            );
+            onSelectionChange(nextSelection);
+          } else {
+            onSelectionChange([]);
+          }
+
+          event.stopPropagation();
         }}
         onDragEnd={onAnyDragEnd}
         onDragOver={(event) => {
@@ -292,7 +325,7 @@ export function LayoutViewport({
             unoptimized
           />
         ) : null}
-        {previewItem ? (
+        {showPreviewItem && previewItem ? (
           <Image
             src={previewItem.texturePath}
             alt={previewItem.id}
@@ -466,6 +499,24 @@ export function LayoutViewport({
       ref={viewportRef}
       className="relative min-h-0 flex-1 cursor-grab select-none overflow-hidden touch-none active:cursor-grabbing"
       style={viewportBackgroundStyle}
+      onClickCapture={(event) => {
+        if (event.shiftKey) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      }}
+      onClick={(event) => {
+        if (event.shiftKey || selectedSlotIds.size === 0) {
+          return;
+        }
+
+        const target = event.target as HTMLElement;
+        if (target.closest("[data-slot-id]")) {
+          return;
+        }
+
+        onSelectionChange([]);
+      }}
       onDragOver={(event) => {
         event.preventDefault();
       }}
@@ -479,7 +530,7 @@ export function LayoutViewport({
         }
 
         const target = event.target as HTMLElement;
-        if (target.closest("[data-slot]") || target.closest("[data-no-pan]")) {
+        if (target.closest("[data-no-pan]")) {
           return;
         }
 
