@@ -109,8 +109,7 @@ const MODEL_RENDER_SUPERSAMPLE = Math.max(
   1,
   Number(process.env.ITEMFETCH_MODEL_RENDER_SUPERSAMPLE ?? "2"),
 );
-const MODEL_RENDER_VIEW: ModelRenderView =
-  process.env.ITEMFETCH_MODEL_RENDER_VIEW === "back" ? "back" : "front";
+const MODEL_RENDER_VIEW: ModelRenderView = "back";
 
 const ITEM_LIMIT = Number(process.env.ITEMFETCH_LIMIT ?? "0");
 const CONCURRENCY = Number(process.env.ITEMFETCH_CONCURRENCY ?? "24");
@@ -1333,6 +1332,60 @@ type ScreenVertex = {
   v: number;
 };
 
+function sampleTextureRgbaWithAlphaBleed(
+  texture: RgbaImage,
+  u: number,
+  v: number,
+): { r: number; g: number; b: number; a: number } {
+  const tx = Math.max(
+    0,
+    Math.min(texture.width - 1, Math.floor((u / 16) * texture.width)),
+  );
+  const ty = Math.max(
+    0,
+    Math.min(texture.height - 1, Math.floor((v / 16) * texture.height)),
+  );
+
+  const offset = (ty * texture.width + tx) * 4;
+  let r = texture.data[offset];
+  let g = texture.data[offset + 1];
+  let b = texture.data[offset + 2];
+  let a = texture.data[offset + 3];
+  if (a > 0) {
+    return { r, g, b, a };
+  }
+
+  // Avoid thin transparent seams from UV edge sampling by borrowing nearest opaque texel.
+  for (let radius = 1; radius <= 2; radius += 1) {
+    let bestOffset = -1;
+    let bestAlpha = 0;
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        const nx = tx + dx;
+        const ny = ty + dy;
+        if (nx < 0 || ny < 0 || nx >= texture.width || ny >= texture.height) {
+          continue;
+        }
+        const candidateOffset = (ny * texture.width + nx) * 4;
+        const candidateAlpha = texture.data[candidateOffset + 3];
+        if (candidateAlpha > bestAlpha) {
+          bestAlpha = candidateAlpha;
+          bestOffset = candidateOffset;
+        }
+      }
+    }
+    if (bestOffset !== -1 && bestAlpha > 0) {
+      r = texture.data[bestOffset];
+      g = texture.data[bestOffset + 1];
+      b = texture.data[bestOffset + 2];
+      a = texture.data[bestOffset + 3];
+      return { r, g, b, a };
+    }
+  }
+
+  return { r, g, b, a };
+}
+
 function drawTexturedTriangle(
   target: RgbaImage,
   texture: RgbaImage,
@@ -1370,22 +1423,8 @@ function drawTexturedTriangle(
 
       const u = w0 * v0.u + w1 * v1.u + w2 * v2.u;
       const v = w0 * v0.v + w1 * v1.v + w2 * v2.v;
-      const tx = Math.max(
-        0,
-        Math.min(
-          texture.width - 1,
-          Math.round((u / 16) * (texture.width - 1)),
-        ),
-      );
-      const ty = Math.max(
-        0,
-        Math.min(
-          texture.height - 1,
-          Math.round((v / 16) * (texture.height - 1)),
-        ),
-      );
-      const texOffset = (ty * texture.width + tx) * 4;
-      const alpha = texture.data[texOffset + 3];
+      const sampled = sampleTextureRgbaWithAlphaBleed(texture, u, v);
+      const alpha = sampled.a;
       if (alpha === 0) {
         continue;
       }
@@ -1394,9 +1433,9 @@ function drawTexturedTriangle(
       alphaBlendPixel(
         target.data,
         dstOffset,
-        texture.data[texOffset],
-        texture.data[texOffset + 1],
-        texture.data[texOffset + 2],
+        sampled.r,
+        sampled.g,
+        sampled.b,
         alpha,
       );
     }
