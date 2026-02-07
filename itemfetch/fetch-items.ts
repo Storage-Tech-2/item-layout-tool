@@ -16,6 +16,23 @@ type ItemIndex = Record<string, Record<string, unknown>>;
 type ModelFile = {
   parent?: string;
   textures?: Record<string, string>;
+  elements?: unknown[];
+};
+
+type ModelFaceDef = {
+  texture: string;
+  uv: [number, number, number, number];
+};
+
+type ModelElementDef = {
+  from: [number, number, number];
+  to: [number, number, number];
+  faces: Partial<Record<"up" | "down" | "north" | "south" | "east" | "west", ModelFaceDef>>;
+};
+
+type ResolvedModelDefinition = {
+  textureMap: Record<string, string>;
+  elements: ModelElementDef[];
 };
 
 type Candidate = {
@@ -60,6 +77,12 @@ type ParsedPng = {
   idatData: Buffer;
 };
 
+type RgbaImage = {
+  width: number;
+  height: number;
+  data: Buffer;
+};
+
 type AnimationMeta = {
   animation?: {
     width?: number;
@@ -79,6 +102,7 @@ const ITEMS_DIRECTORY_ASSET_PATH = "assets/minecraft/items";
 const OUTPUT_ROOT = path.resolve(process.cwd(), "public/items");
 const OUTPUT_TEXTURE_ROOT = path.join(OUTPUT_ROOT, "textures");
 const OUTPUT_INDEX_PATH = path.join(OUTPUT_ROOT, "items.json");
+const MODEL_RENDER_SIZE = Number(process.env.ITEMFETCH_MODEL_RENDER_SIZE ?? "64");
 
 const ITEM_LIMIT = Number(process.env.ITEMFETCH_LIMIT ?? "0");
 const CONCURRENCY = Number(process.env.ITEMFETCH_CONCURRENCY ?? "24");
@@ -117,6 +141,12 @@ const modelCache = new Map<string, Promise<ModelFile | null>>();
 const textureMapCache = new Map<string, Promise<Record<string, string>>>();
 const textureBufferCache = new Map<string, Promise<Buffer | null>>();
 const textureMetaCache = new Map<string, Promise<AnimationMeta | null>>();
+const resolvedModelCache = new Map<string, Promise<ResolvedModelDefinition | null>>();
+const textureRgbaCache = new Map<string, Promise<RgbaImage | null>>();
+const renderedModelTextureCache = new Map<
+  string,
+  Promise<{ textureRef: string; bytes: Buffer } | null>
+>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -477,6 +507,237 @@ function buildPngWithUpdatedImageData(
   return Buffer.concat(parts);
 }
 
+function parseModelFace(value: unknown): ModelFaceDef | null {
+  if (!isRecord(value) || typeof value.texture !== "string") {
+    return null;
+  }
+
+  const uvRaw = value.uv;
+  const uvDefault: [number, number, number, number] = [0, 0, 16, 16];
+  if (!Array.isArray(uvRaw)) {
+    return {
+      texture: value.texture,
+      uv: uvDefault,
+    };
+  }
+
+  if (
+    uvRaw.length !== 4 ||
+    uvRaw.some((entry) => typeof entry !== "number" || !Number.isFinite(entry))
+  ) {
+    return {
+      texture: value.texture,
+      uv: uvDefault,
+    };
+  }
+
+  return {
+    texture: value.texture,
+    uv: [uvRaw[0], uvRaw[1], uvRaw[2], uvRaw[3]],
+  };
+}
+
+function parseModelElements(value: unknown): ModelElementDef[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const elements: ModelElementDef[] = [];
+  for (const rawElement of value) {
+    if (!isRecord(rawElement) || !Array.isArray(rawElement.from) || !Array.isArray(rawElement.to)) {
+      continue;
+    }
+
+    if (
+      rawElement.from.length !== 3 ||
+      rawElement.to.length !== 3 ||
+      rawElement.from.some((entry) => typeof entry !== "number" || !Number.isFinite(entry)) ||
+      rawElement.to.some((entry) => typeof entry !== "number" || !Number.isFinite(entry))
+    ) {
+      continue;
+    }
+
+    const faces: ModelElementDef["faces"] = {};
+    if (isRecord(rawElement.faces)) {
+      for (const faceName of ["up", "down", "north", "south", "east", "west"] as const) {
+        const parsedFace = parseModelFace(rawElement.faces[faceName]);
+        if (parsedFace) {
+          faces[faceName] = parsedFace;
+        }
+      }
+    }
+
+    elements.push({
+      from: [rawElement.from[0], rawElement.from[1], rawElement.from[2]],
+      to: [rawElement.to[0], rawElement.to[1], rawElement.to[2]],
+      faces,
+    });
+  }
+
+  return elements;
+}
+
+function decodePngToRgbaImage(bytes: Buffer): RgbaImage | null {
+  const parsed = parsePng(bytes);
+  if (!parsed) {
+    return null;
+  }
+
+  if (
+    parsed.compressionMethod !== 0 ||
+    parsed.filterMethod !== 0 ||
+    parsed.interlaceMethod !== 0
+  ) {
+    return null;
+  }
+  if (parsed.colorType !== 3 && parsed.bitDepth !== 8) {
+    return null;
+  }
+  if (parsed.colorType === 3 && ![1, 2, 4, 8].includes(parsed.bitDepth)) {
+    return null;
+  }
+
+  const bitsPerPixel = bitsPerPixelForPng(parsed.colorType, parsed.bitDepth);
+  if (!bitsPerPixel) {
+    return null;
+  }
+
+  const rowByteLength = Math.ceil((parsed.width * bitsPerPixel) / 8);
+  const bytesPerPixelForFilter = Math.max(1, Math.ceil(bitsPerPixel / 8));
+  const inflated = inflateSync(parsed.idatData);
+  const decodedRows = decodePngScanlines(
+    inflated,
+    rowByteLength,
+    parsed.height,
+    bytesPerPixelForFilter,
+  );
+  if (!decodedRows) {
+    return null;
+  }
+
+  const rgba = Buffer.alloc(parsed.width * parsed.height * 4);
+  let palette: Buffer | null = null;
+  let transparency: Buffer | null = null;
+  if (parsed.colorType === 3) {
+    for (const chunk of parsed.chunks) {
+      if (chunk.type === "PLTE") {
+        palette = chunk.data;
+      } else if (chunk.type === "tRNS") {
+        transparency = chunk.data;
+      }
+    }
+    if (!palette || palette.length % 3 !== 0) {
+      return null;
+    }
+  }
+  for (let y = 0; y < parsed.height; y += 1) {
+    const rowOffset = y * rowByteLength;
+    for (let x = 0; x < parsed.width; x += 1) {
+      const srcOffset =
+        rowOffset +
+        x *
+          (parsed.colorType === 6
+            ? 4
+            : parsed.colorType === 2
+              ? 3
+              : parsed.colorType === 0
+                ? 1
+                : parsed.colorType === 4
+                  ? 2
+                  : 0);
+      const dstOffset = (y * parsed.width + x) * 4;
+
+      if (parsed.colorType === 6) {
+        rgba[dstOffset] = decodedRows[srcOffset];
+        rgba[dstOffset + 1] = decodedRows[srcOffset + 1];
+        rgba[dstOffset + 2] = decodedRows[srcOffset + 2];
+        rgba[dstOffset + 3] = decodedRows[srcOffset + 3];
+      } else if (parsed.colorType === 2) {
+        rgba[dstOffset] = decodedRows[srcOffset];
+        rgba[dstOffset + 1] = decodedRows[srcOffset + 1];
+        rgba[dstOffset + 2] = decodedRows[srcOffset + 2];
+        rgba[dstOffset + 3] = 255;
+      } else if (parsed.colorType === 0) {
+        const gray = decodedRows[srcOffset];
+        rgba[dstOffset] = gray;
+        rgba[dstOffset + 1] = gray;
+        rgba[dstOffset + 2] = gray;
+        rgba[dstOffset + 3] = 255;
+      } else if (parsed.colorType === 4) {
+        const gray = decodedRows[srcOffset];
+        rgba[dstOffset] = gray;
+        rgba[dstOffset + 1] = gray;
+        rgba[dstOffset + 2] = gray;
+        rgba[dstOffset + 3] = decodedRows[srcOffset + 1];
+      } else if (parsed.colorType === 3) {
+        if (!palette) {
+          return null;
+        }
+        let index = 0;
+        if (parsed.bitDepth === 8) {
+          index = decodedRows[rowOffset + x];
+        } else if (parsed.bitDepth === 4) {
+          const packed = decodedRows[rowOffset + (x >> 1)];
+          index = (x & 1) === 0 ? packed >> 4 : packed & 0x0f;
+        } else if (parsed.bitDepth === 2) {
+          const packed = decodedRows[rowOffset + (x >> 2)];
+          const shift = 6 - (x & 0x3) * 2;
+          index = (packed >> shift) & 0x03;
+        } else {
+          const packed = decodedRows[rowOffset + (x >> 3)];
+          const shift = 7 - (x & 0x7);
+          index = (packed >> shift) & 0x01;
+        }
+        const paletteOffset = index * 3;
+        if (paletteOffset + 2 >= palette.length) {
+          return null;
+        }
+        rgba[dstOffset] = palette[paletteOffset];
+        rgba[dstOffset + 1] = palette[paletteOffset + 1];
+        rgba[dstOffset + 2] = palette[paletteOffset + 2];
+        rgba[dstOffset + 3] =
+          transparency && index < transparency.length ? transparency[index] : 255;
+      } else {
+        return null;
+      }
+    }
+  }
+
+  return {
+    width: parsed.width,
+    height: parsed.height,
+    data: rgba,
+  };
+}
+
+function encodeRgbaImageToPng(image: RgbaImage): Buffer {
+  const { width, height, data } = image;
+  const rowByteLength = width * 4;
+  const scanlines = Buffer.alloc((rowByteLength + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    const dstOffset = y * (rowByteLength + 1);
+    scanlines[dstOffset] = 0;
+    data.copy(scanlines, dstOffset + 1, y * rowByteLength, y * rowByteLength + rowByteLength);
+  }
+
+  const compressed = deflateSync(scanlines);
+  const ihdrData = Buffer.alloc(13);
+  ihdrData.writeUInt32BE(width, 0);
+  ihdrData.writeUInt32BE(height, 4);
+  ihdrData.writeUInt8(8, 8); // bit depth
+  ihdrData.writeUInt8(6, 9); // RGBA
+  ihdrData.writeUInt8(0, 10);
+  ihdrData.writeUInt8(0, 11);
+  ihdrData.writeUInt8(0, 12);
+
+  return Buffer.concat([
+    PNG_SIGNATURE,
+    encodePngChunk("IHDR", ihdrData),
+    encodePngChunk("IDAT", compressed),
+    encodePngChunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
 function toPositiveInteger(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return null;
@@ -788,6 +1049,55 @@ async function loadMergedTextureMap(
   return promise;
 }
 
+async function loadResolvedModelDefinition(
+  modelRef: string,
+  stack = new Set<string>(),
+): Promise<ResolvedModelDefinition | null> {
+  if (stack.has(modelRef)) {
+    return null;
+  }
+
+  const cached = resolvedModelCache.get(modelRef);
+  if (cached) {
+    return cached;
+  }
+
+  const promise = (async () => {
+    const nextStack = new Set(stack);
+    nextStack.add(modelRef);
+
+    const model = await loadModel(modelRef);
+    if (!model) {
+      return null;
+    }
+
+    const inherited = typeof model.parent === "string"
+      ? await loadResolvedModelDefinition(model.parent, nextStack)
+      : null;
+
+    const ownTextures: Record<string, string> = {};
+    if (isRecord(model.textures)) {
+      for (const [key, value] of Object.entries(model.textures)) {
+        if (typeof value === "string") {
+          ownTextures[key] = value;
+        }
+      }
+    }
+
+    const ownElements = parseModelElements(model.elements);
+    return {
+      textureMap: {
+        ...(inherited?.textureMap ?? {}),
+        ...ownTextures,
+      },
+      elements: ownElements.length > 0 ? ownElements : (inherited?.elements ?? []),
+    };
+  })();
+
+  resolvedModelCache.set(modelRef, promise);
+  return promise;
+}
+
 function resolveTextureAlias(
   textureMap: Record<string, string>,
   rawTextureValue: string,
@@ -861,6 +1171,311 @@ async function readTextureBuffer(textureRef: string): Promise<Buffer | null> {
   return promise;
 }
 
+async function readTextureRgba(textureRef: string): Promise<RgbaImage | null> {
+  const cached = textureRgbaCache.get(textureRef);
+  if (cached) {
+    return cached;
+  }
+
+  const promise = (async () => {
+    const bytes = await readTextureBuffer(textureRef);
+    if (!bytes) {
+      return null;
+    }
+    return decodePngToRgbaImage(bytes);
+  })();
+
+  textureRgbaCache.set(textureRef, promise);
+  return promise;
+}
+
+function projectModelPoint(x: number, y: number, z: number): { x: number; y: number } {
+  return {
+    x: x - z,
+    y: (x + z) * 0.5 - y * 1.15,
+  };
+}
+
+function getFullBlockProjectionBounds(): {
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+} {
+  const points = [
+    projectModelPoint(0, 0, 0),
+    projectModelPoint(16, 0, 0),
+    projectModelPoint(0, 0, 16),
+    projectModelPoint(16, 0, 16),
+    projectModelPoint(0, 16, 0),
+    projectModelPoint(16, 16, 0),
+    projectModelPoint(0, 16, 16),
+    projectModelPoint(16, 16, 16),
+  ];
+
+  return {
+    minX: Math.min(...points.map((point) => point.x)),
+    maxX: Math.max(...points.map((point) => point.x)),
+    minY: Math.min(...points.map((point) => point.y)),
+    maxY: Math.max(...points.map((point) => point.y)),
+  };
+}
+
+function alphaBlendPixel(
+  target: Buffer,
+  offset: number,
+  r: number,
+  g: number,
+  b: number,
+  a: number,
+): void {
+  const srcA = a / 255;
+  if (srcA <= 0) {
+    return;
+  }
+
+  const dstA = target[offset + 3] / 255;
+  const outA = srcA + dstA * (1 - srcA);
+  if (outA <= 0) {
+    target[offset] = 0;
+    target[offset + 1] = 0;
+    target[offset + 2] = 0;
+    target[offset + 3] = 0;
+    return;
+  }
+
+  const outR = (r * srcA + target[offset] * dstA * (1 - srcA)) / outA;
+  const outG = (g * srcA + target[offset + 1] * dstA * (1 - srcA)) / outA;
+  const outB = (b * srcA + target[offset + 2] * dstA * (1 - srcA)) / outA;
+
+  target[offset] = Math.max(0, Math.min(255, Math.round(outR)));
+  target[offset + 1] = Math.max(0, Math.min(255, Math.round(outG)));
+  target[offset + 2] = Math.max(0, Math.min(255, Math.round(outB)));
+  target[offset + 3] = Math.max(0, Math.min(255, Math.round(outA * 255)));
+}
+
+type ScreenVertex = {
+  x: number;
+  y: number;
+  u: number;
+  v: number;
+};
+
+function drawTexturedTriangle(
+  target: RgbaImage,
+  texture: RgbaImage,
+  v0: ScreenVertex,
+  v1: ScreenVertex,
+  v2: ScreenVertex,
+): void {
+  const minX = Math.max(0, Math.floor(Math.min(v0.x, v1.x, v2.x)));
+  const maxX = Math.min(target.width - 1, Math.ceil(Math.max(v0.x, v1.x, v2.x)));
+  const minY = Math.max(0, Math.floor(Math.min(v0.y, v1.y, v2.y)));
+  const maxY = Math.min(target.height - 1, Math.ceil(Math.max(v0.y, v1.y, v2.y)));
+
+  const denom =
+    (v1.y - v2.y) * (v0.x - v2.x) +
+    (v2.x - v1.x) * (v0.y - v2.y);
+  if (Math.abs(denom) < 1e-6) {
+    return;
+  }
+
+  for (let py = minY; py <= maxY; py += 1) {
+    for (let px = minX; px <= maxX; px += 1) {
+      const sx = px + 0.5;
+      const sy = py + 0.5;
+
+      const w0 =
+        ((v1.y - v2.y) * (sx - v2.x) + (v2.x - v1.x) * (sy - v2.y)) / denom;
+      const w1 =
+        ((v2.y - v0.y) * (sx - v2.x) + (v0.x - v2.x) * (sy - v2.y)) / denom;
+      const w2 = 1 - w0 - w1;
+
+      if (w0 < -1e-6 || w1 < -1e-6 || w2 < -1e-6) {
+        continue;
+      }
+
+      const u = w0 * v0.u + w1 * v1.u + w2 * v2.u;
+      const v = w0 * v0.v + w1 * v1.v + w2 * v2.v;
+      const tx = Math.max(
+        0,
+        Math.min(
+          texture.width - 1,
+          Math.round((u / 16) * (texture.width - 1)),
+        ),
+      );
+      const ty = Math.max(
+        0,
+        Math.min(
+          texture.height - 1,
+          Math.round((v / 16) * (texture.height - 1)),
+        ),
+      );
+      const texOffset = (ty * texture.width + tx) * 4;
+      const alpha = texture.data[texOffset + 3];
+      if (alpha === 0) {
+        continue;
+      }
+
+      const dstOffset = (py * target.width + px) * 4;
+      alphaBlendPixel(
+        target.data,
+        dstOffset,
+        texture.data[texOffset],
+        texture.data[texOffset + 1],
+        texture.data[texOffset + 2],
+        alpha,
+      );
+    }
+  }
+}
+
+async function renderTextureFromModel(
+  modelRef: string,
+): Promise<{ textureRef: string; bytes: Buffer } | null> {
+  const cached = renderedModelTextureCache.get(modelRef);
+  if (cached) {
+    return cached;
+  }
+
+  const promise = (async () => {
+    const resolved = await loadResolvedModelDefinition(modelRef);
+    if (!resolved || resolved.elements.length === 0) {
+      return null;
+    }
+
+    const facesToRender: Array<{
+      points: Array<{ x: number; y: number; z: number }>;
+      uv: [number, number, number, number];
+      textureRef: string;
+      depth: number;
+    }> = [];
+
+    for (const element of resolved.elements) {
+      const x1 = element.from[0];
+      const y1 = element.from[1];
+      const z1 = element.from[2];
+      const x2 = element.to[0];
+      const y2 = element.to[1];
+      const z2 = element.to[2];
+
+      const pushFace = (
+        face: ModelFaceDef | undefined,
+        points: Array<{ x: number; y: number; z: number }>,
+      ) => {
+        if (!face) {
+          return;
+        }
+        const textureRef = resolveTextureAlias(resolved.textureMap, face.texture);
+        if (!textureRef) {
+          return;
+        }
+        const depth =
+          points.reduce((sum, point) => sum + point.x + point.z + point.y * 0.35, 0) /
+          points.length;
+        facesToRender.push({
+          points,
+          uv: face.uv,
+          textureRef,
+          depth,
+        });
+      };
+
+      pushFace(element.faces.up, [
+        { x: x1, y: y2, z: z1 },
+        { x: x2, y: y2, z: z1 },
+        { x: x2, y: y2, z: z2 },
+        { x: x1, y: y2, z: z2 },
+      ]);
+
+      pushFace(element.faces.east, [
+        { x: x2, y: y2, z: z1 },
+        { x: x2, y: y2, z: z2 },
+        { x: x2, y: y1, z: z2 },
+        { x: x2, y: y1, z: z1 },
+      ]);
+
+      pushFace(element.faces.south, [
+        { x: x1, y: y2, z: z2 },
+        { x: x2, y: y2, z: z2 },
+        { x: x2, y: y1, z: z2 },
+        { x: x1, y: y1, z: z2 },
+      ]);
+    }
+
+    if (facesToRender.length === 0) {
+      return null;
+    }
+
+    const projected = facesToRender.map((face) => ({
+      ...face,
+      projectedPoints: face.points.map((point) =>
+        projectModelPoint(point.x, point.y, point.z),
+      ),
+    }));
+
+    const { minX, maxX, minY, maxY } = getFullBlockProjectionBounds();
+    const outputSize = Math.max(16, MODEL_RENDER_SIZE);
+    const padding = 1;
+    const spanX = Math.max(1e-6, maxX - minX);
+    const spanY = Math.max(1e-6, maxY - minY);
+    const scale = Math.min(
+      (outputSize - padding * 2) / spanX,
+      (outputSize - padding * 2) / spanY,
+    );
+
+    const output: RgbaImage = {
+      width: outputSize,
+      height: outputSize,
+      data: Buffer.alloc(outputSize * outputSize * 4),
+    };
+
+    projected.sort((a, b) => a.depth - b.depth);
+    for (const face of projected) {
+      const texture = await readTextureRgba(face.textureRef);
+      if (!texture) {
+        continue;
+      }
+
+      const [u1, v1, u2, v2] = face.uv;
+      const mapped = face.projectedPoints.map((point) => ({
+        x: (point.x - minX) * scale + padding,
+        y: (point.y - minY) * scale + padding,
+      }));
+
+      const vertices: ScreenVertex[] = [
+        { ...mapped[0], u: u1, v: v1 },
+        { ...mapped[1], u: u2, v: v1 },
+        { ...mapped[2], u: u2, v: v2 },
+        { ...mapped[3], u: u1, v: v2 },
+      ];
+
+      drawTexturedTriangle(output, texture, vertices[0], vertices[1], vertices[2]);
+      drawTexturedTriangle(output, texture, vertices[0], vertices[2], vertices[3]);
+    }
+
+    let hasOpaquePixel = false;
+    for (let i = 3; i < output.data.length; i += 4) {
+      if (output.data[i] > 0) {
+        hasOpaquePixel = true;
+        break;
+      }
+    }
+    if (!hasOpaquePixel) {
+      return null;
+    }
+
+    const sourceTexture = projected[0].textureRef;
+    return {
+      textureRef: sourceTexture,
+      bytes: encodeRgbaImageToPng(output),
+    };
+  })();
+
+  renderedModelTextureCache.set(modelRef, promise);
+  return promise;
+}
+
 async function resolveItemTexture(
   itemId: string,
   itemDefinition: Record<string, unknown>,
@@ -876,6 +1491,15 @@ async function resolveItemTexture(
         return { textureRef: candidate.ref, sourceModel: null, bytes };
       }
       continue;
+    }
+
+    const rendered = await renderTextureFromModel(candidate.ref);
+    if (rendered) {
+      return {
+        textureRef: rendered.textureRef,
+        sourceModel: candidate.ref,
+        bytes: rendered.bytes,
+      };
     }
 
     const resolvedTexture = await resolveTextureFromModel(candidate.ref);
@@ -1070,7 +1694,6 @@ async function main(): Promise<void> {
     blocksJavaSource,
     foodsJavaSource,
     creativeModeTabsJavaSource,
-    sourceInfo,
     jarPath,
     cacheVersionRoot,
   } = await loadJavaSources();
