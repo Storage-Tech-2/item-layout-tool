@@ -250,10 +250,6 @@ function parseTopLevelCall(input: string): TopLevelCall | null {
 
 function getBaseExpression(input: string): string {
   const expression = stripLeadingCast(trimOuterParens(input));
-  let depthParen = 0;
-  let depthBracket = 0;
-  let depthBrace = 0;
-  let depthAngle = 0;
   let inString = false;
   let quote = "";
   let escaping = false;
@@ -280,24 +276,16 @@ function getBaseExpression(input: string): string {
       continue;
     }
 
-    if (char === "(") depthParen += 1;
-    if (char === ")") depthParen = Math.max(0, depthParen - 1);
-    if (char === "[") depthBracket += 1;
-    if (char === "]") depthBracket = Math.max(0, depthBracket - 1);
-    if (char === "{") depthBrace += 1;
-    if (char === "}") depthBrace = Math.max(0, depthBrace - 1);
-    if (char === "<") depthAngle += 1;
-    if (char === ">") depthAngle = Math.max(0, depthAngle - 1);
-
-    if (
-      char === "." &&
-      depthParen === 0 &&
-      depthBracket === 0 &&
-      depthBrace === 0 &&
-      depthAngle === 0
-    ) {
-      return expression.slice(0, i).trim();
+    if (char !== "(") {
+      continue;
     }
+
+    const closeParenIndex = findMatchingParen(expression, i);
+    if (closeParenIndex === -1) {
+      return expression.trim();
+    }
+
+    return expression.slice(0, closeParenIndex + 1).trim();
   }
 
   return expression.trim();
@@ -588,7 +576,7 @@ function findMatchingBrace(source: string, openIndex: number): number {
 function parsePropertiesHelpers(blocksSource: string): Map<string, PropertiesHelper> {
   const result = new Map<string, PropertiesHelper>();
   const signaturePattern =
-    /private\s+static\s+Properties\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/g;
+    /private\s+static\s+(?:[A-Za-z0-9_$.]+\.)?Properties\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/g;
 
   let match: RegExpExecArray | null = null;
   while ((match = signaturePattern.exec(blocksSource)) !== null) {
@@ -652,9 +640,10 @@ function inferBlockLoot(
     if (!noLootTable && overrideLootTable === null) {
       const baseExpression = getBaseExpression(propertiesExpression);
       const baseCall = parseTopLevelCall(baseExpression);
-      if (baseCall && helpers.has(baseCall.name)) {
-        helperMethod = baseCall.name;
-        const helper = helpers.get(baseCall.name)!;
+      const helperName = baseCall ? getUnqualifiedMethodName(baseCall.name) : null;
+      if (baseCall && helperName && helpers.has(helperName)) {
+        helperMethod = helperName;
+        const helper = helpers.get(helperName)!;
         if (helper.hasNoLootTable) {
           noLootTable = true;
         }
@@ -774,19 +763,29 @@ function deriveSpawnEggId(rawArg: string | undefined, fallbackId: string): strin
   return `${entityMatch[1].toLowerCase()}_spawn_egg`;
 }
 
+function getUnqualifiedMethodName(name: string): string {
+  const trimmed = name.trim();
+  const lastDot = trimmed.lastIndexOf(".");
+  return lastDot === -1 ? trimmed : trimmed.slice(lastDot + 1);
+}
+
+function isPropertiesConstructorExpression(arg: string): boolean {
+  return /\bnew\s+(?:[A-Za-z0-9_$.]+\.)?Properties\s*\(/.test(arg);
+}
+
 function extractPropertiesExpressionFromRegistration(
   registrationName: string,
   args: string[],
 ): string | null {
   for (const arg of args) {
-    if (/\bnew\s+Properties\s*\(/.test(arg)) {
+    if (isPropertiesConstructorExpression(arg)) {
       return arg.trim();
     }
   }
 
   if (registrationName === "registerSpawnEgg") {
     const entityArg = args[0] ?? "type";
-    return `new Properties().spawnEgg(${entityArg})`;
+    return `new Item.Properties().spawnEgg(${entityArg})`;
   }
 
   return null;
@@ -890,28 +889,36 @@ export function parseItems(itemsSource: string, blockMap: Map<string, ParsedBloc
     let propertiesExpression: string | null = null;
 
     if (outerCall) {
-      if (outerCall.name === "registerBlock") {
+      const registrationName = getUnqualifiedMethodName(outerCall.name);
+
+      if (registrationName === "registerBlock") {
         registration = "block";
         blockField = parseBlockFieldReference(outerCall.args[0] ?? "") ?? null;
         if (blockField && blockMap.has(blockField)) {
           id = blockMap.get(blockField)!.id;
         }
-        if (outerCall.args.length >= 2 && !/\bnew\s+Properties\s*\(/.test(outerCall.args[1])) {
+        if (
+          outerCall.args.length >= 2 &&
+          !isPropertiesConstructorExpression(outerCall.args[1])
+        ) {
           itemFactory = outerCall.args[1].trim();
         }
-      } else if (outerCall.name === "registerItem") {
+      } else if (registrationName === "registerItem") {
         registration = "item";
         id = parseRegisterItemId(outerCall.args[0], fallbackId);
-        if (outerCall.args.length >= 2 && !/\bnew\s+Properties\s*\(/.test(outerCall.args[1])) {
+        if (
+          outerCall.args.length >= 2 &&
+          !isPropertiesConstructorExpression(outerCall.args[1])
+        ) {
           itemFactory = outerCall.args[1].trim();
         }
-      } else if (outerCall.name === "registerSpawnEgg") {
+      } else if (registrationName === "registerSpawnEgg") {
         registration = "spawn_egg";
         id = deriveSpawnEggId(outerCall.args[0], fallbackId);
       }
 
       propertiesExpression = extractPropertiesExpressionFromRegistration(
-        outerCall.name,
+        registrationName,
         outerCall.args,
       );
     }

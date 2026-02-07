@@ -23,7 +23,6 @@ export async function runItemCodeFetch(): Promise<void> {
         (block) => block.loot.overrideLootTable !== null,
       ).length,
     },
-    blocks,
     items,
   };
 
