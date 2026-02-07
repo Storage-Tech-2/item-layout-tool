@@ -1,4 +1,10 @@
-import type { BlockLootBehavior, ParsedBlock, ParsedFood, ParsedItem } from "./types";
+import type {
+  BlockLootBehavior,
+  ParsedBlock,
+  ParsedCreativeTab,
+  ParsedFood,
+  ParsedItem,
+} from "./types";
 import { stripMinecraftNamespace } from "./utils";
 
 type TopLevelCall = {
@@ -867,6 +873,60 @@ export function parseFoods(foodsSource: string): ParsedFood[] {
   }
 
   return foods;
+}
+
+export function parseCreativeModeTabs(
+  creativeModeTabsSource: string,
+): ParsedCreativeTab[] {
+  const keyFieldToId = new Map<string, string>();
+  const keyPattern =
+    /private\s+static\s+final\s+ResourceKey<CreativeModeTab>\s+([A-Z0-9_]+)\s*=\s*CreativeModeTabs\.createKey\(\s*"([^"]+)"\s*\)\s*;/g;
+  let keyMatch: RegExpExecArray | null = null;
+  while ((keyMatch = keyPattern.exec(creativeModeTabsSource)) !== null) {
+    keyFieldToId.set(keyMatch[1], keyMatch[2]);
+  }
+
+  const tabs: ParsedCreativeTab[] = [];
+  const registerPattern = /Registry\.register\s*\(\s*registry\s*,\s*([A-Z0-9_]+)\s*,/g;
+  let registerMatch: RegExpExecArray | null = null;
+  while ((registerMatch = registerPattern.exec(creativeModeTabsSource)) !== null) {
+    const tabFieldName = registerMatch[1];
+    const statementStart = registerMatch.index;
+    const statementEnd = findStatementEnd(creativeModeTabsSource, registerPattern.lastIndex);
+    if (statementEnd === -1) {
+      continue;
+    }
+
+    const statement = creativeModeTabsSource.slice(statementStart, statementEnd + 1);
+    const displayItemsPattern =
+      /\.displayItems\s*\(\s*\(\s*[A-Za-z_][A-Za-z0-9_]*\s*,\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*->\s*\{/;
+    const displayItemsMatch = displayItemsPattern.exec(statement);
+    const itemFields = new Set<string>();
+
+    if (displayItemsMatch) {
+      const openBraceOffset =
+        displayItemsMatch.index + displayItemsMatch[0].lastIndexOf("{");
+      const closeBraceOffset = findMatchingBrace(statement, openBraceOffset);
+      if (closeBraceOffset !== -1) {
+        const body = statement.slice(openBraceOffset + 1, closeBraceOffset);
+        const itemReferencePattern = /\bItems\.([A-Z0-9_]+)\b/g;
+        let itemReferenceMatch: RegExpExecArray | null = null;
+        while ((itemReferenceMatch = itemReferencePattern.exec(body)) !== null) {
+          itemFields.add(itemReferenceMatch[1]);
+        }
+      }
+    }
+
+    tabs.push({
+      fieldName: tabFieldName,
+      id: keyFieldToId.get(tabFieldName) ?? toSnakeCaseFromConstant(tabFieldName),
+      itemFields: Array.from(itemFields),
+    });
+
+    registerPattern.lastIndex = statementEnd + 1;
+  }
+
+  return tabs;
 }
 
 function parseRegisterItemId(rawFirstArg: string | undefined, fallbackId: string): string {

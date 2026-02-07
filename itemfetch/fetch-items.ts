@@ -1,7 +1,12 @@
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
-import { parseBlocks, parseFoods, parseItems } from "./src/parser";
+import {
+  parseBlocks,
+  parseCreativeModeTabs,
+  parseFoods,
+  parseItems,
+} from "./src/parser";
 import { loadJavaSources } from "./src/source-loader";
 import type { BlockLootBehavior, ParsedFood, ParsedItem } from "./src/types";
 import { pathExists, runExec } from "./src/utils";
@@ -32,6 +37,7 @@ type OutputItem = {
   rarity: string | null;
   fireResistant: boolean | null;
   foodReference: string | null;
+  creativeTabs: string[];
   food: {
     id: string;
     fieldName: string;
@@ -967,6 +973,7 @@ function toOutputItem(
   texture: { texturePath: string | null; sourceTexture: string | null; sourceModel: string | null },
   parsedItem: ParsedItem | null,
   parsedFood: ParsedFood | null,
+  creativeTabs: string[],
 ): OutputItem {
   return {
     id: itemId,
@@ -982,6 +989,7 @@ function toOutputItem(
     rarity: parsedItem?.rarity ?? null,
     fireResistant: parsedItem?.fireResistant ?? null,
     foodReference: parsedItem?.foodReference ?? null,
+    creativeTabs,
     food: parsedFood
       ? {
           id: parsedFood.id,
@@ -1044,6 +1052,7 @@ async function main(): Promise<void> {
     itemsJavaSource,
     blocksJavaSource,
     foodsJavaSource,
+    creativeModeTabsJavaSource,
     sourceInfo,
     jarPath,
     cacheVersionRoot,
@@ -1064,9 +1073,30 @@ async function main(): Promise<void> {
   const blockMap = new Map(parsedBlocks.map((block) => [block.fieldName, block]));
   const parsedItems = parseItems(itemsJavaSource, blockMap);
   const parsedItemById = new Map(parsedItems.map((item) => [item.id, item]));
+  const parsedItemByFieldName = new Map(parsedItems.map((item) => [item.fieldName, item]));
   const parsedFoods = foodsJavaSource ? parseFoods(foodsJavaSource) : [];
   const parsedFoodByReference = new Map(parsedFoods.map((food) => [food.reference, food]));
   const parsedFoodByFieldName = new Map(parsedFoods.map((food) => [food.fieldName, food]));
+  const parsedCreativeTabs = creativeModeTabsJavaSource
+    ? parseCreativeModeTabs(creativeModeTabsJavaSource)
+    : [];
+
+  const creativeTabIdsByItemId = new Map<string, Set<string>>();
+  const unresolvedCreativeTabItemFieldNames = new Set<string>();
+  for (const tab of parsedCreativeTabs) {
+    for (const itemField of tab.itemFields) {
+      const parsedItem = parsedItemByFieldName.get(itemField);
+      if (!parsedItem) {
+        unresolvedCreativeTabItemFieldNames.add(itemField);
+        continue;
+      }
+
+      if (!creativeTabIdsByItemId.has(parsedItem.id)) {
+        creativeTabIdsByItemId.set(parsedItem.id, new Set<string>());
+      }
+      creativeTabIdsByItemId.get(parsedItem.id)!.add(tab.id);
+    }
+  }
 
   const itemIndex = await fetchItemIndex();
   const itemIdsSet = new Set<string>([
@@ -1097,6 +1127,9 @@ async function main(): Promise<void> {
       parsedFoodByReference,
       parsedFoodByFieldName,
     );
+    const creativeTabs = parsedItem
+      ? Array.from(creativeTabIdsByItemId.get(parsedItem.id) ?? [])
+      : [];
 
     if (resolved) {
       const textureFilename = `${itemId}.png`;
@@ -1111,6 +1144,7 @@ async function main(): Promise<void> {
         },
         parsedItem,
         parsedFood,
+        creativeTabs,
       );
       texturedCount += 1;
     } else {
@@ -1123,6 +1157,7 @@ async function main(): Promise<void> {
         },
         parsedItem,
         parsedFood,
+        creativeTabs,
       );
       missingTextureItems.push(itemId);
     }
@@ -1156,6 +1191,11 @@ async function main(): Promise<void> {
       foodDefinitionCount: parsedFoods.length,
       itemsWithFoodReferenceCount: outputItems.filter((item) => item.foodReference !== null).length,
       itemsWithFoodDataCount: outputItems.filter((item) => item.food !== null).length,
+      creativeTabCount: parsedCreativeTabs.length,
+      creativeTabsWithItemsCount: parsedCreativeTabs.filter((tab) => tab.itemFields.length > 0)
+        .length,
+      itemsWithCreativeTabCount: outputItems.filter((item) => item.creativeTabs.length > 0).length,
+      unresolvedCreativeTabItemFieldCount: unresolvedCreativeTabItemFieldNames.size,
     },
     items: outputItems,
   };

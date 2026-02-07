@@ -4,12 +4,14 @@ import path from "node:path";
 import {
   BLOCKS_CLASS_CANDIDATES,
   CACHE_ROOT,
+  CREATIVE_MODE_TABS_CLASS_CANDIDATES,
   CFR_JAR_PATH_OVERRIDE,
   CFR_JAR_URL,
   CFR_VERSION,
   FOODS_CLASS_CANDIDATES,
   ITEM_CLASS_CANDIDATES,
   LOCAL_BLOCKS_JAVA_PATH,
+  LOCAL_CREATIVE_MODE_TABS_JAVA_PATH,
   LOCAL_FOODS_JAVA_PATH,
   LOCAL_ITEMS_JAVA_PATH,
   TOOL_CACHE_ROOT,
@@ -229,15 +231,20 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
 
   if (LOCAL_ITEMS_JAVA_PATH && LOCAL_BLOCKS_JAVA_PATH) {
     console.log(`Using local Java files: ${LOCAL_ITEMS_JAVA_PATH}, ${LOCAL_BLOCKS_JAVA_PATH}`);
-    const [itemsJavaSource, blocksJavaSource, foodsJavaSource] = await Promise.all([
+    const [itemsJavaSource, blocksJavaSource, foodsJavaSource, creativeModeTabsJavaSource] =
+      await Promise.all([
       readFile(LOCAL_ITEMS_JAVA_PATH, "utf8"),
       readFile(LOCAL_BLOCKS_JAVA_PATH, "utf8"),
       LOCAL_FOODS_JAVA_PATH ? readFile(LOCAL_FOODS_JAVA_PATH, "utf8") : Promise.resolve(null),
+      LOCAL_CREATIVE_MODE_TABS_JAVA_PATH
+        ? readFile(LOCAL_CREATIVE_MODE_TABS_JAVA_PATH, "utf8")
+        : Promise.resolve(null),
     ]);
     return {
       itemsJavaSource,
       blocksJavaSource,
       foodsJavaSource,
+      creativeModeTabsJavaSource,
       jarPath: null,
       cacheVersionRoot: null,
       minecraftVersion: null,
@@ -246,6 +253,7 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
         itemsJavaPath: LOCAL_ITEMS_JAVA_PATH,
         blocksJavaPath: LOCAL_BLOCKS_JAVA_PATH,
         foodsJavaPath: LOCAL_FOODS_JAVA_PATH,
+        creativeModeTabsJavaPath: LOCAL_CREATIVE_MODE_TABS_JAVA_PATH,
       },
     };
   }
@@ -270,25 +278,31 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
   const itemsClassEntry = pickJarEntry(jarEntries, ITEM_CLASS_CANDIDATES);
   const blocksClassEntry = pickJarEntry(jarEntries, BLOCKS_CLASS_CANDIDATES);
   const foodsClassEntry = pickJarEntry(jarEntries, FOODS_CLASS_CANDIDATES);
-  if (!itemsClassEntry || !blocksClassEntry || !foodsClassEntry) {
+  const creativeModeTabsClassEntry = pickJarEntry(
+    jarEntries,
+    CREATIVE_MODE_TABS_CLASS_CANDIDATES,
+  );
+  if (!itemsClassEntry || !blocksClassEntry || !foodsClassEntry || !creativeModeTabsClassEntry) {
     throw new Error(
-      `Could not find required class entries in jar. Items=${itemsClassEntry ?? "missing"}, Blocks=${blocksClassEntry ?? "missing"}, Foods=${foodsClassEntry ?? "missing"}.`,
+      `Could not find required class entries in jar. Items=${itemsClassEntry ?? "missing"}, Blocks=${blocksClassEntry ?? "missing"}, Foods=${foodsClassEntry ?? "missing"}, CreativeModeTabs=${creativeModeTabsClassEntry ?? "missing"}.`,
     );
   }
 
   console.log(
-    `Decompiling ${itemsClassEntry}, ${blocksClassEntry}, and ${foodsClassEntry}...`,
+    `Decompiling ${itemsClassEntry}, ${blocksClassEntry}, ${foodsClassEntry}, and ${creativeModeTabsClassEntry}...`,
   );
-  const [itemsResult, blocksResult, foodsResult] = await Promise.all([
+  const [itemsResult, blocksResult, foodsResult, creativeModeTabsResult] = await Promise.all([
     decompileClass(jarPath, itemsClassEntry, cfrJarPath, versionRoot),
     decompileClass(jarPath, blocksClassEntry, cfrJarPath, versionRoot),
     decompileClass(jarPath, foodsClassEntry, cfrJarPath, versionRoot),
+    decompileClass(jarPath, creativeModeTabsClassEntry, cfrJarPath, versionRoot),
   ]);
 
   return {
     itemsJavaSource: itemsResult.javaSource,
     blocksJavaSource: blocksResult.javaSource,
     foodsJavaSource: foodsResult.javaSource,
+    creativeModeTabsJavaSource: creativeModeTabsResult.javaSource,
     jarPath,
     cacheVersionRoot: versionRoot,
     minecraftVersion: versionSource.selectedVersion,
@@ -304,9 +318,11 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
       itemsClassEntry,
       blocksClassEntry,
       foodsClassEntry,
+      creativeModeTabsClassEntry,
       itemsJavaPath: itemsResult.javaPath,
       blocksJavaPath: blocksResult.javaPath,
       foodsJavaPath: foodsResult.javaPath,
+      creativeModeTabsJavaPath: creativeModeTabsResult.javaPath,
       tempDirectory: os.tmpdir(),
     },
   };

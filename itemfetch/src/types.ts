@@ -72,10 +72,17 @@ export type ParsedFood = {
   propertyCalls: Array<{ name: string; args: string[] }>;
 };
 
+export type ParsedCreativeTab = {
+  fieldName: string;
+  id: string;
+  itemFields: string[];
+};
+
 export type LoadedJavaSources = {
   itemsJavaSource: string;
   blocksJavaSource: string;
   foodsJavaSource: string | null;
+  creativeModeTabsJavaSource: string | null;
   jarPath: string | null;
   cacheVersionRoot: string | null;
   minecraftVersion: string | null;
