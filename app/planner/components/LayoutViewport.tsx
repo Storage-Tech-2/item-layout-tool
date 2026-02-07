@@ -20,7 +20,7 @@ import {
   SLOT_SIZE,
   STAGE_SIZE,
 } from "../constants";
-import type { CatalogItem, HallConfig, HallId } from "../types";
+import type { CatalogItem, HallConfig, HallId, PreviewPlacement } from "../types";
 import { getHallSize, misSlotId, nonMisSlotId, toTitle } from "../utils";
 
 type LayoutViewportProps = {
@@ -43,7 +43,7 @@ type LayoutViewportProps = {
   ) => void;
   onAnyDragEnd: () => void;
   onClearSlot: (slotId: string) => void;
-  dragPreviewPlacements: { slotId: string; itemId: string; kind: "place" | "swap" }[];
+  dragPreviewPlacements: PreviewPlacement[];
   selectedSlotIds: Set<string>;
   onSelectionChange: (slotIds: string[]) => void;
 };

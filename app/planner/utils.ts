@@ -95,8 +95,8 @@ export function buildOrderedSlotIds(configs: Record<HallId, HallConfig>): string
       continue;
     }
 
-    for (let slice = 0; slice < hall.slices; slice += 1) {
-      for (const side of [0, 1] as const) {
+    for (const side of [0, 1] as const) {
+      for (let slice = 0; slice < hall.slices; slice += 1) {
         for (let row = 0; row < hall.rowsPerSide; row += 1) {
           ordered.push(nonMisSlotId(hallId, slice, side, row));
         }

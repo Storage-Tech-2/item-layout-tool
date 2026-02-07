@@ -39,3 +39,19 @@ export type DragPayload = {
   originSlotId?: string;
   sourceSlotIds?: string[];
 };
+
+export type SlotPoint = {
+  x: number;
+  y: number;
+};
+
+export type IncomingEntry = {
+  itemId: string;
+  sourceSlotId?: string;
+};
+
+export type PreviewPlacement = {
+  slotId: string;
+  itemId: string;
+  kind: "place" | "swap";
+};
