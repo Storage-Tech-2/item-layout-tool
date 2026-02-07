@@ -53,6 +53,12 @@ export function buildSlotCenters(
   hallConfigs: Record<HallId, HallConfig>,
 ): Map<string, SlotPoint> {
   const slotCenters = new Map<string, SlotPoint>();
+  const toVisualSliceIndex = (hallId: HallId, slices: number, slice: number): number => {
+    if (hallId === "north" || hallId === "west") {
+      return slices - 1 - slice;
+    }
+    return slice;
+  };
 
   for (const hallId of HALL_ORDER) {
     const config = hallConfigs[hallId];
@@ -62,15 +68,16 @@ export function buildSlotCenters(
     const hallTopLeft = getHallTopLeft(hallId, width, height);
     if (config.type === "mis") {
       for (let slice = 0; slice < config.slices; slice += 1) {
+        const visualSlice = toVisualSliceIndex(hallId, config.slices, slice);
         for (let misUnit = 0; misUnit < config.misUnitsPerSlice; misUnit += 1) {
           const unitLeft =
             orientation === "horizontal"
-              ? hallTopLeft.x + slice * (MIS_SLICE_MAIN + SLOT_GAP)
+              ? hallTopLeft.x + visualSlice * (MIS_SLICE_MAIN + SLOT_GAP)
               : hallTopLeft.x + misUnit * (MIS_CROSS + SLOT_GAP);
           const unitTop =
             orientation === "horizontal"
               ? hallTopLeft.y + misUnit * (MIS_CROSS + SLOT_GAP)
-              : hallTopLeft.y + slice * (MIS_SLICE_MAIN + SLOT_GAP);
+              : hallTopLeft.y + visualSlice * (MIS_SLICE_MAIN + SLOT_GAP);
           const unitWidth = orientation === "horizontal" ? MIS_SLICE_MAIN : MIS_CROSS;
           const unitHeight = orientation === "horizontal" ? MIS_CROSS : MIS_SLICE_MAIN;
           const columns =
@@ -103,8 +110,9 @@ export function buildSlotCenters(
       const bottomGridTop = hallTopLeft.y + height - sideDepthPx;
 
       for (let slice = 0; slice < config.slices; slice += 1) {
+        const visualSlice = toVisualSliceIndex(hallId, config.slices, slice);
         for (let row = 0; row < config.rowsPerSide; row += 1) {
-          const x = hallTopLeft.x + slice * step + SLOT_SIZE / 2;
+          const x = hallTopLeft.x + visualSlice * step + SLOT_SIZE / 2;
           const topY = topGridTop + row * step + SLOT_SIZE / 2;
           const bottomY = bottomGridTop + row * step + SLOT_SIZE / 2;
 
@@ -119,8 +127,9 @@ export function buildSlotCenters(
     const rightGridLeft = hallTopLeft.x + width - sideDepthPx;
 
     for (let slice = 0; slice < config.slices; slice += 1) {
+      const visualSlice = toVisualSliceIndex(hallId, config.slices, slice);
       for (let row = 0; row < config.rowsPerSide; row += 1) {
-        const y = hallTopLeft.y + slice * step + SLOT_SIZE / 2;
+        const y = hallTopLeft.y + visualSlice * step + SLOT_SIZE / 2;
         const leftX = leftGridLeft + row * step + SLOT_SIZE / 2;
         const rightX = rightGridLeft + row * step + SLOT_SIZE / 2;
 

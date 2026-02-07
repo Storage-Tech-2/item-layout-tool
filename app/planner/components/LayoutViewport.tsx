@@ -104,6 +104,14 @@ const MIS_OPEN_PANEL_CLASSES = [
   "border-[rgba(139,88,31,0.55)] bg-[linear-gradient(180deg,rgba(255,248,233,0.97)_0%,rgba(245,229,198,0.97)_100%)]",
 ] as const;
 
+function getVisualSliceOrder(hallId: HallId, slices: number): number[] {
+  const order = Array.from({ length: slices }, (_, index) => index);
+  if (hallId === "north" || hallId === "west") {
+    order.reverse();
+  }
+  return order;
+}
+
 function DeferredNumberInput({
   value,
   min,
@@ -480,6 +488,7 @@ export function LayoutViewport({
   ): ReactNode {
     const sideDepth = config.rowsPerSide;
     const mainSlices = config.slices;
+    const sliceOrder = getVisualSliceOrder(hallId, mainSlices);
 
     if (orientation === "horizontal") {
       return (
@@ -493,7 +502,7 @@ export function LayoutViewport({
             }}
           >
             {Array.from({ length: sideDepth }, (_, row) =>
-              Array.from({ length: mainSlices }, (_, slice) =>
+              sliceOrder.map((slice) =>
                 renderSlot(nonMisSlotId(hallId, slice, 0, row)),
               ),
             )}
@@ -508,7 +517,7 @@ export function LayoutViewport({
             }}
           >
             {Array.from({ length: sideDepth }, (_, row) =>
-              Array.from({ length: mainSlices }, (_, slice) =>
+              sliceOrder.map((slice) =>
                 renderSlot(nonMisSlotId(hallId, slice, 1, row)),
               ),
             )}
@@ -529,7 +538,7 @@ export function LayoutViewport({
             gap: `${SLOT_GAP}px`,
           }}
         >
-          {Array.from({ length: mainSlices }, (_, slice) =>
+          {sliceOrder.map((slice) =>
             Array.from({ length: sideDepth }, (_, row) =>
               renderSlot(nonMisSlotId(hallId, slice, 0, row)),
             ),
@@ -544,7 +553,7 @@ export function LayoutViewport({
             gap: `${SLOT_GAP}px`,
           }}
         >
-          {Array.from({ length: mainSlices }, (_, slice) =>
+          {sliceOrder.map((slice) =>
             Array.from({ length: sideDepth }, (_, row) =>
               renderSlot(nonMisSlotId(hallId, slice, 1, row)),
             ),
@@ -563,10 +572,11 @@ export function LayoutViewport({
   ): ReactNode {
     const directionClass =
       orientation === "horizontal" ? "flex-row" : "flex-col";
+    const sliceOrder = getVisualSliceOrder(hallId, config.slices);
 
     return (
       <div className={`absolute inset-0 flex gap-1 ${directionClass}`}>
-        {Array.from({ length: config.slices }, (_, slice) => {
+        {sliceOrder.map((slice) => {
           return (
             <div
               key={`${hallId}-mis-${slice}`}
@@ -1000,8 +1010,18 @@ export function LayoutViewport({
 
             const hallFirstSlot =
               hall.type === "mis"
-                ? misSlotId(hallId, 0, 0, 0)
-                : nonMisSlotId(hallId, 0, 0, 0);
+                ? misSlotId(
+                    hallId,
+                    hallId === "north" || hallId === "west" ? hall.slices - 1 : 0,
+                    0,
+                    0,
+                  )
+                : nonMisSlotId(
+                    hallId,
+                    hallId === "north" || hallId === "west" ? hall.slices - 1 : 0,
+                    0,
+                    0,
+                  );
 
             return (
               <section
