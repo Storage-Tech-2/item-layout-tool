@@ -104,9 +104,13 @@ const ITEMS_DIRECTORY_ASSET_PATH = "assets/minecraft/items";
 const OUTPUT_ROOT = path.resolve(process.cwd(), "public/items");
 const OUTPUT_TEXTURE_ROOT = path.join(OUTPUT_ROOT, "textures");
 const OUTPUT_INDEX_PATH = path.join(OUTPUT_ROOT, "items.json");
-const MODEL_RENDER_SIZE = Number(process.env.ITEMFETCH_MODEL_RENDER_SIZE ?? "64");
+const MODEL_RENDER_SIZE = Number(process.env.ITEMFETCH_MODEL_RENDER_SIZE ?? "128");
+const MODEL_RENDER_SUPERSAMPLE = Math.max(
+  1,
+  Number(process.env.ITEMFETCH_MODEL_RENDER_SUPERSAMPLE ?? "2"),
+);
 const MODEL_RENDER_VIEW: ModelRenderView =
-  process.env.ITEMFETCH_MODEL_RENDER_VIEW === "front" ? "front" : "back";
+  process.env.ITEMFETCH_MODEL_RENDER_VIEW === "back" ? "back" : "front";
 
 const ITEM_LIMIT = Number(process.env.ITEMFETCH_LIMIT ?? "0");
 const CONCURRENCY = Number(process.env.ITEMFETCH_CONCURRENCY ?? "24");
@@ -742,6 +746,58 @@ function encodeRgbaImageToPng(image: RgbaImage): Buffer {
   ]);
 }
 
+function downsampleRgbaImage(
+  source: RgbaImage,
+  targetWidth: number,
+  targetHeight: number,
+): RgbaImage {
+  if (source.width === targetWidth && source.height === targetHeight) {
+    return source;
+  }
+
+  const out = Buffer.alloc(targetWidth * targetHeight * 4);
+  const scaleX = source.width / targetWidth;
+  const scaleY = source.height / targetHeight;
+
+  for (let ty = 0; ty < targetHeight; ty += 1) {
+    const sy0 = Math.floor(ty * scaleY);
+    const sy1 = Math.min(source.height, Math.floor((ty + 1) * scaleY));
+    for (let tx = 0; tx < targetWidth; tx += 1) {
+      const sx0 = Math.floor(tx * scaleX);
+      const sx1 = Math.min(source.width, Math.floor((tx + 1) * scaleX));
+
+      let sumR = 0;
+      let sumG = 0;
+      let sumB = 0;
+      let sumA = 0;
+      let count = 0;
+
+      for (let sy = sy0; sy < Math.max(sy1, sy0 + 1); sy += 1) {
+        for (let sx = sx0; sx < Math.max(sx1, sx0 + 1); sx += 1) {
+          const srcOffset = (sy * source.width + sx) * 4;
+          sumR += source.data[srcOffset];
+          sumG += source.data[srcOffset + 1];
+          sumB += source.data[srcOffset + 2];
+          sumA += source.data[srcOffset + 3];
+          count += 1;
+        }
+      }
+
+      const dstOffset = (ty * targetWidth + tx) * 4;
+      out[dstOffset] = Math.round(sumR / count);
+      out[dstOffset + 1] = Math.round(sumG / count);
+      out[dstOffset + 2] = Math.round(sumB / count);
+      out[dstOffset + 3] = Math.round(sumA / count);
+    }
+  }
+
+  return {
+    width: targetWidth,
+    height: targetHeight,
+    data: out,
+  };
+}
+
 function toPositiveInteger(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return null;
@@ -1284,10 +1340,10 @@ function drawTexturedTriangle(
   v1: ScreenVertex,
   v2: ScreenVertex,
 ): void {
-  const minX = Math.max(0, Math.floor(Math.min(v0.x, v1.x, v2.x)));
-  const maxX = Math.min(target.width - 1, Math.ceil(Math.max(v0.x, v1.x, v2.x)));
-  const minY = Math.max(0, Math.floor(Math.min(v0.y, v1.y, v2.y)));
-  const maxY = Math.min(target.height - 1, Math.ceil(Math.max(v0.y, v1.y, v2.y)));
+  const minX = Math.max(0, Math.floor(Math.min(v0.x, v1.x, v2.x)) - 1);
+  const maxX = Math.min(target.width - 1, Math.ceil(Math.max(v0.x, v1.x, v2.x)) + 1);
+  const minY = Math.max(0, Math.floor(Math.min(v0.y, v1.y, v2.y)) - 1);
+  const maxY = Math.min(target.height - 1, Math.ceil(Math.max(v0.y, v1.y, v2.y)) + 1);
 
   const denom =
     (v1.y - v2.y) * (v0.x - v2.x) +
@@ -1295,6 +1351,7 @@ function drawTexturedTriangle(
   if (Math.abs(denom) < 1e-6) {
     return;
   }
+  const edgeEpsilon = 0.002;
 
   for (let py = minY; py <= maxY; py += 1) {
     for (let px = minX; px <= maxX; px += 1) {
@@ -1307,7 +1364,7 @@ function drawTexturedTriangle(
         ((v2.y - v0.y) * (sx - v2.x) + (v0.x - v2.x) * (sy - v2.y)) / denom;
       const w2 = 1 - w0 - w1;
 
-      if (w0 < -1e-6 || w1 < -1e-6 || w2 < -1e-6) {
+      if (w0 < -edgeEpsilon || w1 < -edgeEpsilon || w2 < -edgeEpsilon) {
         continue;
       }
 
@@ -1448,18 +1505,19 @@ async function renderTextureFromModel(
 
     const { minX, maxX, minY, maxY } = getFullBlockProjectionBounds();
     const outputSize = Math.max(16, MODEL_RENDER_SIZE);
-    const padding = 1;
+    const supersampledSize = outputSize * MODEL_RENDER_SUPERSAMPLE;
+    const padding = MODEL_RENDER_SUPERSAMPLE;
     const spanX = Math.max(1e-6, maxX - minX);
     const spanY = Math.max(1e-6, maxY - minY);
     const scale = Math.min(
-      (outputSize - padding * 2) / spanX,
-      (outputSize - padding * 2) / spanY,
+      (supersampledSize - padding * 2) / spanX,
+      (supersampledSize - padding * 2) / spanY,
     );
 
     const output: RgbaImage = {
-      width: outputSize,
-      height: outputSize,
-      data: Buffer.alloc(outputSize * outputSize * 4),
+      width: supersampledSize,
+      height: supersampledSize,
+      data: Buffer.alloc(supersampledSize * supersampledSize * 4),
     };
 
     projected.sort((a, b) => a.depth - b.depth);
@@ -1497,10 +1555,15 @@ async function renderTextureFromModel(
       return null;
     }
 
+    const finalImage =
+      MODEL_RENDER_SUPERSAMPLE > 1
+        ? downsampleRgbaImage(output, outputSize, outputSize)
+        : output;
+
     const sourceTexture = projected[0].textureRef;
     return {
       textureRef: sourceTexture,
-      bytes: encodeRgbaImageToPng(output),
+      bytes: encodeRgbaImageToPng(finalImage),
     };
   })();
 
