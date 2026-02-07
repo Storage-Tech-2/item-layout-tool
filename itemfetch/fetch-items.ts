@@ -83,6 +83,8 @@ type RgbaImage = {
   data: Buffer;
 };
 
+type ModelRenderView = "front" | "back";
+
 type AnimationMeta = {
   animation?: {
     width?: number;
@@ -103,6 +105,8 @@ const OUTPUT_ROOT = path.resolve(process.cwd(), "public/items");
 const OUTPUT_TEXTURE_ROOT = path.join(OUTPUT_ROOT, "textures");
 const OUTPUT_INDEX_PATH = path.join(OUTPUT_ROOT, "items.json");
 const MODEL_RENDER_SIZE = Number(process.env.ITEMFETCH_MODEL_RENDER_SIZE ?? "64");
+const MODEL_RENDER_VIEW: ModelRenderView =
+  process.env.ITEMFETCH_MODEL_RENDER_VIEW === "front" ? "front" : "back";
 
 const ITEM_LIMIT = Number(process.env.ITEMFETCH_LIMIT ?? "0");
 const CONCURRENCY = Number(process.env.ITEMFETCH_CONCURRENCY ?? "24");
@@ -1196,6 +1200,18 @@ function projectModelPoint(x: number, y: number, z: number): { x: number; y: num
   };
 }
 
+function projectModelPointForView(
+  x: number,
+  y: number,
+  z: number,
+  view: ModelRenderView,
+): { x: number; y: number } {
+  if (view === "back") {
+    return projectModelPoint(16 - x, y, 16 - z);
+  }
+  return projectModelPoint(x, y, z);
+}
+
 function getFullBlockProjectionBounds(): {
   minX: number;
   maxX: number;
@@ -1203,14 +1219,14 @@ function getFullBlockProjectionBounds(): {
   maxY: number;
 } {
   const points = [
-    projectModelPoint(0, 0, 0),
-    projectModelPoint(16, 0, 0),
-    projectModelPoint(0, 0, 16),
-    projectModelPoint(16, 0, 16),
-    projectModelPoint(0, 16, 0),
-    projectModelPoint(16, 16, 0),
-    projectModelPoint(0, 16, 16),
-    projectModelPoint(16, 16, 16),
+    projectModelPointForView(0, 0, 0, MODEL_RENDER_VIEW),
+    projectModelPointForView(16, 0, 0, MODEL_RENDER_VIEW),
+    projectModelPointForView(0, 0, 16, MODEL_RENDER_VIEW),
+    projectModelPointForView(16, 0, 16, MODEL_RENDER_VIEW),
+    projectModelPointForView(0, 16, 0, MODEL_RENDER_VIEW),
+    projectModelPointForView(16, 16, 0, MODEL_RENDER_VIEW),
+    projectModelPointForView(0, 16, 16, MODEL_RENDER_VIEW),
+    projectModelPointForView(16, 16, 16, MODEL_RENDER_VIEW),
   ];
 
   return {
@@ -1388,19 +1404,35 @@ async function renderTextureFromModel(
         { x: x1, y: y2, z: z2 },
       ]);
 
-      pushFace(element.faces.east, [
-        { x: x2, y: y2, z: z1 },
-        { x: x2, y: y2, z: z2 },
-        { x: x2, y: y1, z: z2 },
-        { x: x2, y: y1, z: z1 },
-      ]);
+      if (MODEL_RENDER_VIEW === "back") {
+        pushFace(element.faces.west, [
+          { x: x1, y: y2, z: z2 },
+          { x: x1, y: y2, z: z1 },
+          { x: x1, y: y1, z: z1 },
+          { x: x1, y: y1, z: z2 },
+        ]);
 
-      pushFace(element.faces.south, [
-        { x: x1, y: y2, z: z2 },
-        { x: x2, y: y2, z: z2 },
-        { x: x2, y: y1, z: z2 },
-        { x: x1, y: y1, z: z2 },
-      ]);
+        pushFace(element.faces.north, [
+          { x: x2, y: y2, z: z1 },
+          { x: x1, y: y2, z: z1 },
+          { x: x1, y: y1, z: z1 },
+          { x: x2, y: y1, z: z1 },
+        ]);
+      } else {
+        pushFace(element.faces.east, [
+          { x: x2, y: y2, z: z1 },
+          { x: x2, y: y2, z: z2 },
+          { x: x2, y: y1, z: z2 },
+          { x: x2, y: y1, z: z1 },
+        ]);
+
+        pushFace(element.faces.south, [
+          { x: x1, y: y2, z: z2 },
+          { x: x2, y: y2, z: z2 },
+          { x: x2, y: y1, z: z2 },
+          { x: x1, y: y1, z: z2 },
+        ]);
+      }
     }
 
     if (facesToRender.length === 0) {
@@ -1410,7 +1442,7 @@ async function renderTextureFromModel(
     const projected = facesToRender.map((face) => ({
       ...face,
       projectedPoints: face.points.map((point) =>
-        projectModelPoint(point.x, point.y, point.z),
+        projectModelPointForView(point.x, point.y, point.z, MODEL_RENDER_VIEW),
       ),
     }));
 
