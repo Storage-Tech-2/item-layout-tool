@@ -1,5 +1,5 @@
 import { type DragEvent, useMemo, useState } from "react";
-import { DRAG_DATA_KEY } from "../constants";
+import { DRAG_DATA_KEY, HALL_ORDER } from "../constants";
 import { retainValidAssignments } from "../lib/layoutAssignments";
 import { buildSlotCenters, toPointKey } from "../lib/layoutGeometry";
 import {
@@ -43,6 +43,10 @@ type UseLayoutAssignmentsResult = {
   handleViewportDropFallback: (event: DragEvent<HTMLElement>) => void;
   handleLibraryDragOver: (event: DragEvent<HTMLElement>) => void;
   handleLibraryDrop: (event: DragEvent<HTMLElement>) => void;
+  preserveAssignmentsForConfigChange: (
+    previousConfigs: Record<HallId, HallConfig>,
+    nextConfigs: Record<HallId, HallConfig>,
+  ) => void;
   clearSlot: (slotId: string) => void;
   setSelectedSlotIds: (slotIds: string[]) => void;
 };
@@ -400,6 +404,126 @@ export function useLayoutAssignments({
     setSelectedSlotIdsState(slotIds);
   }
 
+  function preserveAssignmentsForConfigChange(
+    previousConfigs: Record<HallId, HallConfig>,
+    nextConfigs: Record<HallId, HallConfig>,
+  ): void {
+    const previousOrderedSlotIds = buildOrderedSlotIds(previousConfigs);
+    const nextOrderedSlotIds = buildOrderedSlotIds(nextConfigs);
+    const previousValidSlotIdSet = new Set(previousOrderedSlotIds);
+    const nextOrderIndex = new Map(
+      nextOrderedSlotIds.map((slotId, index) => [slotId, index]),
+    );
+    const previousOrderIndex = new Map(
+      previousOrderedSlotIds.map((slotId, index) => [slotId, index]),
+    );
+    const previousCenterBySlotId = buildSlotCenters(previousConfigs);
+    const nextCenterBySlotId = buildSlotCenters(nextConfigs);
+
+    const parseHallId = (slotId: string): HallId | null => {
+      const hallId = slotId.split(":")[0];
+      if (hallId === "north" || hallId === "east" || hallId === "south" || hallId === "west") {
+        return hallId;
+      }
+      return null;
+    };
+
+    const pickNearestSlot = (
+      targetPoint: { x: number; y: number } | undefined,
+      candidates: Set<string>,
+    ): string | null => {
+      let bestSlotId: string | null = null;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      let bestOrder = Number.POSITIVE_INFINITY;
+
+      for (const candidateSlotId of candidates) {
+        const center = nextCenterBySlotId.get(candidateSlotId);
+        const order = nextOrderIndex.get(candidateSlotId) ?? Number.POSITIVE_INFINITY;
+        const distance = targetPoint
+          ? ((center?.x ?? Number.POSITIVE_INFINITY) - targetPoint.x) ** 2 +
+            ((center?.y ?? Number.POSITIVE_INFINITY) - targetPoint.y) ** 2
+          : Number.POSITIVE_INFINITY;
+
+        if (
+          distance < bestDistance ||
+          (distance === bestDistance && order < bestOrder)
+        ) {
+          bestDistance = distance;
+          bestOrder = order;
+          bestSlotId = candidateSlotId;
+        }
+      }
+
+      if (!bestSlotId && candidates.size > 0) {
+        bestSlotId = Array.from(candidates).sort((a, b) => {
+          return (nextOrderIndex.get(a) ?? Number.POSITIVE_INFINITY) -
+            (nextOrderIndex.get(b) ?? Number.POSITIVE_INFINITY);
+        })[0] ?? null;
+      }
+
+      return bestSlotId;
+    };
+
+    setSlotAssignments((current) => {
+      const currentFromPrevious = retainValidAssignments(current, previousValidSlotIdSet);
+      const entries = Object.entries(currentFromPrevious)
+        .map(([slotId, itemId]) => ({
+          slotId,
+          itemId,
+          hallId: parseHallId(slotId),
+          point: previousCenterBySlotId.get(slotId),
+        }))
+        .sort((a, b) => {
+          return (previousOrderIndex.get(a.slotId) ?? Number.POSITIVE_INFINITY) -
+            (previousOrderIndex.get(b.slotId) ?? Number.POSITIVE_INFINITY);
+        });
+
+      if (entries.length === 0) {
+        return {};
+      }
+
+      const unassignedGlobal = new Set(nextOrderedSlotIds);
+      const unassignedByHall = new Map<HallId, Set<string>>();
+      for (const hallId of HALL_ORDER) {
+        const hallSlots = nextOrderedSlotIds.filter((slotId) => slotId.startsWith(`${hallId}:`));
+        unassignedByHall.set(hallId, new Set(hallSlots));
+      }
+
+      const remapped: Record<string, string> = {};
+
+      for (const entry of entries) {
+        let targetSlotId: string | null = null;
+
+        if (entry.hallId) {
+          const hallCandidates = unassignedByHall.get(entry.hallId);
+          if (hallCandidates && hallCandidates.size > 0) {
+            targetSlotId = pickNearestSlot(entry.point, hallCandidates);
+          }
+        }
+
+        if (!targetSlotId && unassignedGlobal.size > 0) {
+          targetSlotId = pickNearestSlot(entry.point, unassignedGlobal);
+        }
+
+        if (!targetSlotId) {
+          continue;
+        }
+
+        remapped[targetSlotId] = entry.itemId;
+        unassignedGlobal.delete(targetSlotId);
+        const targetHallId = parseHallId(targetSlotId);
+        if (targetHallId) {
+          unassignedByHall.get(targetHallId)?.delete(targetSlotId);
+        }
+      }
+
+      return remapped;
+    });
+
+    setSelectedSlotIdsState([]);
+    clearDragState();
+  }
+
   return {
     itemById,
     activeSlotAssignments,
@@ -417,6 +541,7 @@ export function useLayoutAssignments({
     handleViewportDropFallback,
     handleLibraryDragOver,
     handleLibraryDrop,
+    preserveAssignmentsForConfigChange,
     clearSlot,
     setSelectedSlotIds,
   };
