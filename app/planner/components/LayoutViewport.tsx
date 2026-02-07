@@ -81,6 +81,10 @@ export function LayoutViewport({
     width: number;
     height: number;
   } | null>(null);
+  const [expandedMisSlice, setExpandedMisSlice] = useState<{
+    hallId: HallId;
+    slice: number;
+  } | null>(null);
 
   const viewportBackgroundStyle = useMemo(
     () => ({
@@ -156,6 +160,19 @@ export function LayoutViewport({
       viewport.removeEventListener("contextmenu", preventContextMenu);
     };
   }, [viewportRef]);
+
+  const validExpandedMisSlice = useMemo(() => {
+    if (!expandedMisSlice) {
+      return null;
+    }
+
+    const config = hallConfigs[expandedMisSlice.hallId];
+    if (config.type !== "mis" || expandedMisSlice.slice >= config.slices) {
+      return null;
+    }
+
+    return expandedMisSlice;
+  }, [expandedMisSlice, hallConfigs]);
 
   const hallPlacement = useMemo(() => {
     const positions: Record<
@@ -454,6 +471,20 @@ export function LayoutViewport({
               className="grid min-w-0 flex-1 grid-rows-[auto_auto_1fr] gap-[0.22rem] rounded-[0.65rem] border border-[rgba(73,97,78,0.45)] bg-[linear-gradient(180deg,rgba(244,250,240,0.95)_0%,rgba(221,235,212,0.95)_100%)] p-[0.32rem]"
               onDragOver={(event) => onSlotDragOver(event, firstSlot)}
               onDrop={(event) => onSlotDrop(event, firstSlot)}
+              onClick={(event) => {
+                if (event.shiftKey) {
+                  event.preventDefault();
+                  return;
+                }
+
+                event.stopPropagation();
+                setExpandedMisSlice((current) => {
+                  if (current?.hallId === hallId && current.slice === slice) {
+                    return null;
+                  }
+                  return { hallId, slice };
+                });
+              }}
               title={`Slice ${slice + 1} • ${assignedItemIds.length}/${config.misSlotsPerSlice}`}
               data-slot
             >
@@ -493,6 +524,25 @@ export function LayoutViewport({
       </div>
     );
   }
+
+  const expandedMisConfig = validExpandedMisSlice
+    ? hallConfigs[validExpandedMisSlice.hallId]
+    : null;
+  const expandedMisSlotIds =
+    validExpandedMisSlice && expandedMisConfig?.type === "mis"
+      ? Array.from(
+          { length: expandedMisConfig.misSlotsPerSlice },
+          (_, index) =>
+            misSlotId(validExpandedMisSlice.hallId, validExpandedMisSlice.slice, index),
+        )
+      : [];
+  const expandedMisColumns =
+    expandedMisConfig && expandedMisConfig.misSlotsPerSlice % 9 === 0
+      ? 9
+      : Math.min(
+          12,
+          Math.max(6, Math.ceil(Math.sqrt(expandedMisConfig?.misSlotsPerSlice ?? 1))),
+        );
 
   return (
     <div
@@ -643,6 +693,44 @@ export function LayoutViewport({
           -
         </button>
       </div>
+
+      {validExpandedMisSlice && expandedMisConfig?.type === "mis" ? (
+        <section
+          className="absolute left-1/2 top-5 z-30 w-[min(88vw,600px)] -translate-x-1/2 overflow-hidden rounded-[0.85rem] border border-[rgba(58,90,74,0.55)] bg-[linear-gradient(180deg,rgba(244,250,240,0.97)_0%,rgba(223,236,216,0.97)_100%)] shadow-[0_12px_34px_rgba(38,48,33,0.28)]"
+          data-no-pan
+          onClick={(event) => event.stopPropagation()}
+        >
+          <header className="flex items-center justify-between border-b border-[rgba(63,88,72,0.28)] px-3 py-2">
+            <div className="grid gap-[0.08rem] text-[#2e5042]">
+              <div className="text-[0.78rem] font-bold uppercase tracking-[0.05em]">
+                {HALL_LABELS[validExpandedMisSlice.hallId]} MIS Slice{" "}
+                {validExpandedMisSlice.slice + 1}
+              </div>
+              <div className="text-[0.68rem] text-[#3e6455]">
+                {expandedMisSlotIds.filter((slotId) => Boolean(slotAssignments[slotId])).length}/
+                {expandedMisConfig.misSlotsPerSlice} assigned
+              </div>
+            </div>
+            <button
+              type="button"
+              className="rounded-[0.4rem] border border-[rgba(82,104,88,0.45)] bg-[rgba(253,255,252,0.92)] px-[0.5rem] py-[0.2rem] text-[0.72rem] font-semibold text-[#2f4b3f]"
+              onClick={() => setExpandedMisSlice(null)}
+            >
+              Close
+            </button>
+          </header>
+          <div className="max-h-[64vh] overflow-auto p-3">
+            <div
+              className="grid content-start gap-[4px]"
+              style={{
+                gridTemplateColumns: `repeat(${expandedMisColumns}, ${SLOT_SIZE}px)`,
+              }}
+            >
+              {expandedMisSlotIds.map((slotId) => renderSlot(slotId))}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <div
         className="absolute left-0 top-0 origin-top-left"
