@@ -1,5 +1,12 @@
 import type { NextConfig } from "next";
 
+const configuredBasePath = (process.env.NEXT_BASE_PATH ?? "").trim().replace(/\/$/, "");
+const basePath = configuredBasePath
+  ? configuredBasePath.startsWith("/")
+    ? configuredBasePath
+    : `/${configuredBasePath}`
+  : "";
+
 const nextConfig: NextConfig = {
   /**
    * Enable static exports.
@@ -7,13 +14,19 @@ const nextConfig: NextConfig = {
    * @see https://nextjs.org/docs/app/building-your-application/deploying/static-exports
    */
   output: "export",
+  trailingSlash: true,
 
   /**
    * Set base path. This is usually the slug of your repository.
    *
    * @see https://nextjs.org/docs/app/api-reference/next-config-js/basePath
    */
-  basePath: "/nextjs-github-pages",
+  ...(basePath
+    ? {
+        basePath,
+        assetPrefix: basePath,
+      }
+    : {}),
 
   /**
    * Disable server-based image optimization. Next.js does not support
