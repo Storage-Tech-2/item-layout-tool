@@ -42,7 +42,7 @@ export function nextConfigsForHallSlices(
   hallId: HallId,
   rawValue: string,
 ): Record<HallId, HallConfig> {
-  const slices = clamp(Number(rawValue) || 1, 1, 72);
+  const slices = clamp(Number(rawValue) || 1, 1, 200);
   return {
     ...current,
     [hallId]: {

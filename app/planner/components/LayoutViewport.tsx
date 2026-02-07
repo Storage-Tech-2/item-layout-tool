@@ -891,7 +891,7 @@ export function LayoutViewport({
                         className="w-[2.2rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
                         type="number"
                         min={1}
-                        max={72}
+                        max={200}
                         value={hall.slices}
                         onChange={(event) => onHallSlicesChange(hallId, event.target.value)}
                       />
@@ -902,8 +902,8 @@ export function LayoutViewport({
                         <input
                           className="w-[2.55rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
                           type="number"
-                          min={10}
-                          max={200}
+                          min={1}
+                          max={54}
                           value={hall.misSlotsPerSlice}
                           onChange={(event) =>
                             onHallMisCapacityChange(hallId, event.target.value)

@@ -121,7 +121,7 @@ export function LayoutControls({
                     className="w-full rounded-[0.45rem] border border-[rgba(133,108,70,0.4)] bg-[#fffdf8] px-[0.36rem] py-[0.3rem] text-[0.8rem] text-[#1f1a16] outline-none"
                     type="number"
                     min={1}
-                    max={72}
+                    max={200}
                     value={hall.slices}
                     onChange={(event) => onHallSlicesChange(hallId, event.target.value)}
                   />
@@ -148,7 +148,7 @@ export function LayoutControls({
                       className="w-full rounded-[0.45rem] border border-[rgba(133,108,70,0.4)] bg-[#fffdf8] px-[0.36rem] py-[0.3rem] text-[0.8rem] text-[#1f1a16] outline-none"
                       type="number"
                       min={1}
-                      max={9}
+                      max={6}
                       value={hall.rowsPerSide}
                       onChange={(event) => onHallRowsChange(hallId, event.target.value)}
                     />

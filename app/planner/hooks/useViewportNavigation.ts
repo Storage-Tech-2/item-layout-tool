@@ -35,7 +35,7 @@ export function useViewportNavigation(): {
   const previousBodyUserSelect = useRef("");
 
   const [state, setState] = useState<ViewportState>({
-    zoom: 0.9,
+    zoom: 0.6,
     pan: { x: 160, y: 110 },
   });
 
