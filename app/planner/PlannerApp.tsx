@@ -381,6 +381,7 @@ export function PlannerApp() {
     if (incoming.length === 0) {
       return [];
     }
+    const allowOccupiedTargets = payload.source === "layout";
 
     const working = retainValidAssignments(assignments, orderedSlotIdSet);
     const incomingSet = new Set(incoming);
@@ -432,7 +433,11 @@ export function PlannerApp() {
             continue;
           }
 
-          if (usedTargetSlots.has(targetSlotId) || working[targetSlotId]) {
+          if (usedTargetSlots.has(targetSlotId)) {
+            continue;
+          }
+
+          if (!allowOccupiedTargets && working[targetSlotId]) {
             continue;
           }
 
@@ -463,8 +468,10 @@ export function PlannerApp() {
     let cursor = anchorIndex;
 
     for (const itemId of incoming) {
-      while (cursor < orderedSlotIds.length && working[orderedSlotIds[cursor]]) {
-        cursor += 1;
+      if (!allowOccupiedTargets) {
+        while (cursor < orderedSlotIds.length && working[orderedSlotIds[cursor]]) {
+          cursor += 1;
+        }
       }
 
       if (cursor >= orderedSlotIds.length) {
@@ -532,17 +539,16 @@ export function PlannerApp() {
 
     setSlotAssignments((current) => {
       const next = retainValidAssignments(current, orderedSlotIdSet);
-      const incoming = payload.itemIds.filter((itemId) => itemById.has(itemId));
+      const incomingEntries = payload.itemIds
+        .map((itemId, index) => ({
+          itemId,
+          sourceSlotId: payload.sourceSlotIds?.[index],
+        }))
+        .filter((entry) => itemById.has(entry.itemId));
+      const incoming = incomingEntries.map((entry) => entry.itemId);
 
       if (incoming.length === 0) {
         return current;
-      }
-
-      const incomingSet = new Set(incoming);
-      for (const [slotId, itemId] of Object.entries(next)) {
-        if (incomingSet.has(itemId)) {
-          delete next[slotId];
-        }
       }
 
       const placements = buildPlacements(anchorSlotId, payload, current);
@@ -550,8 +556,88 @@ export function PlannerApp() {
         return current;
       }
 
+      const incomingSet = new Set(incoming);
+      const displaced: Array<{ itemId: string; preferredSlotId?: string }> = [];
+      for (const [index, placement] of placements.entries()) {
+        const existingItemId = current[placement.slotId];
+        if (existingItemId && !incomingSet.has(existingItemId)) {
+          displaced.push({
+            itemId: existingItemId,
+            preferredSlotId: incomingEntries[index]?.sourceSlotId,
+          });
+        }
+      }
+
+      for (const [slotId, itemId] of Object.entries(next)) {
+        if (incomingSet.has(itemId)) {
+          delete next[slotId];
+        }
+      }
+
       for (const placement of placements) {
         next[placement.slotId] = placement.itemId;
+      }
+
+      if (payload.source === "layout" && displaced.length > 0) {
+        const targetSlots = new Set(placements.map((placement) => placement.slotId));
+        const sourceSlots: string[] = [];
+        const sourceSlotSet = new Set<string>();
+
+        for (const entry of incomingEntries) {
+          if (
+            entry.sourceSlotId &&
+            orderedSlotIdSet.has(entry.sourceSlotId) &&
+            !sourceSlotSet.has(entry.sourceSlotId)
+          ) {
+            sourceSlots.push(entry.sourceSlotId);
+            sourceSlotSet.add(entry.sourceSlotId);
+          }
+        }
+
+        const candidateSwapSlots = sourceSlots.filter(
+          (slotId) => !targetSlots.has(slotId) && !next[slotId],
+        );
+
+        if (candidateSwapSlots.length < displaced.length) {
+          return current;
+        }
+
+        const usedSwapSlots = new Set<string>();
+        const remaining: string[] = [];
+
+        for (const item of displaced) {
+          const preferred = item.preferredSlotId;
+          if (
+            preferred &&
+            candidateSwapSlots.includes(preferred) &&
+            !usedSwapSlots.has(preferred)
+          ) {
+            next[preferred] = item.itemId;
+            usedSwapSlots.add(preferred);
+            continue;
+          }
+
+          remaining.push(item.itemId);
+        }
+
+        let cursor = 0;
+        for (const itemId of remaining) {
+          while (
+            cursor < candidateSwapSlots.length &&
+            usedSwapSlots.has(candidateSwapSlots[cursor])
+          ) {
+            cursor += 1;
+          }
+
+          if (cursor >= candidateSwapSlots.length) {
+            return current;
+          }
+
+          const slotId = candidateSwapSlots[cursor];
+          usedSwapSlots.add(slotId);
+          next[slotId] = itemId;
+          cursor += 1;
+        }
       }
 
       return next;
