@@ -1,19 +1,16 @@
 import type {
   CatalogItem,
   DragPayload,
+  HallId,
   IncomingEntry,
   PreviewPlacement,
-  SlotPoint,
 } from "../types";
 import { retainValidAssignments } from "./layoutAssignments";
-import { toPointKey } from "./layoutGeometry";
 
 type PlacementContext = {
   orderedSlotIds: string[];
   orderedSlotIdSet: Set<string>;
   itemById: Map<string, CatalogItem>;
-  slotCenterById: Map<string, SlotPoint>;
-  slotIdByPointKey: Map<string, string>;
 };
 
 type BuildPlacementsInput = {
@@ -30,6 +27,116 @@ type BuildSwapPlacementsInput = {
   assignments: Record<string, string>;
   orderedSlotIdSet: Set<string>;
 };
+
+type ParsedGridSlot = {
+  kind: "grid";
+  hallId: HallId;
+  slice: number;
+  side: number;
+  row: number;
+};
+
+type ParsedMisSlot = {
+  kind: "mis";
+  hallId: HallId;
+  slice: number;
+  misUnit: number;
+  index: number;
+};
+
+type ParsedSlot = ParsedGridSlot | ParsedMisSlot;
+
+function parseHallId(raw: string): HallId | null {
+  if (raw === "north" || raw === "east" || raw === "south" || raw === "west") {
+    return raw;
+  }
+  return null;
+}
+
+function parseIntPart(raw: string): number | null {
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  return value;
+}
+
+function parseSlotId(slotId: string): ParsedSlot | null {
+  const [hallRaw, kindRaw, aRaw, bRaw, cRaw] = slotId.split(":");
+  const hallId = parseHallId(hallRaw);
+  if (!hallId) {
+    return null;
+  }
+
+  const a = parseIntPart(aRaw);
+  const b = parseIntPart(bRaw);
+  const c = parseIntPart(cRaw);
+  if (a === null || b === null || c === null) {
+    return null;
+  }
+
+  if (kindRaw === "g") {
+    return {
+      kind: "grid",
+      hallId,
+      slice: a,
+      side: b,
+      row: c,
+    };
+  }
+
+  if (kindRaw === "m") {
+    return {
+      kind: "mis",
+      hallId,
+      slice: a,
+      misUnit: b,
+      index: c,
+    };
+  }
+
+  return null;
+}
+
+function projectRepresentationTargetSlotId(
+  sourceSlotId: string,
+  originSlotId: string,
+  anchorSlotId: string,
+): string | null {
+  const source = parseSlotId(sourceSlotId);
+  const origin = parseSlotId(originSlotId);
+  const anchor = parseSlotId(anchorSlotId);
+
+  if (!source || !origin || !anchor) {
+    return null;
+  }
+
+  if (source.kind !== origin.kind || anchor.kind !== origin.kind) {
+    return null;
+  }
+
+  if (origin.kind === "grid" && source.kind === "grid" && anchor.kind === "grid") {
+    const targetSlice = anchor.slice + (source.slice - origin.slice);
+    const targetSide = anchor.side + (source.side - origin.side);
+    const targetRow = anchor.row + (source.row - origin.row);
+
+    if (targetSide < 0 || targetSide > 1) {
+      return null;
+    }
+
+    return `${anchor.hallId}:g:${targetSlice}:${targetSide}:${targetRow}`;
+  }
+
+  if (origin.kind === "mis" && source.kind === "mis" && anchor.kind === "mis") {
+    const targetSlice = anchor.slice + (source.slice - origin.slice);
+    const targetMisUnit = anchor.misUnit + (source.misUnit - origin.misUnit);
+    const targetIndex = anchor.index + (source.index - origin.index);
+
+    return `${anchor.hallId}:m:${targetSlice}:${targetMisUnit}:${targetIndex}`;
+  }
+
+  return null;
+}
 
 export function getIncomingEntries(
   payload: DragPayload,
@@ -49,13 +156,7 @@ export function buildPlacements({
   assignments,
   context,
 }: BuildPlacementsInput): PreviewPlacement[] {
-  const {
-    orderedSlotIds,
-    orderedSlotIdSet,
-    itemById,
-    slotCenterById,
-    slotIdByPointKey,
-  } = context;
+  const { orderedSlotIds, orderedSlotIdSet, itemById } = context;
 
   const anchorIndex = orderedSlotIds.indexOf(anchorSlotId);
   if (anchorIndex === -1) {
@@ -87,58 +188,43 @@ export function buildPlacements({
 
   if (canTryShapePlacement) {
     const originSlotId = payload.originSlotId as string;
-    const originPoint = slotCenterById.get(originSlotId);
-    const anchorPoint = slotCenterById.get(anchorSlotId);
+    const shapePlacements: PreviewPlacement[] = [];
+    const usedTargetSlots = new Set<string>();
 
-    if (originPoint && anchorPoint) {
-      const delta = {
-        x: anchorPoint.x - originPoint.x,
-        y: anchorPoint.y - originPoint.y,
-      };
-
-      const shapePlacements: PreviewPlacement[] = [];
-      const usedTargetSlots = new Set<string>();
-
-      for (const entry of incomingEntries) {
-        if (!entry.sourceSlotId) {
-          continue;
-        }
-
-        const sourcePoint = slotCenterById.get(entry.sourceSlotId);
-        if (!sourcePoint) {
-          continue;
-        }
-
-        const targetPoint = {
-          x: sourcePoint.x + delta.x,
-          y: sourcePoint.y + delta.y,
-        };
-        const targetSlotId = slotIdByPointKey.get(toPointKey(targetPoint));
-
-        if (!targetSlotId) {
-          continue;
-        }
-
-        if (usedTargetSlots.has(targetSlotId)) {
-          continue;
-        }
-
-        if (!allowOccupiedTargets && working[targetSlotId]) {
-          continue;
-        }
-
-        shapePlacements.push({
-          slotId: targetSlotId,
-          itemId: entry.itemId,
-          kind: "place",
-        });
-        usedTargetSlots.add(targetSlotId);
-        working[targetSlotId] = entry.itemId;
+    for (const entry of incomingEntries) {
+      if (!entry.sourceSlotId) {
+        continue;
       }
 
-      if (shapePlacements.length === incomingEntries.length) {
-        return shapePlacements;
+      const targetSlotId = projectRepresentationTargetSlotId(
+        entry.sourceSlotId,
+        originSlotId,
+        anchorSlotId,
+      );
+
+      if (!targetSlotId || !orderedSlotIdSet.has(targetSlotId)) {
+        continue;
       }
+
+      if (usedTargetSlots.has(targetSlotId)) {
+        continue;
+      }
+
+      if (!allowOccupiedTargets && working[targetSlotId]) {
+        continue;
+      }
+
+      shapePlacements.push({
+        slotId: targetSlotId,
+        itemId: entry.itemId,
+        kind: "place",
+      });
+      usedTargetSlots.add(targetSlotId);
+      working[targetSlotId] = entry.itemId;
+    }
+
+    if (shapePlacements.length === incomingEntries.length) {
+      return shapePlacements;
     }
   }
 

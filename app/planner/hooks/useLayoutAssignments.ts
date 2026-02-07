@@ -1,7 +1,7 @@
 import { type DragEvent, useMemo, useState } from "react";
 import { DRAG_DATA_KEY, HALL_ORDER } from "../constants";
 import { retainValidAssignments } from "../lib/layoutAssignments";
-import { buildSlotCenters, toPointKey } from "../lib/layoutGeometry";
+import { buildSlotCenters } from "../lib/layoutGeometry";
 import {
   arePreviewsEqual,
   buildPlacements,
@@ -68,24 +68,13 @@ export function useLayoutAssignments({
   const orderedSlotIds = useMemo(() => buildOrderedSlotIds(hallConfigs), [hallConfigs]);
   const orderedSlotIdSet = useMemo(() => new Set(orderedSlotIds), [orderedSlotIds]);
 
-  const slotCenterById = useMemo(() => buildSlotCenters(hallConfigs), [hallConfigs]);
-  const slotIdByPointKey = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const [slotId, point] of slotCenterById.entries()) {
-      map.set(toPointKey(point), slotId);
-    }
-    return map;
-  }, [slotCenterById]);
-
   const placementContext = useMemo(
     () => ({
       orderedSlotIds,
       orderedSlotIdSet,
       itemById: new Map(catalogItems.map((item) => [item.id, item])),
-      slotCenterById,
-      slotIdByPointKey,
     }),
-    [catalogItems, orderedSlotIds, orderedSlotIdSet, slotCenterById, slotIdByPointKey],
+    [catalogItems, orderedSlotIds, orderedSlotIdSet],
   );
   const itemById = placementContext.itemById;
 
