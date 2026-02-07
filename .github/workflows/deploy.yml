@@ -78,6 +78,9 @@ jobs:
 
       - name: Install dependencies
         run: ${{ steps.detect-package-manager.outputs.manager }} ${{ steps.detect-package-manager.outputs.command }}
+      
+      - name: Build item list
+        run: ${{ steps.detect-package-manager.outputs.runner }} tsx itemfetch/fetch-items.ts
 
       - name: Build with Next.js
         run: ${{ steps.detect-package-manager.outputs.runner }} next build
