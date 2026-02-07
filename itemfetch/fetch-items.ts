@@ -22,11 +22,19 @@ type ModelFile = {
 type ModelFaceDef = {
   texture: string;
   uv: [number, number, number, number];
+  rotation: 0 | 90 | 180 | 270;
+};
+
+type ModelElementRotation = {
+  axis: "x" | "y" | "z";
+  angle: number;
+  origin: [number, number, number];
 };
 
 type ModelElementDef = {
   from: [number, number, number];
   to: [number, number, number];
+  rotation: ModelElementRotation | null;
   faces: Partial<Record<"up" | "down" | "north" | "south" | "east" | "west", ModelFaceDef>>;
 };
 
@@ -519,12 +527,17 @@ function parseModelFace(value: unknown): ModelFaceDef | null {
     return null;
   }
 
+  const rotationRaw = value.rotation;
+  const rotation =
+    rotationRaw === 90 || rotationRaw === 180 || rotationRaw === 270 ? rotationRaw : 0;
+
   const uvRaw = value.uv;
   const uvDefault: [number, number, number, number] = [0, 0, 16, 16];
   if (!Array.isArray(uvRaw)) {
     return {
       texture: value.texture,
       uv: uvDefault,
+      rotation,
     };
   }
 
@@ -535,12 +548,39 @@ function parseModelFace(value: unknown): ModelFaceDef | null {
     return {
       texture: value.texture,
       uv: uvDefault,
+      rotation,
     };
   }
 
   return {
     texture: value.texture,
     uv: [uvRaw[0], uvRaw[1], uvRaw[2], uvRaw[3]],
+    rotation,
+  };
+}
+
+function parseModelElementRotation(value: unknown): ModelElementRotation | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (value.axis !== "x" && value.axis !== "y" && value.axis !== "z") {
+    return null;
+  }
+  if (typeof value.angle !== "number" || !Number.isFinite(value.angle)) {
+    return null;
+  }
+  if (
+    !Array.isArray(value.origin) ||
+    value.origin.length !== 3 ||
+    value.origin.some((entry) => typeof entry !== "number" || !Number.isFinite(entry))
+  ) {
+    return null;
+  }
+
+  return {
+    axis: value.axis,
+    angle: value.angle,
+    origin: [value.origin[0], value.origin[1], value.origin[2]],
   };
 }
 
@@ -577,6 +617,7 @@ function parseModelElements(value: unknown): ModelElementDef[] {
     elements.push({
       from: [rawElement.from[0], rawElement.from[1], rawElement.from[2]],
       to: [rawElement.to[0], rawElement.to[1], rawElement.to[2]],
+      rotation: parseModelElementRotation(rawElement.rotation),
       faces,
     });
   }
@@ -1325,6 +1366,154 @@ function alphaBlendPixel(
   target[offset + 3] = Math.max(0, Math.min(255, Math.round(outA * 255)));
 }
 
+type Vec3 = { x: number; y: number; z: number };
+
+function rotateVectorAroundAxis(
+  vector: Vec3,
+  axis: "x" | "y" | "z",
+  radians: number,
+): Vec3 {
+  const c = Math.cos(radians);
+  const s = Math.sin(radians);
+  if (axis === "x") {
+    return {
+      x: vector.x,
+      y: vector.y * c - vector.z * s,
+      z: vector.y * s + vector.z * c,
+    };
+  }
+  if (axis === "y") {
+    return {
+      x: vector.x * c + vector.z * s,
+      y: vector.y,
+      z: -vector.x * s + vector.z * c,
+    };
+  }
+  return {
+    x: vector.x * c - vector.y * s,
+    y: vector.x * s + vector.y * c,
+    z: vector.z,
+  };
+}
+
+function rotatePointAroundElementRotation(
+  point: Vec3,
+  rotation: ModelElementRotation | null,
+): Vec3 {
+  if (!rotation || rotation.angle === 0) {
+    return point;
+  }
+  const radians = (rotation.angle * Math.PI) / 180;
+  const translated = {
+    x: point.x - rotation.origin[0],
+    y: point.y - rotation.origin[1],
+    z: point.z - rotation.origin[2],
+  };
+  const rotated = rotateVectorAroundAxis(translated, rotation.axis, radians);
+  return {
+    x: rotated.x + rotation.origin[0],
+    y: rotated.y + rotation.origin[1],
+    z: rotated.z + rotation.origin[2],
+  };
+}
+
+function normalizeVec3(vector: Vec3): Vec3 {
+  const length = Math.hypot(vector.x, vector.y, vector.z);
+  if (length <= 1e-8) {
+    return { x: 0, y: 0, z: 0 };
+  }
+  return {
+    x: vector.x / length,
+    y: vector.y / length,
+    z: vector.z / length,
+  };
+}
+
+function getFaceGeometry(
+  faceName: "up" | "down" | "north" | "south" | "east" | "west",
+  x1: number,
+  y1: number,
+  z1: number,
+  x2: number,
+  y2: number,
+  z2: number,
+): { points: Vec3[]; normal: Vec3 } {
+  switch (faceName) {
+    case "up":
+      return {
+        points: [
+          { x: x1, y: y2, z: z1 },
+          { x: x2, y: y2, z: z1 },
+          { x: x2, y: y2, z: z2 },
+          { x: x1, y: y2, z: z2 },
+        ],
+        normal: { x: 0, y: 1, z: 0 },
+      };
+    case "down":
+      return {
+        points: [
+          { x: x1, y: y1, z: z2 },
+          { x: x2, y: y1, z: z2 },
+          { x: x2, y: y1, z: z1 },
+          { x: x1, y: y1, z: z1 },
+        ],
+        normal: { x: 0, y: -1, z: 0 },
+      };
+    case "north":
+      return {
+        points: [
+          { x: x2, y: y2, z: z1 },
+          { x: x1, y: y2, z: z1 },
+          { x: x1, y: y1, z: z1 },
+          { x: x2, y: y1, z: z1 },
+        ],
+        normal: { x: 0, y: 0, z: -1 },
+      };
+    case "south":
+      return {
+        points: [
+          { x: x1, y: y2, z: z2 },
+          { x: x2, y: y2, z: z2 },
+          { x: x2, y: y1, z: z2 },
+          { x: x1, y: y1, z: z2 },
+        ],
+        normal: { x: 0, y: 0, z: 1 },
+      };
+    case "east":
+      return {
+        points: [
+          { x: x2, y: y2, z: z1 },
+          { x: x2, y: y2, z: z2 },
+          { x: x2, y: y1, z: z2 },
+          { x: x2, y: y1, z: z1 },
+        ],
+        normal: { x: 1, y: 0, z: 0 },
+      };
+    default:
+      return {
+        points: [
+          { x: x1, y: y2, z: z2 },
+          { x: x1, y: y2, z: z1 },
+          { x: x1, y: y1, z: z1 },
+          { x: x1, y: y1, z: z2 },
+        ],
+        normal: { x: -1, y: 0, z: 0 },
+      };
+  }
+}
+
+function rotateUvCorners(
+  corners: Array<{ u: number; v: number }>,
+  rotation: 0 | 90 | 180 | 270,
+): Array<{ u: number; v: number }> {
+  let rotated = corners;
+  const steps = rotation / 90;
+  for (let i = 0; i < steps; i += 1) {
+    rotated = [rotated[3], rotated[0], rotated[1], rotated[2]];
+  }
+  return rotated;
+}
+
 type ScreenVertex = {
   x: number;
   y: number;
@@ -1458,10 +1647,15 @@ async function renderTextureFromModel(
 
     const facesToRender: Array<{
       points: Array<{ x: number; y: number; z: number }>;
-      uv: [number, number, number, number];
+      uvCorners: Array<{ u: number; v: number }>;
       textureRef: string;
       depth: number;
     }> = [];
+    const viewDirection = normalizeVec3(
+      MODEL_RENDER_VIEW === "back"
+        ? { x: -1, y: 1, z: -1 }
+        : { x: 1, y: 1, z: 1 },
+    );
 
     for (const element of resolved.elements) {
       const x1 = element.from[0];
@@ -1470,64 +1664,69 @@ async function renderTextureFromModel(
       const x2 = element.to[0];
       const y2 = element.to[1];
       const z2 = element.to[2];
-
-      const pushFace = (
-        face: ModelFaceDef | undefined,
-        points: Array<{ x: number; y: number; z: number }>,
-      ) => {
+      for (const faceName of ["up", "down", "north", "south", "east", "west"] as const) {
+        const face = element.faces[faceName];
         if (!face) {
-          return;
+          continue;
         }
         const textureRef = resolveTextureAlias(resolved.textureMap, face.texture);
         if (!textureRef) {
-          return;
+          continue;
         }
+
+        const geometry = getFaceGeometry(faceName, x1, y1, z1, x2, y2, z2);
+        const rotatedPoints = geometry.points.map((point) =>
+          rotatePointAroundElementRotation(point, element.rotation),
+        );
+        const rotatedNormal = normalizeVec3(
+          rotateVectorAroundAxis(
+            geometry.normal,
+            element.rotation?.axis ?? "x",
+            element.rotation ? (element.rotation.angle * Math.PI) / 180 : 0,
+          ),
+        );
+        const facing = rotatedNormal.x * viewDirection.x +
+          rotatedNormal.y * viewDirection.y +
+          rotatedNormal.z * viewDirection.z;
+        if (facing <= 1e-4) {
+          continue;
+        }
+
+        const [u1, v1, u2, v2] = face.uv;
+        const uvCorners = rotateUvCorners(
+          [
+            { u: u1, v: v1 },
+            { u: u2, v: v1 },
+            { u: u2, v: v2 },
+            { u: u1, v: v2 },
+          ],
+          face.rotation,
+        );
+
+        const centroid = rotatedPoints.reduce(
+          (sum, point) => ({
+            x: sum.x + point.x,
+            y: sum.y + point.y,
+            z: sum.z + point.z,
+          }),
+          { x: 0, y: 0, z: 0 },
+        );
+        centroid.x /= rotatedPoints.length;
+        centroid.y /= rotatedPoints.length;
+        centroid.z /= rotatedPoints.length;
+
+        // Painter depth in camera-aligned axis; smaller is farther, larger is nearer.
         const depth =
-          points.reduce((sum, point) => sum + point.x + point.z + point.y * 0.35, 0) /
-          points.length;
+          centroid.x * viewDirection.x +
+          centroid.y * viewDirection.y +
+          centroid.z * viewDirection.z;
+
         facesToRender.push({
-          points,
-          uv: face.uv,
+          points: rotatedPoints,
+          uvCorners,
           textureRef,
           depth,
         });
-      };
-
-      pushFace(element.faces.up, [
-        { x: x1, y: y2, z: z1 },
-        { x: x2, y: y2, z: z1 },
-        { x: x2, y: y2, z: z2 },
-        { x: x1, y: y2, z: z2 },
-      ]);
-
-      if (MODEL_RENDER_VIEW === "back") {
-        pushFace(element.faces.west, [
-          { x: x1, y: y2, z: z2 },
-          { x: x1, y: y2, z: z1 },
-          { x: x1, y: y1, z: z1 },
-          { x: x1, y: y1, z: z2 },
-        ]);
-
-        pushFace(element.faces.north, [
-          { x: x2, y: y2, z: z1 },
-          { x: x1, y: y2, z: z1 },
-          { x: x1, y: y1, z: z1 },
-          { x: x2, y: y1, z: z1 },
-        ]);
-      } else {
-        pushFace(element.faces.east, [
-          { x: x2, y: y2, z: z1 },
-          { x: x2, y: y2, z: z2 },
-          { x: x2, y: y1, z: z2 },
-          { x: x2, y: y1, z: z1 },
-        ]);
-
-        pushFace(element.faces.south, [
-          { x: x1, y: y2, z: z2 },
-          { x: x2, y: y2, z: z2 },
-          { x: x2, y: y1, z: z2 },
-          { x: x1, y: y1, z: z2 },
-        ]);
       }
     }
 
@@ -1566,17 +1765,16 @@ async function renderTextureFromModel(
         continue;
       }
 
-      const [u1, v1, u2, v2] = face.uv;
       const mapped = face.projectedPoints.map((point) => ({
         x: (point.x - minX) * scale + padding,
         y: (point.y - minY) * scale + padding,
       }));
 
       const vertices: ScreenVertex[] = [
-        { ...mapped[0], u: u1, v: v1 },
-        { ...mapped[1], u: u2, v: v1 },
-        { ...mapped[2], u: u2, v: v2 },
-        { ...mapped[3], u: u1, v: v2 },
+        { ...mapped[0], u: face.uvCorners[0].u, v: face.uvCorners[0].v },
+        { ...mapped[1], u: face.uvCorners[1].u, v: face.uvCorners[1].v },
+        { ...mapped[2], u: face.uvCorners[2].u, v: face.uvCorners[2].v },
+        { ...mapped[3], u: face.uvCorners[3].u, v: face.uvCorners[3].v },
       ];
 
       drawTexturedTriangle(output, texture, vertices[0], vertices[1], vertices[2]);
