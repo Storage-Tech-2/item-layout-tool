@@ -819,6 +819,14 @@ export function LayoutViewport({
             const hall = hallConfigs[hallId];
             const orientation = HALL_ORIENTATION[hallId];
             const placement = hallPlacement[hallId];
+            const controlAnchorStyle =
+              hallId === "north"
+                ? { left: "50%", top: "-0.36rem", transform: "translate(-50%, -100%)" }
+                : hallId === "south"
+                  ? { left: "50%", bottom: "-0.36rem", transform: "translate(-50%, 100%)" }
+                  : hallId === "east"
+                    ? { right: "-0.36rem", top: "50%", transform: "translate(100%, -50%)" }
+                    : { left: "-0.36rem", top: "50%", transform: "translate(-100%, -50%)" };
 
             const hallFirstSlot =
               hall.type === "mis"
@@ -852,7 +860,8 @@ export function LayoutViewport({
                 }}
               >
                 <div
-                  className="absolute left-[0.45rem] top-[-2.35rem] z-10 flex items-center gap-[0.2rem] rounded-[0.55rem] border border-[rgba(132,100,63,0.4)] bg-[rgba(255,244,223,0.96)] px-[0.32rem] py-[0.2rem] text-[#5f4c33]"
+                  className="absolute z-10"
+                  style={controlAnchorStyle}
                   data-no-pan
                   onPointerDown={(event) => {
                     event.stopPropagation();
@@ -861,58 +870,60 @@ export function LayoutViewport({
                     event.stopPropagation();
                   }}
                 >
-                  <span className="text-[0.62rem] font-bold uppercase tracking-[0.04em]">
-                    {HALL_LABELS[hallId]}
-                  </span>
-                  <select
-                    className="rounded-[0.35rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.24rem] py-[0.1rem] text-[0.62rem] font-semibold text-[#2b251f]"
-                    value={hall.type}
-                    onChange={(event) =>
-                      onHallTypeChange(hallId, event.target.value as HallType)
-                    }
-                  >
-                    <option value="bulk">Bulk</option>
-                    <option value="chest">Chest</option>
-                    <option value="mis">MIS</option>
-                  </select>
-                  <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
-                    <span>S</span>
-                    <input
-                      className="w-[2.2rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
-                      type="number"
-                      min={1}
-                      max={72}
-                      value={hall.slices}
-                      onChange={(event) => onHallSlicesChange(hallId, event.target.value)}
-                    />
-                  </label>
-                  {hall.type === "mis" ? (
+                  <div className="flex items-center gap-[0.2rem] rounded-[0.55rem] border border-[rgba(132,100,63,0.4)] bg-[rgba(255,244,223,0.96)] px-[0.32rem] py-[0.2rem] text-[#5f4c33]">
+                    <span className="text-[0.62rem] font-bold uppercase tracking-[0.04em]">
+                      {HALL_LABELS[hallId]}
+                    </span>
+                    <select
+                      className="rounded-[0.35rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.24rem] py-[0.1rem] text-[0.62rem] font-semibold text-[#2b251f]"
+                      value={hall.type}
+                      onChange={(event) =>
+                        onHallTypeChange(hallId, event.target.value as HallType)
+                      }
+                    >
+                      <option value="bulk">Bulk</option>
+                      <option value="chest">Chest</option>
+                      <option value="mis">MIS</option>
+                    </select>
                     <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
-                      <span>C</span>
+                      <span>S</span>
                       <input
-                        className="w-[2.55rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
-                        type="number"
-                        min={10}
-                        max={200}
-                        value={hall.misSlotsPerSlice}
-                        onChange={(event) =>
-                          onHallMisCapacityChange(hallId, event.target.value)
-                        }
-                      />
-                    </label>
-                  ) : (
-                    <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
-                      <span>R</span>
-                      <input
-                        className="w-[2rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
+                        className="w-[2.2rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
                         type="number"
                         min={1}
-                        max={9}
-                        value={hall.rowsPerSide}
-                        onChange={(event) => onHallRowsChange(hallId, event.target.value)}
+                        max={72}
+                        value={hall.slices}
+                        onChange={(event) => onHallSlicesChange(hallId, event.target.value)}
                       />
                     </label>
-                  )}
+                    {hall.type === "mis" ? (
+                      <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
+                        <span>C</span>
+                        <input
+                          className="w-[2.55rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
+                          type="number"
+                          min={10}
+                          max={200}
+                          value={hall.misSlotsPerSlice}
+                          onChange={(event) =>
+                            onHallMisCapacityChange(hallId, event.target.value)
+                          }
+                        />
+                      </label>
+                    ) : (
+                      <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
+                        <span>R</span>
+                        <input
+                          className="w-[2rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
+                          type="number"
+                          min={1}
+                          max={9}
+                          value={hall.rowsPerSide}
+                          onChange={(event) => onHallRowsChange(hallId, event.target.value)}
+                        />
+                      </label>
+                    )}
+                  </div>
                 </div>
 
                 {hall.type === "mis"
