@@ -1,4 +1,4 @@
-import type { BlockLootBehavior, ParsedBlock, ParsedItem } from "./types";
+import type { BlockLootBehavior, ParsedBlock, ParsedFood, ParsedItem } from "./types";
 import { stripMinecraftNamespace } from "./utils";
 
 type TopLevelCall = {
@@ -20,6 +20,11 @@ type PropertiesHelper = {
   params: string[];
   hasNoLootTable: boolean;
   overrideLootTableExpression: string | null;
+};
+
+type BuilderHelper = {
+  params: string[];
+  returnExpression: string;
 };
 
 function splitTopLevel(input: string, separator: string): string[] {
@@ -436,7 +441,7 @@ function findStatementEnd(source: string, fromIndex: number): number {
 
 function extractStaticFieldInitializers(
   source: string,
-  typeName: "Item" | "Block",
+  typeName: string,
 ): FieldInitializer[] {
   const fields: FieldInitializer[] = [];
   const pattern = new RegExp(
@@ -478,6 +483,15 @@ function parseIntegerLiteral(value: string): number | null {
     return null;
   }
   return Number.parseInt(normalized, 10);
+}
+
+function parseFloatLiteral(value: string): number | null {
+  const normalized = value.trim().replace(/_/g, "");
+  if (!/^-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[fFdD]?$/.test(normalized)) {
+    return null;
+  }
+  const asNumber = Number.parseFloat(normalized.replace(/[fFdD]$/, ""));
+  return Number.isFinite(asNumber) ? asNumber : null;
 }
 
 function parseBlockFieldReference(value: string): string | null {
@@ -604,6 +618,36 @@ function parsePropertiesHelpers(blocksSource: string): Map<string, PropertiesHel
   return result;
 }
 
+function parseBuilderHelpers(source: string): Map<string, BuilderHelper> {
+  const result = new Map<string, BuilderHelper>();
+  const signaturePattern =
+    /private\s+static\s+(?:[A-Za-z0-9_$.]+\.)?Builder\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/g;
+
+  let match: RegExpExecArray | null = null;
+  while ((match = signaturePattern.exec(source)) !== null) {
+    const methodName = match[1];
+    const params = parseParameterNames(match[2]);
+    const openBraceIndex = signaturePattern.lastIndex - 1;
+    const closeBraceIndex = findMatchingBrace(source, openBraceIndex);
+    if (closeBraceIndex === -1) {
+      continue;
+    }
+
+    const body = source.slice(openBraceIndex + 1, closeBraceIndex);
+    const returnMatch = /return\s+([\s\S]*?);/.exec(body);
+    if (returnMatch) {
+      result.set(methodName, {
+        params,
+        returnExpression: returnMatch[1].trim(),
+      });
+    }
+
+    signaturePattern.lastIndex = closeBraceIndex + 1;
+  }
+
+  return result;
+}
+
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -613,7 +657,10 @@ function substituteParams(template: string, params: string[], args: string[]): s
   for (let i = 0; i < params.length; i += 1) {
     const name = params[i];
     const replacement = args[i]?.trim() ?? name;
-    output = output.replace(new RegExp(`\\b${escapeRegex(name)}\\b`, "g"), replacement);
+    output = output.replace(
+      new RegExp(`(?<![A-Za-z0-9_$.])${escapeRegex(name)}\\b`, "g"),
+      replacement,
+    );
   }
   return output;
 }
@@ -727,6 +774,99 @@ export function parseBlocks(blocksSource: string): ParsedBlock[] {
   }
 
   return blocks;
+}
+
+function expandBuilderCallsFromHelpers(
+  initializer: string,
+  helpers: Map<string, BuilderHelper>,
+): MethodCall[] {
+  const calls = extractMethodCalls(initializer);
+  const baseExpression = getBaseExpression(initializer);
+  const baseCall = parseTopLevelCall(baseExpression);
+  const helperName = baseCall ? getUnqualifiedMethodName(baseCall.name) : null;
+
+  if (!baseCall || !helperName || !helpers.has(helperName)) {
+    return calls;
+  }
+
+  const helper = helpers.get(helperName)!;
+  const substituted = substituteParams(helper.returnExpression, helper.params, baseCall.args);
+  const helperCalls = extractMethodCalls(substituted);
+  const tailCalls =
+    calls.length > 0 && calls[0].name === helperName ? calls.slice(1) : calls;
+  return [...helperCalls, ...tailCalls];
+}
+
+export function parseFoods(foodsSource: string): ParsedFood[] {
+  const fields = extractStaticFieldInitializers(foodsSource, "FoodProperties");
+  const builderHelpers = parseBuilderHelpers(foodsSource);
+  const foods: ParsedFood[] = [];
+
+  for (const field of fields) {
+    const calls = expandBuilderCallsFromHelpers(field.initializer, builderHelpers);
+
+    let nutrition: number | null = null;
+    let saturationModifier: number | null = null;
+    let alwaysEdible = false;
+    let usingConvertsTo: string | null = null;
+    const effects: Array<{ effect: string; probability: number | null }> = [];
+
+    for (const call of calls) {
+      if (call.name === "nutrition" && call.args.length > 0) {
+        const value = parseIntegerLiteral(call.args[0]);
+        if (value !== null) {
+          nutrition = value;
+        }
+        continue;
+      }
+
+      if (call.name === "saturationModifier" && call.args.length > 0) {
+        const value = parseFloatLiteral(call.args[0]);
+        if (value !== null) {
+          saturationModifier = value;
+        }
+        continue;
+      }
+
+      if (call.name === "alwaysEdible") {
+        alwaysEdible = true;
+        continue;
+      }
+
+      if (call.name === "usingConvertsTo" && call.args.length > 0) {
+        usingConvertsTo = call.args[0].trim();
+        continue;
+      }
+
+      if (call.name === "effect" && call.args.length > 0) {
+        const probability =
+          call.args.length > 1 ? parseFloatLiteral(call.args[1]) : null;
+        effects.push({
+          effect: call.args[0].trim(),
+          probability,
+        });
+        continue;
+      }
+    }
+
+    foods.push({
+      fieldName: field.name,
+      id: toSnakeCaseFromConstant(field.name),
+      reference: `Foods.${field.name}`,
+      initializer: field.initializer,
+      nutrition,
+      saturationModifier,
+      alwaysEdible,
+      usingConvertsTo,
+      effects,
+      propertyCalls: calls.map((call) => ({
+        name: call.name,
+        args: call.args,
+      })),
+    });
+  }
+
+  return foods;
 }
 
 function parseRegisterItemId(rawFirstArg: string | undefined, fallbackId: string): string {

@@ -7,8 +7,10 @@ import {
   CFR_JAR_PATH_OVERRIDE,
   CFR_JAR_URL,
   CFR_VERSION,
+  FOODS_CLASS_CANDIDATES,
   ITEM_CLASS_CANDIDATES,
   LOCAL_BLOCKS_JAVA_PATH,
+  LOCAL_FOODS_JAVA_PATH,
   LOCAL_ITEMS_JAVA_PATH,
   TOOL_CACHE_ROOT,
   VERSION_MANIFEST_URL,
@@ -227,13 +229,15 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
 
   if (LOCAL_ITEMS_JAVA_PATH && LOCAL_BLOCKS_JAVA_PATH) {
     console.log(`Using local Java files: ${LOCAL_ITEMS_JAVA_PATH}, ${LOCAL_BLOCKS_JAVA_PATH}`);
-    const [itemsJavaSource, blocksJavaSource] = await Promise.all([
+    const [itemsJavaSource, blocksJavaSource, foodsJavaSource] = await Promise.all([
       readFile(LOCAL_ITEMS_JAVA_PATH, "utf8"),
       readFile(LOCAL_BLOCKS_JAVA_PATH, "utf8"),
+      LOCAL_FOODS_JAVA_PATH ? readFile(LOCAL_FOODS_JAVA_PATH, "utf8") : Promise.resolve(null),
     ]);
     return {
       itemsJavaSource,
       blocksJavaSource,
+      foodsJavaSource,
       jarPath: null,
       cacheVersionRoot: null,
       minecraftVersion: null,
@@ -241,6 +245,7 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
         mode: "local-java",
         itemsJavaPath: LOCAL_ITEMS_JAVA_PATH,
         blocksJavaPath: LOCAL_BLOCKS_JAVA_PATH,
+        foodsJavaPath: LOCAL_FOODS_JAVA_PATH,
       },
     };
   }
@@ -264,21 +269,26 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
 
   const itemsClassEntry = pickJarEntry(jarEntries, ITEM_CLASS_CANDIDATES);
   const blocksClassEntry = pickJarEntry(jarEntries, BLOCKS_CLASS_CANDIDATES);
-  if (!itemsClassEntry || !blocksClassEntry) {
+  const foodsClassEntry = pickJarEntry(jarEntries, FOODS_CLASS_CANDIDATES);
+  if (!itemsClassEntry || !blocksClassEntry || !foodsClassEntry) {
     throw new Error(
-      `Could not find required class entries in jar. Items=${itemsClassEntry ?? "missing"}, Blocks=${blocksClassEntry ?? "missing"}.`,
+      `Could not find required class entries in jar. Items=${itemsClassEntry ?? "missing"}, Blocks=${blocksClassEntry ?? "missing"}, Foods=${foodsClassEntry ?? "missing"}.`,
     );
   }
 
-  console.log(`Decompiling ${itemsClassEntry} and ${blocksClassEntry}...`);
-  const [itemsResult, blocksResult] = await Promise.all([
+  console.log(
+    `Decompiling ${itemsClassEntry}, ${blocksClassEntry}, and ${foodsClassEntry}...`,
+  );
+  const [itemsResult, blocksResult, foodsResult] = await Promise.all([
     decompileClass(jarPath, itemsClassEntry, cfrJarPath, versionRoot),
     decompileClass(jarPath, blocksClassEntry, cfrJarPath, versionRoot),
+    decompileClass(jarPath, foodsClassEntry, cfrJarPath, versionRoot),
   ]);
 
   return {
     itemsJavaSource: itemsResult.javaSource,
     blocksJavaSource: blocksResult.javaSource,
+    foodsJavaSource: foodsResult.javaSource,
     jarPath,
     cacheVersionRoot: versionRoot,
     minecraftVersion: versionSource.selectedVersion,
@@ -293,8 +303,10 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
       cfrJarPath,
       itemsClassEntry,
       blocksClassEntry,
+      foodsClassEntry,
       itemsJavaPath: itemsResult.javaPath,
       blocksJavaPath: blocksResult.javaPath,
+      foodsJavaPath: foodsResult.javaPath,
       tempDirectory: os.tmpdir(),
     },
   };

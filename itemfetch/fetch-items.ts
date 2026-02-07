@@ -1,9 +1,9 @@
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
-import { parseBlocks, parseItems } from "./src/parser";
+import { parseBlocks, parseFoods, parseItems } from "./src/parser";
 import { loadJavaSources } from "./src/source-loader";
-import type { BlockLootBehavior, ParsedItem } from "./src/types";
+import type { BlockLootBehavior, ParsedFood, ParsedItem } from "./src/types";
 import { pathExists, runExec } from "./src/utils";
 
 type ItemIndex = Record<string, Record<string, unknown>>;
@@ -32,6 +32,19 @@ type OutputItem = {
   rarity: string | null;
   fireResistant: boolean | null;
   foodReference: string | null;
+  food: {
+    id: string;
+    fieldName: string;
+    reference: string;
+    nutrition: number | null;
+    saturationModifier: number | null;
+    alwaysEdible: boolean;
+    usingConvertsTo: string | null;
+    effects: Array<{
+      effect: string;
+      probability: number | null;
+    }>;
+  } | null;
   propertyCalls: Array<{ name: string; args: string[] }>;
   blockLoot: BlockLootBehavior | null;
 };
@@ -953,6 +966,7 @@ function toOutputItem(
   itemId: string,
   texture: { texturePath: string | null; sourceTexture: string | null; sourceModel: string | null },
   parsedItem: ParsedItem | null,
+  parsedFood: ParsedFood | null,
 ): OutputItem {
   return {
     id: itemId,
@@ -968,14 +982,72 @@ function toOutputItem(
     rarity: parsedItem?.rarity ?? null,
     fireResistant: parsedItem?.fireResistant ?? null,
     foodReference: parsedItem?.foodReference ?? null,
+    food: parsedFood
+      ? {
+          id: parsedFood.id,
+          fieldName: parsedFood.fieldName,
+          reference: parsedFood.reference,
+          nutrition: parsedFood.nutrition,
+          saturationModifier: parsedFood.saturationModifier,
+          alwaysEdible: parsedFood.alwaysEdible,
+          usingConvertsTo: parsedFood.usingConvertsTo,
+          effects: parsedFood.effects,
+        }
+      : null,
     propertyCalls: parsedItem?.propertyCalls ?? [],
     blockLoot: parsedItem?.blockLoot ?? null,
   };
 }
 
+function normalizeFoodReference(reference: string | null): string | null {
+  if (!reference) {
+    return null;
+  }
+
+  const fullMatch = /(?:net\.minecraft\.world\.food\.)?Foods\.([A-Z0-9_]+)/.exec(reference);
+  if (fullMatch) {
+    return `Foods.${fullMatch[1]}`;
+  }
+
+  const fieldMatch = /^\s*([A-Z0-9_]+)\s*$/.exec(reference);
+  if (fieldMatch) {
+    return `Foods.${fieldMatch[1]}`;
+  }
+
+  return null;
+}
+
+function resolveParsedFood(
+  foodReference: string | null,
+  foodByReference: Map<string, ParsedFood>,
+  foodByFieldName: Map<string, ParsedFood>,
+): ParsedFood | null {
+  if (!foodReference) {
+    return null;
+  }
+
+  const normalized = normalizeFoodReference(foodReference);
+  if (normalized && foodByReference.has(normalized)) {
+    return foodByReference.get(normalized) ?? null;
+  }
+
+  const fallbackField = /([A-Z0-9_]+)\s*$/.exec(foodReference)?.[1] ?? null;
+  if (fallbackField && foodByFieldName.has(fallbackField)) {
+    return foodByFieldName.get(fallbackField) ?? null;
+  }
+
+  return null;
+}
+
 async function main(): Promise<void> {
-  const { itemsJavaSource, blocksJavaSource, sourceInfo, jarPath, cacheVersionRoot } =
-    await loadJavaSources();
+  const {
+    itemsJavaSource,
+    blocksJavaSource,
+    foodsJavaSource,
+    sourceInfo,
+    jarPath,
+    cacheVersionRoot,
+  } = await loadJavaSources();
 
   if (!activeAssetsRoot) {
     if (!jarPath || !cacheVersionRoot) {
@@ -992,6 +1064,9 @@ async function main(): Promise<void> {
   const blockMap = new Map(parsedBlocks.map((block) => [block.fieldName, block]));
   const parsedItems = parseItems(itemsJavaSource, blockMap);
   const parsedItemById = new Map(parsedItems.map((item) => [item.id, item]));
+  const parsedFoods = foodsJavaSource ? parseFoods(foodsJavaSource) : [];
+  const parsedFoodByReference = new Map(parsedFoods.map((food) => [food.reference, food]));
+  const parsedFoodByFieldName = new Map(parsedFoods.map((food) => [food.fieldName, food]));
 
   const itemIndex = await fetchItemIndex();
   const itemIdsSet = new Set<string>([
@@ -1017,6 +1092,11 @@ async function main(): Promise<void> {
     const definition = itemIndex[itemId] ?? {};
     const resolved = await resolveItemTexture(itemId, definition);
     const parsedItem = parsedItemById.get(itemId) ?? null;
+    const parsedFood = resolveParsedFood(
+      parsedItem?.foodReference ?? null,
+      parsedFoodByReference,
+      parsedFoodByFieldName,
+    );
 
     if (resolved) {
       const textureFilename = `${itemId}.png`;
@@ -1030,6 +1110,7 @@ async function main(): Promise<void> {
           sourceModel: resolved.sourceModel,
         },
         parsedItem,
+        parsedFood,
       );
       texturedCount += 1;
     } else {
@@ -1041,6 +1122,7 @@ async function main(): Promise<void> {
           sourceModel: null,
         },
         parsedItem,
+        parsedFood,
       );
       missingTextureItems.push(itemId);
     }
@@ -1071,6 +1153,9 @@ async function main(): Promise<void> {
       overrideLootTableBlockCount: parsedBlocks.filter(
         (block) => block.loot.overrideLootTable !== null,
       ).length,
+      foodDefinitionCount: parsedFoods.length,
+      itemsWithFoodReferenceCount: outputItems.filter((item) => item.foodReference !== null).length,
+      itemsWithFoodDataCount: outputItems.filter((item) => item.food !== null).length,
     },
     items: outputItems,
   };

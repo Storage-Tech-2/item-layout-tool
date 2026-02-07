@@ -56,9 +56,26 @@ export type ParsedItem = {
   blockLoot: BlockLootBehavior | null;
 };
 
+export type ParsedFood = {
+  fieldName: string;
+  id: string;
+  reference: string;
+  initializer: string;
+  nutrition: number | null;
+  saturationModifier: number | null;
+  alwaysEdible: boolean;
+  usingConvertsTo: string | null;
+  effects: Array<{
+    effect: string;
+    probability: number | null;
+  }>;
+  propertyCalls: Array<{ name: string; args: string[] }>;
+};
+
 export type LoadedJavaSources = {
   itemsJavaSource: string;
   blocksJavaSource: string;
+  foodsJavaSource: string | null;
   jarPath: string | null;
   cacheVersionRoot: string | null;
   minecraftVersion: string | null;
