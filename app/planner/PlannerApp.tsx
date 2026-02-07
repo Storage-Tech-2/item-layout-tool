@@ -24,6 +24,12 @@ import { ItemLibraryPanel } from "./components/ItemLibraryPanel";
 type PreviewPlacement = {
   slotId: string;
   itemId: string;
+  kind: "place" | "swap";
+};
+
+type IncomingEntry = {
+  itemId: string;
+  sourceSlotId?: string;
 };
 
 type SlotPoint = {
@@ -347,10 +353,11 @@ export function PlannerApp() {
         selectedSlotsInOrder.map((selectedSlotId, index) => ({
           slotId: selectedSlotId,
           itemId: selectedItemIds[index] ?? itemId,
+          kind: "place",
         })),
       );
     } else {
-      setDragPreviews([{ slotId, itemId }]);
+      setDragPreviews([{ slotId, itemId, kind: "place" }]);
       setSelectedSlotIds([slotId]);
     }
   }
@@ -358,6 +365,15 @@ export function PlannerApp() {
   function clearDragState(): void {
     setActiveDragPayload(null);
     setDragPreviews([]);
+  }
+
+  function getIncomingEntries(payload: DragPayload): IncomingEntry[] {
+    return payload.itemIds
+      .map((itemId, index) => ({
+        itemId,
+        sourceSlotId: payload.sourceSlotIds?.[index],
+      }))
+      .filter((entry) => itemById.has(entry.itemId));
   }
 
   function buildPlacements(
@@ -370,12 +386,7 @@ export function PlannerApp() {
       return [];
     }
 
-    const incomingEntries = payload.itemIds
-      .map((itemId, index) => ({
-        itemId,
-        sourceSlotId: payload.sourceSlotIds?.[index],
-      }))
-      .filter((entry) => itemById.has(entry.itemId));
+    const incomingEntries = getIncomingEntries(payload);
 
     const incoming = incomingEntries.map((entry) => entry.itemId);
     if (incoming.length === 0) {
@@ -444,6 +455,7 @@ export function PlannerApp() {
           shapePlacements.push({
             slotId: targetSlotId,
             itemId: entry.itemId,
+            kind: "place",
           });
           usedTargetSlots.add(targetSlotId);
           working[targetSlotId] = entry.itemId;
@@ -460,6 +472,7 @@ export function PlannerApp() {
         {
           slotId: anchorSlotId,
           itemId: incoming[0],
+          kind: "place",
         },
       ];
     }
@@ -479,12 +492,120 @@ export function PlannerApp() {
       }
 
       const slotId = orderedSlotIds[cursor];
-      previews.push({ slotId, itemId });
+      previews.push({ slotId, itemId, kind: "place" });
       working[slotId] = itemId;
       cursor += 1;
     }
 
     return previews;
+  }
+
+  function buildSwapPlacements(
+    payload: DragPayload,
+    incomingEntries: IncomingEntry[],
+    placements: PreviewPlacement[],
+    assignments: Record<string, string>,
+  ): PreviewPlacement[] | null {
+    if (payload.source !== "layout" || placements.length === 0) {
+      return [];
+    }
+
+    const incomingSet = new Set(incomingEntries.map((entry) => entry.itemId));
+    const displaced: Array<{ itemId: string; preferredSlotId?: string }> = [];
+    for (const [index, placement] of placements.entries()) {
+      const existingItemId = assignments[placement.slotId];
+      if (existingItemId && !incomingSet.has(existingItemId)) {
+        displaced.push({
+          itemId: existingItemId,
+          preferredSlotId: incomingEntries[index]?.sourceSlotId,
+        });
+      }
+    }
+
+    if (displaced.length === 0) {
+      return [];
+    }
+
+    const next = retainValidAssignments(assignments, orderedSlotIdSet);
+    for (const [slotId, itemId] of Object.entries(next)) {
+      if (incomingSet.has(itemId)) {
+        delete next[slotId];
+      }
+    }
+    for (const placement of placements) {
+      next[placement.slotId] = placement.itemId;
+    }
+
+    const targetSlots = new Set(placements.map((placement) => placement.slotId));
+    const sourceSlots: string[] = [];
+    const sourceSlotSet = new Set<string>();
+
+    for (const entry of incomingEntries) {
+      if (
+        entry.sourceSlotId &&
+        orderedSlotIdSet.has(entry.sourceSlotId) &&
+        !sourceSlotSet.has(entry.sourceSlotId)
+      ) {
+        sourceSlots.push(entry.sourceSlotId);
+        sourceSlotSet.add(entry.sourceSlotId);
+      }
+    }
+
+    const candidateSwapSlots = sourceSlots.filter(
+      (slotId) => !targetSlots.has(slotId) && !next[slotId],
+    );
+
+    if (candidateSwapSlots.length < displaced.length) {
+      return null;
+    }
+
+    const swapPlacements: PreviewPlacement[] = [];
+    const usedSwapSlots = new Set<string>();
+    const remaining: string[] = [];
+
+    for (const item of displaced) {
+      const preferred = item.preferredSlotId;
+      if (
+        preferred &&
+        candidateSwapSlots.includes(preferred) &&
+        !usedSwapSlots.has(preferred)
+      ) {
+        swapPlacements.push({
+          slotId: preferred,
+          itemId: item.itemId,
+          kind: "swap",
+        });
+        usedSwapSlots.add(preferred);
+        continue;
+      }
+
+      remaining.push(item.itemId);
+    }
+
+    let cursor = 0;
+    for (const itemId of remaining) {
+      while (
+        cursor < candidateSwapSlots.length &&
+        usedSwapSlots.has(candidateSwapSlots[cursor])
+      ) {
+        cursor += 1;
+      }
+
+      if (cursor >= candidateSwapSlots.length) {
+        return null;
+      }
+
+      const slotId = candidateSwapSlots[cursor];
+      swapPlacements.push({
+        slotId,
+        itemId,
+        kind: "swap",
+      });
+      usedSwapSlots.add(slotId);
+      cursor += 1;
+    }
+
+    return swapPlacements;
   }
 
   function arePreviewsEqual(
@@ -500,7 +621,8 @@ export function PlannerApp() {
       const nextPlacement = next[index];
       if (
         currentPlacement.slotId !== nextPlacement.slotId ||
-        currentPlacement.itemId !== nextPlacement.itemId
+        currentPlacement.itemId !== nextPlacement.itemId ||
+        currentPlacement.kind !== nextPlacement.kind
       ) {
         return false;
       }
@@ -525,26 +647,29 @@ export function PlannerApp() {
 
     setActiveDragPayload(payload);
 
-    const nextPreviews = buildPlacements(slotId, payload, activeSlotAssignments);
+    const placements = buildPlacements(slotId, payload, activeSlotAssignments);
+    const incomingEntries = getIncomingEntries(payload);
+    const swapPreviews = buildSwapPlacements(
+      payload,
+      incomingEntries,
+      placements,
+      activeSlotAssignments,
+    );
+    const nextPreviews =
+      swapPreviews === null ? placements : [...placements, ...swapPreviews];
     setDragPreviews((current) =>
       arePreviewsEqual(current, nextPreviews) ? current : nextPreviews,
     );
   }
 
   function placePayload(anchorSlotId: string, payload: DragPayload): void {
-    const anchorIndex = orderedSlotIds.indexOf(anchorSlotId);
-    if (anchorIndex === -1) {
+    if (orderedSlotIds.indexOf(anchorSlotId) === -1) {
       return;
     }
 
     setSlotAssignments((current) => {
       const next = retainValidAssignments(current, orderedSlotIdSet);
-      const incomingEntries = payload.itemIds
-        .map((itemId, index) => ({
-          itemId,
-          sourceSlotId: payload.sourceSlotIds?.[index],
-        }))
-        .filter((entry) => itemById.has(entry.itemId));
+      const incomingEntries = getIncomingEntries(payload);
       const incoming = incomingEntries.map((entry) => entry.itemId);
 
       if (incoming.length === 0) {
@@ -556,18 +681,17 @@ export function PlannerApp() {
         return current;
       }
 
-      const incomingSet = new Set(incoming);
-      const displaced: Array<{ itemId: string; preferredSlotId?: string }> = [];
-      for (const [index, placement] of placements.entries()) {
-        const existingItemId = current[placement.slotId];
-        if (existingItemId && !incomingSet.has(existingItemId)) {
-          displaced.push({
-            itemId: existingItemId,
-            preferredSlotId: incomingEntries[index]?.sourceSlotId,
-          });
-        }
+      const swapPlacements = buildSwapPlacements(
+        payload,
+        incomingEntries,
+        placements,
+        current,
+      );
+      if (swapPlacements === null) {
+        return current;
       }
 
+      const incomingSet = new Set(incoming);
       for (const [slotId, itemId] of Object.entries(next)) {
         if (incomingSet.has(itemId)) {
           delete next[slotId];
@@ -578,66 +702,8 @@ export function PlannerApp() {
         next[placement.slotId] = placement.itemId;
       }
 
-      if (payload.source === "layout" && displaced.length > 0) {
-        const targetSlots = new Set(placements.map((placement) => placement.slotId));
-        const sourceSlots: string[] = [];
-        const sourceSlotSet = new Set<string>();
-
-        for (const entry of incomingEntries) {
-          if (
-            entry.sourceSlotId &&
-            orderedSlotIdSet.has(entry.sourceSlotId) &&
-            !sourceSlotSet.has(entry.sourceSlotId)
-          ) {
-            sourceSlots.push(entry.sourceSlotId);
-            sourceSlotSet.add(entry.sourceSlotId);
-          }
-        }
-
-        const candidateSwapSlots = sourceSlots.filter(
-          (slotId) => !targetSlots.has(slotId) && !next[slotId],
-        );
-
-        if (candidateSwapSlots.length < displaced.length) {
-          return current;
-        }
-
-        const usedSwapSlots = new Set<string>();
-        const remaining: string[] = [];
-
-        for (const item of displaced) {
-          const preferred = item.preferredSlotId;
-          if (
-            preferred &&
-            candidateSwapSlots.includes(preferred) &&
-            !usedSwapSlots.has(preferred)
-          ) {
-            next[preferred] = item.itemId;
-            usedSwapSlots.add(preferred);
-            continue;
-          }
-
-          remaining.push(item.itemId);
-        }
-
-        let cursor = 0;
-        for (const itemId of remaining) {
-          while (
-            cursor < candidateSwapSlots.length &&
-            usedSwapSlots.has(candidateSwapSlots[cursor])
-          ) {
-            cursor += 1;
-          }
-
-          if (cursor >= candidateSwapSlots.length) {
-            return current;
-          }
-
-          const slotId = candidateSwapSlots[cursor];
-          usedSwapSlots.add(slotId);
-          next[slotId] = itemId;
-          cursor += 1;
-        }
+      for (const swapPlacement of swapPlacements) {
+        next[swapPlacement.slotId] = swapPlacement.itemId;
       }
 
       return next;

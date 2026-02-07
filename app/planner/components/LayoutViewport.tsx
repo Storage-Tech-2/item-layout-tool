@@ -43,7 +43,7 @@ type LayoutViewportProps = {
   ) => void;
   onAnyDragEnd: () => void;
   onClearSlot: (slotId: string) => void;
-  dragPreviewPlacements: { slotId: string; itemId: string }[];
+  dragPreviewPlacements: { slotId: string; itemId: string; kind: "place" | "swap" }[];
   selectedSlotIds: Set<string>;
   onSelectionChange: (slotIds: string[]) => void;
 };
@@ -88,9 +88,12 @@ export function LayoutViewport({
   );
 
   const previewBySlot = useMemo(() => {
-    const map = new Map<string, string>();
+    const map = new Map<string, { itemId: string; kind: "place" | "swap" }>();
     for (const placement of dragPreviewPlacements) {
-      map.set(placement.slotId, placement.itemId);
+      map.set(placement.slotId, {
+        itemId: placement.itemId,
+        kind: placement.kind,
+      });
     }
     return map;
   }, [dragPreviewPlacements]);
@@ -207,9 +210,11 @@ export function LayoutViewport({
   function renderSlot(slotId: string): ReactNode {
     const assignedItemId = slotAssignments[slotId];
     const assignedItem = assignedItemId ? itemById.get(assignedItemId) : undefined;
-    const previewItemId = previewBySlot.get(slotId);
+    const preview = previewBySlot.get(slotId);
+    const previewItemId = preview?.itemId;
     const previewItem = previewItemId ? itemById.get(previewItemId) : undefined;
     const isDropTarget = Boolean(previewItem);
+    const isSwapPreview = preview?.kind === "swap";
     const isSelected = selectedSlotIds.has(slotId) && Boolean(assignedItem);
 
     return (
@@ -220,7 +225,13 @@ export function LayoutViewport({
           assignedItem
             ? "border-[rgba(40,102,110,0.62)] bg-[linear-gradient(145deg,rgba(237,253,249,0.95)_0%,rgba(205,235,226,0.95)_100%)]"
             : "border-[rgba(108,89,62,0.35)] bg-[linear-gradient(145deg,rgba(245,233,216,0.95)_0%,rgba(231,212,184,0.95)_100%)]"
-        } ${isDropTarget ? "border-[rgba(22,132,120,0.92)] shadow-[0_0_0_2px_rgba(85,204,178,0.38)]" : ""} ${isSelected ? "shadow-[0_0_0_2px_rgba(37,99,235,0.55)]" : ""}`}
+        } ${
+          isDropTarget
+            ? isSwapPreview
+              ? "border-[rgba(194,65,12,0.92)] shadow-[0_0_0_2px_rgba(251,146,60,0.45)]"
+              : "border-[rgba(22,132,120,0.92)] shadow-[0_0_0_2px_rgba(85,204,178,0.38)]"
+            : ""
+        } ${isSelected ? "shadow-[0_0_0_2px_rgba(37,99,235,0.55)]" : ""}`}
         draggable={Boolean(assignedItem)}
         onPointerDown={(event) => {
           if (event.button === 2) {
@@ -283,9 +294,17 @@ export function LayoutViewport({
             className={`pointer-events-none absolute inset-0 z-[2] m-auto ${
               assignedItem ? "opacity-40" : "opacity-[0.55]"
             }`}
+            style={{
+              filter: isSwapPreview
+                ? "sepia(1) saturate(2.2) hue-rotate(-18deg)"
+                : undefined,
+            }}
             draggable={false}
             unoptimized
           />
+        ) : null}
+        {previewItem && isSwapPreview ? (
+          <div className="pointer-events-none absolute inset-0 z-[3] bg-[rgba(245,158,11,0.28)]" />
         ) : null}
       </button>
     );
