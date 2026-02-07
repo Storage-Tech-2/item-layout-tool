@@ -18,46 +18,53 @@ export const HALL_ORIENTATION: Record<HallId, HallOrientation> = {
 
 export const HALL_TYPE_DEFAULTS: Record<
   HallType,
-  Pick<HallConfig, "rowsPerSide" | "misSlotsPerSlice">
+  Pick<HallConfig, "rowsPerSide" | "misSlotsPerSlice" | "misUnitsPerSlice">
 > = {
   bulk: {
     rowsPerSide: 1,
     misSlotsPerSlice: 54,
+    misUnitsPerSlice: 1,
   },
   chest: {
     rowsPerSide: 4,
     misSlotsPerSlice: 54,
+    misUnitsPerSlice: 1,
   },
   mis: {
     rowsPerSide: 4,
     misSlotsPerSlice: 54,
+    misUnitsPerSlice: 1,
   },
 };
 
 export const DEFAULT_HALLS: Record<HallId, HallConfig> = {
   north: {
     type: "bulk",
-    slices: 10,
-    rowsPerSide: 1,
+    slices: 8,
+    rowsPerSide: 2,
     misSlotsPerSlice: 54,
+    misUnitsPerSlice: 2,
   },
   east: {
     type: "chest",
-    slices: 12,
+    slices: 16,
     rowsPerSide: 4,
     misSlotsPerSlice: 54,
+    misUnitsPerSlice: 2,
   },
   south: {
     type: "mis",
     slices: 4,
     rowsPerSide: 4,
     misSlotsPerSlice: 54,
+    misUnitsPerSlice: 2,
   },
   west: {
     type: "chest",
-    slices: 10,
+    slices: 16,
     rowsPerSide: 4,
     misSlotsPerSlice: 54,
+    misUnitsPerSlice: 2,
   },
 };
 

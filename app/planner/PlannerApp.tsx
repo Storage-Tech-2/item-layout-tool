@@ -5,6 +5,7 @@ import { LayoutViewport } from "./components/LayoutViewport";
 import { useCatalog } from "./hooks/useCatalog";
 import {
   nextConfigsForHallMisCapacity,
+  nextConfigsForHallMisUnitsPerSlice,
   nextConfigsForHallRows,
   nextConfigsForHallSlices,
   nextConfigsForHallType,
@@ -23,6 +24,7 @@ export function PlannerApp() {
     setHallSlices,
     setHallRowsPerSide,
     setHallMisCapacity,
+    setHallMisUnitsPerSlice,
     applyHallPreset,
   } = useHallConfigs();
   const {
@@ -84,6 +86,12 @@ export function PlannerApp() {
     setHallMisCapacity(hallId, value);
   }
 
+  function handleHallMisUnitsPerSliceChange(hallId: HallId, value: string): void {
+    const nextConfigs = nextConfigsForHallMisUnitsPerSlice(hallConfigs, hallId, value);
+    preserveAssignmentsForConfigChange(hallConfigs, nextConfigs);
+    setHallMisUnitsPerSlice(hallId, value);
+  }
+
   function handleApplyPreset(type: HallType): void {
     const nextConfigs = nextConfigsForPreset(hallConfigs, type);
     preserveAssignmentsForConfigChange(hallConfigs, nextConfigs);
@@ -113,6 +121,7 @@ export function PlannerApp() {
           onHallSlicesChange={handleHallSlicesChange}
           onHallRowsChange={handleHallRowsChange}
           onHallMisCapacityChange={handleHallMisCapacityChange}
+          onHallMisUnitsChange={handleHallMisUnitsPerSliceChange}
           onSlotItemDragStart={beginSlotItemDrag}
           onAnyDragEnd={clearDragState}
           onClearSlot={clearSlot}

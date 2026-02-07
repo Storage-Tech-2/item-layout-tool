@@ -13,6 +13,7 @@ type UseHallConfigsResult = {
   setHallSlices: (hallId: HallId, rawValue: string) => void;
   setHallRowsPerSide: (hallId: HallId, rawValue: string) => void;
   setHallMisCapacity: (hallId: HallId, rawValue: string) => void;
+  setHallMisUnitsPerSlice: (hallId: HallId, rawValue: string) => void;
   applyHallPreset: (type: HallType) => void;
 };
 
@@ -31,8 +32,12 @@ export function nextConfigsForHallType(
       rowsPerSide: nextType === "mis" ? previousConfig.rowsPerSide : defaults.rowsPerSide,
       misSlotsPerSlice:
         nextType === "mis"
-          ? Math.max(10, previousConfig.misSlotsPerSlice)
+          ? Math.max(1, previousConfig.misSlotsPerSlice)
           : previousConfig.misSlotsPerSlice,
+      misUnitsPerSlice:
+        nextType === "mis"
+          ? Math.max(1, previousConfig.misUnitsPerSlice)
+          : previousConfig.misUnitsPerSlice,
     },
   };
 }
@@ -72,12 +77,27 @@ export function nextConfigsForHallMisCapacity(
   hallId: HallId,
   rawValue: string,
 ): Record<HallId, HallConfig> {
-  const misSlotsPerSlice = clamp(Number(rawValue) || 10, 10, 200);
+  const misSlotsPerSlice = clamp(Number(rawValue) || 1, 1, 200);
   return {
     ...current,
     [hallId]: {
       ...current[hallId],
       misSlotsPerSlice,
+    },
+  };
+}
+
+export function nextConfigsForHallMisUnitsPerSlice(
+  current: Record<HallId, HallConfig>,
+  hallId: HallId,
+  rawValue: string,
+): Record<HallId, HallConfig> {
+  const misUnitsPerSlice = clamp(Number(rawValue) || 1, 1, 8);
+  return {
+    ...current,
+    [hallId]: {
+      ...current[hallId],
+      misUnitsPerSlice,
     },
   };
 }
@@ -95,8 +115,12 @@ export function nextConfigsForPreset(
         type === "mis" ? next[hallId].rowsPerSide : HALL_TYPE_DEFAULTS[type].rowsPerSide,
       misSlotsPerSlice:
         type === "mis"
-          ? Math.max(10, next[hallId].misSlotsPerSlice)
+          ? Math.max(1, next[hallId].misSlotsPerSlice)
           : next[hallId].misSlotsPerSlice,
+      misUnitsPerSlice:
+        type === "mis"
+          ? Math.max(1, next[hallId].misUnitsPerSlice)
+          : next[hallId].misUnitsPerSlice,
     };
   }
   return next;
@@ -125,6 +149,12 @@ export function useHallConfigs(): UseHallConfigsResult {
     );
   }
 
+  function setHallMisUnitsPerSlice(hallId: HallId, rawValue: string): void {
+    setHallConfigs((current) =>
+      nextConfigsForHallMisUnitsPerSlice(current, hallId, rawValue),
+    );
+  }
+
   function applyHallPreset(type: HallType): void {
     setHallConfigs((current) => nextConfigsForPreset(current, type));
   }
@@ -135,6 +165,7 @@ export function useHallConfigs(): UseHallConfigsResult {
     setHallSlices,
     setHallRowsPerSide,
     setHallMisCapacity,
+    setHallMisUnitsPerSlice,
     applyHallPreset,
   };
 }

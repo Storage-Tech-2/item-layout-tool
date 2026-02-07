@@ -9,6 +9,7 @@ export type HallConfig = {
   slices: number;
   rowsPerSide: number;
   misSlotsPerSlice: number;
+  misUnitsPerSlice: number;
 };
 
 export type CatalogItem = {

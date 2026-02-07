@@ -52,8 +52,13 @@ export function nonMisSlotId(
   return `${hallId}:g:${slice}:${side}:${row}`;
 }
 
-export function misSlotId(hallId: HallId, slice: number, index: number): string {
-  return `${hallId}:m:${slice}:${index}`;
+export function misSlotId(
+  hallId: HallId,
+  slice: number,
+  misUnit: number,
+  index: number,
+): string {
+  return `${hallId}:m:${slice}:${misUnit}:${index}`;
 }
 
 export function getHallSize(
@@ -63,10 +68,13 @@ export function getHallSize(
   if (config.type === "mis") {
     const main =
       config.slices * MIS_SLICE_MAIN + Math.max(0, config.slices - 1) * SLOT_GAP;
+    const cross =
+      config.misUnitsPerSlice * MIS_CROSS +
+      Math.max(0, config.misUnitsPerSlice - 1) * SLOT_GAP;
     if (orientation === "horizontal") {
-      return { width: main, height: MIS_CROSS };
+      return { width: main, height: cross };
     }
-    return { width: MIS_CROSS, height: main };
+    return { width: cross, height: main };
   }
 
   const main = config.slices * SLOT_SIZE + Math.max(0, config.slices - 1) * SLOT_GAP;
@@ -88,8 +96,10 @@ export function buildOrderedSlotIds(configs: Record<HallId, HallConfig>): string
 
     if (hall.type === "mis") {
       for (let slice = 0; slice < hall.slices; slice += 1) {
-        for (let index = 0; index < hall.misSlotsPerSlice; index += 1) {
-          ordered.push(misSlotId(hallId, slice, index));
+        for (let misUnit = 0; misUnit < hall.misUnitsPerSlice; misUnit += 1) {
+          for (let index = 0; index < hall.misSlotsPerSlice; index += 1) {
+            ordered.push(misSlotId(hallId, slice, misUnit, index));
+          }
         }
       }
       continue;

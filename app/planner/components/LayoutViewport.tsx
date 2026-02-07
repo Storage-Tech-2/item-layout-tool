@@ -49,6 +49,7 @@ type LayoutViewportProps = {
   onHallSlicesChange: (hallId: HallId, value: string) => void;
   onHallRowsChange: (hallId: HallId, value: string) => void;
   onHallMisCapacityChange: (hallId: HallId, value: string) => void;
+  onHallMisUnitsChange: (hallId: HallId, value: string) => void;
   onSlotItemDragStart: (
     event: DragEvent<HTMLElement>,
     slotId: string,
@@ -121,6 +122,7 @@ export function LayoutViewport({
   onHallSlicesChange,
   onHallRowsChange,
   onHallMisCapacityChange,
+  onHallMisUnitsChange,
   onSlotItemDragStart,
   onAnyDragEnd,
   onClearSlot,
@@ -141,6 +143,7 @@ export function LayoutViewport({
   const [expandedMisSlice, setExpandedMisSlice] = useState<{
     hallId: HallId;
     slice: number;
+    misUnit: number;
   } | null>(null);
 
   const viewportBackgroundStyle = useMemo(
@@ -224,7 +227,11 @@ export function LayoutViewport({
     }
 
     const config = hallConfigs[expandedMisSlice.hallId];
-    if (config.type !== "mis" || expandedMisSlice.slice >= config.slices) {
+    if (
+      config.type !== "mis" ||
+      expandedMisSlice.slice >= config.slices ||
+      expandedMisSlice.misUnit >= config.misUnitsPerSlice
+    ) {
       return null;
     }
 
@@ -510,71 +517,94 @@ export function LayoutViewport({
     return (
       <div className={`absolute inset-0 flex gap-1 ${directionClass}`}>
         {Array.from({ length: config.slices }, (_, slice) => {
-          const slotIds = Array.from(
-            { length: config.misSlotsPerSlice },
-            (_, index) => misSlotId(hallId, slice, index),
-          );
-
-          const assignedItemIds = slotIds
-            .map((slotId) => slotAssignments[slotId])
-            .filter((itemId): itemId is string => Boolean(itemId));
-
-          const previewIds = assignedItemIds.slice(0, 6);
-          const firstSlot = slotIds[0];
-
           return (
             <div
               key={`${hallId}-mis-${slice}`}
-              className="grid min-w-0 flex-1 grid-rows-[auto_auto_1fr] gap-[0.22rem] rounded-[0.65rem] border border-[rgba(73,97,78,0.45)] bg-[linear-gradient(180deg,rgba(244,250,240,0.95)_0%,rgba(221,235,212,0.95)_100%)] p-[0.32rem]"
-              onDragOver={(event) => onSlotDragOver(event, firstSlot)}
-              onDrop={(event) => onSlotDrop(event, firstSlot)}
-              onClick={(event) => {
-                if (event.shiftKey) {
-                  event.preventDefault();
-                  return;
-                }
-
-                event.stopPropagation();
-                setExpandedMisSlice((current) => {
-                  if (current?.hallId === hallId && current.slice === slice) {
-                    return null;
-                  }
-                  return { hallId, slice };
-                });
+              className="grid min-w-0 flex-1 gap-1"
+              style={{
+                gridTemplateRows:
+                  orientation === "horizontal"
+                    ? `repeat(${config.misUnitsPerSlice}, minmax(0, 1fr))`
+                    : "none",
+                gridTemplateColumns:
+                  orientation === "vertical"
+                    ? `repeat(${config.misUnitsPerSlice}, minmax(0, 1fr))`
+                    : "none",
               }}
-              title={`Slice ${slice + 1} • ${assignedItemIds.length}/${config.misSlotsPerSlice}`}
-              data-slot
             >
-              <div className="text-[0.6rem] font-bold uppercase tracking-[0.04em] text-[#355039]">
-                Slice {slice + 1}
-              </div>
-              <div className="text-[0.65rem] font-bold text-[#33524f]">
-                {assignedItemIds.length}/{config.misSlotsPerSlice}
-              </div>
-              <div className="grid content-start grid-cols-3 gap-[2px]">
-                {previewIds.map((itemId) => {
-                  const item = itemById.get(itemId);
-                  if (!item) {
-                    return null;
-                  }
+              {Array.from({ length: config.misUnitsPerSlice }, (_, misUnit) => {
+                const slotIds = Array.from(
+                  { length: config.misSlotsPerSlice },
+                  (_, index) => misSlotId(hallId, slice, misUnit, index),
+                );
 
-                  return (
-                    <div
-                      key={`${hallId}-mis-${slice}-${itemId}`}
-                      className="grid aspect-square place-items-center overflow-hidden rounded-[0.25rem] border border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
-                    >
-                      <Image
-                        src={item.texturePath}
-                        alt={item.id}
-                        width={16}
-                        height={16}
-                        draggable={false}
-                        unoptimized
-                      />
+                const assignedItemIds = slotIds
+                  .map((slotId) => slotAssignments[slotId])
+                  .filter((itemId): itemId is string => Boolean(itemId));
+
+                const previewIds = assignedItemIds.slice(0, 6);
+                const firstSlot = slotIds[0];
+
+                return (
+                  <div
+                    key={`${hallId}-mis-${slice}-${misUnit}`}
+                    className="grid min-w-0 grid-rows-[auto_auto_1fr] gap-[0.22rem] rounded-[0.65rem] border border-[rgba(73,97,78,0.45)] bg-[linear-gradient(180deg,rgba(244,250,240,0.95)_0%,rgba(221,235,212,0.95)_100%)] p-[0.32rem]"
+                    onDragOver={(event) => onSlotDragOver(event, firstSlot)}
+                    onDrop={(event) => onSlotDrop(event, firstSlot)}
+                    onClick={(event) => {
+                      if (event.shiftKey) {
+                        event.preventDefault();
+                        return;
+                      }
+
+                      event.stopPropagation();
+                      setExpandedMisSlice((current) => {
+                        if (
+                          current?.hallId === hallId &&
+                          current.slice === slice &&
+                          current.misUnit === misUnit
+                        ) {
+                          return null;
+                        }
+                        return { hallId, slice, misUnit };
+                      });
+                    }}
+                    title={`Slice ${slice + 1} • MIS ${misUnit + 1} • ${assignedItemIds.length}/${config.misSlotsPerSlice}`}
+                    data-slot
+                  >
+                    <div className="text-[0.6rem] font-bold uppercase tracking-[0.04em] text-[#355039]">
+                      Slice {slice + 1} • MIS {misUnit + 1}
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="text-[0.65rem] font-bold text-[#33524f]">
+                      {assignedItemIds.length}/{config.misSlotsPerSlice}
+                    </div>
+                    <div className="grid content-start grid-cols-3 gap-[2px]">
+                      {previewIds.map((itemId) => {
+                        const item = itemById.get(itemId);
+                        if (!item) {
+                          return null;
+                        }
+
+                        return (
+                          <div
+                            key={`${hallId}-mis-${slice}-${misUnit}-${itemId}`}
+                            className="grid aspect-square place-items-center overflow-hidden rounded-[0.25rem] border border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
+                          >
+                            <Image
+                              src={item.texturePath}
+                              alt={item.id}
+                              width={16}
+                              height={16}
+                              draggable={false}
+                              unoptimized
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -590,7 +620,12 @@ export function LayoutViewport({
       ? Array.from(
           { length: expandedMisConfig.misSlotsPerSlice },
           (_, index) =>
-            misSlotId(validExpandedMisSlice.hallId, validExpandedMisSlice.slice, index),
+            misSlotId(
+              validExpandedMisSlice.hallId,
+              validExpandedMisSlice.slice,
+              validExpandedMisSlice.misUnit,
+              index,
+            ),
         )
       : [];
   const expandedMisColumns =
@@ -800,7 +835,7 @@ export function LayoutViewport({
             <div className="grid gap-[0.08rem] text-[#2e5042]">
               <div className="text-[0.78rem] font-bold uppercase tracking-[0.05em]">
                 {HALL_LABELS[validExpandedMisSlice.hallId]} MIS Slice{" "}
-                {validExpandedMisSlice.slice + 1}
+                {validExpandedMisSlice.slice + 1} • MIS {validExpandedMisSlice.misUnit + 1}
               </div>
               <div className="text-[0.68rem] text-[#3e6455]">
                 {expandedMisSlotIds.filter((slotId) => Boolean(slotAssignments[slotId])).length}/
@@ -864,12 +899,12 @@ export function LayoutViewport({
                 : hallId === "south"
                   ? { left: "50%", bottom: "-0.36rem", transform: "translate(-50%, 100%)" }
                   : hallId === "east"
-                    ? { right: "-0.36rem", top: "50%", transform: "translate(100%, -50%)" }
-                    : { left: "-0.36rem", top: "50%", transform: "translate(-100%, -50%)" };
+                    ? { right: "0", top: "-0.36rem", transform: "translate(0, -100%)" }
+                    : { left: "0", top: "-0.36rem", transform: "translate(0, -100%)" };
 
             const hallFirstSlot =
               hall.type === "mis"
-                ? misSlotId(hallId, 0, 0)
+                ? misSlotId(hallId, 0, 0, 0)
                 : nonMisSlotId(hallId, 0, 0, 0);
 
             return (
@@ -940,7 +975,7 @@ export function LayoutViewport({
                         <DeferredNumberInput
                           className="w-[2.55rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
                           min={1}
-                          max={54}
+                          max={200}
                           value={hall.misSlotsPerSlice}
                           onCommit={(nextValue) =>
                             onHallMisCapacityChange(hallId, nextValue)
@@ -959,6 +994,18 @@ export function LayoutViewport({
                         />
                       </label>
                     )}
+                    {hall.type === "mis" ? (
+                      <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
+                        <span>M</span>
+                        <DeferredNumberInput
+                          className="w-[2rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
+                          min={1}
+                          max={8}
+                          value={hall.misUnitsPerSlice}
+                          onCommit={(nextValue) => onHallMisUnitsChange(hallId, nextValue)}
+                        />
+                      </label>
+                    ) : null}
                   </div>
                 </div>
 

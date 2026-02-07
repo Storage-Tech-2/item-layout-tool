@@ -62,31 +62,33 @@ export function buildSlotCenters(
     const hallTopLeft = getHallTopLeft(hallId, width, height);
     if (config.type === "mis") {
       for (let slice = 0; slice < config.slices; slice += 1) {
-        const sliceLeft =
-          orientation === "horizontal"
-            ? hallTopLeft.x + slice * (MIS_SLICE_MAIN + SLOT_GAP)
-            : hallTopLeft.x;
-        const sliceTop =
-          orientation === "horizontal"
-            ? hallTopLeft.y
-            : hallTopLeft.y + slice * (MIS_SLICE_MAIN + SLOT_GAP);
-        const sliceWidth = orientation === "horizontal" ? MIS_SLICE_MAIN : MIS_CROSS;
-        const sliceHeight = orientation === "horizontal" ? MIS_CROSS : MIS_SLICE_MAIN;
-        const columns =
-          config.misSlotsPerSlice % 9 === 0
-            ? 9
-            : Math.min(12, Math.max(6, Math.ceil(Math.sqrt(config.misSlotsPerSlice))));
-        const rows = Math.max(1, Math.ceil(config.misSlotsPerSlice / columns));
-        const cellWidth = sliceWidth / columns;
-        const cellHeight = sliceHeight / rows;
+        for (let misUnit = 0; misUnit < config.misUnitsPerSlice; misUnit += 1) {
+          const unitLeft =
+            orientation === "horizontal"
+              ? hallTopLeft.x + slice * (MIS_SLICE_MAIN + SLOT_GAP)
+              : hallTopLeft.x + misUnit * (MIS_CROSS + SLOT_GAP);
+          const unitTop =
+            orientation === "horizontal"
+              ? hallTopLeft.y + misUnit * (MIS_CROSS + SLOT_GAP)
+              : hallTopLeft.y + slice * (MIS_SLICE_MAIN + SLOT_GAP);
+          const unitWidth = orientation === "horizontal" ? MIS_SLICE_MAIN : MIS_CROSS;
+          const unitHeight = orientation === "horizontal" ? MIS_CROSS : MIS_SLICE_MAIN;
+          const columns =
+            config.misSlotsPerSlice % 9 === 0
+              ? 9
+              : Math.min(12, Math.max(6, Math.ceil(Math.sqrt(config.misSlotsPerSlice))));
+          const rows = Math.max(1, Math.ceil(config.misSlotsPerSlice / columns));
+          const cellWidth = unitWidth / columns;
+          const cellHeight = unitHeight / rows;
 
-        for (let index = 0; index < config.misSlotsPerSlice; index += 1) {
-          const column = index % columns;
-          const row = Math.floor(index / columns);
-          slotCenters.set(`${hallId}:m:${slice}:${index}`, {
-            x: sliceLeft + (column + 0.5) * cellWidth,
-            y: sliceTop + (row + 0.5) * cellHeight,
-          });
+          for (let index = 0; index < config.misSlotsPerSlice; index += 1) {
+            const column = index % columns;
+            const row = Math.floor(index / columns);
+            slotCenters.set(`${hallId}:m:${slice}:${misUnit}:${index}`, {
+              x: unitLeft + (column + 0.5) * cellWidth,
+              y: unitTop + (row + 0.5) * cellHeight,
+            });
+          }
         }
       }
       continue;
