@@ -55,6 +55,11 @@ type LayoutViewportProps = {
     slotId: string,
     itemId: string,
   ) => void;
+  onSlotGroupDragStart: (
+    event: DragEvent<HTMLElement>,
+    slotIds: string[],
+    originSlotId?: string,
+  ) => void;
   onAnyDragEnd: () => void;
   onClearSlot: (slotId: string) => void;
   draggedSourceSlotIds: Set<string>;
@@ -70,6 +75,34 @@ type DeferredNumberInputProps = {
   className: string;
   onCommit: (value: string) => void;
 };
+
+type ExpandedMisTarget = {
+  hallId: HallId;
+  slice: number;
+  misUnit: number;
+};
+
+type ExpandedMisEntry = {
+  target: ExpandedMisTarget;
+  config: HallConfig;
+  slotIds: string[];
+  columns: number;
+  colorIndex: number;
+};
+
+function toExpandedMisKey(target: ExpandedMisTarget): string {
+  return `${target.hallId}:${target.slice}:${target.misUnit}`;
+}
+
+const MIS_OPEN_CARD_CLASSES = [
+  "border-[rgba(24,120,92,0.88)] bg-[linear-gradient(180deg,rgba(228,248,241,0.98)_0%,rgba(202,232,220,0.98)_100%)] shadow-[0_0_0_2px_rgba(16,185,129,0.33)]",
+  "border-[rgba(176,93,26,0.88)] bg-[linear-gradient(180deg,rgba(255,245,222,0.98)_0%,rgba(247,226,178,0.98)_100%)] shadow-[0_0_0_2px_rgba(245,158,11,0.32)]",
+] as const;
+
+const MIS_OPEN_PANEL_CLASSES = [
+  "border-[rgba(58,90,74,0.55)] bg-[linear-gradient(180deg,rgba(244,250,240,0.97)_0%,rgba(223,236,216,0.97)_100%)]",
+  "border-[rgba(139,88,31,0.55)] bg-[linear-gradient(180deg,rgba(255,248,233,0.97)_0%,rgba(245,229,198,0.97)_100%)]",
+] as const;
 
 function DeferredNumberInput({
   value,
@@ -124,6 +157,7 @@ export function LayoutViewport({
   onHallMisCapacityChange,
   onHallMisUnitsChange,
   onSlotItemDragStart,
+  onSlotGroupDragStart,
   onAnyDragEnd,
   onClearSlot,
   draggedSourceSlotIds,
@@ -140,11 +174,7 @@ export function LayoutViewport({
     width: number;
     height: number;
   } | null>(null);
-  const [expandedMisSlice, setExpandedMisSlice] = useState<{
-    hallId: HallId;
-    slice: number;
-    misUnit: number;
-  } | null>(null);
+  const [expandedMisSlices, setExpandedMisSlices] = useState<ExpandedMisTarget[]>([]);
 
   const viewportBackgroundStyle = useMemo(
     () => ({
@@ -221,22 +251,42 @@ export function LayoutViewport({
     };
   }, [viewportRef]);
 
-  const validExpandedMisSlice = useMemo(() => {
-    if (!expandedMisSlice) {
-      return null;
+  const validExpandedMisSlices = useMemo(() => {
+    const deduped = new Map<string, ExpandedMisTarget>();
+    for (const target of expandedMisSlices) {
+      deduped.set(toExpandedMisKey(target), target);
     }
 
-    const config = hallConfigs[expandedMisSlice.hallId];
-    if (
-      config.type !== "mis" ||
-      expandedMisSlice.slice >= config.slices ||
-      expandedMisSlice.misUnit >= config.misUnitsPerSlice
-    ) {
-      return null;
+    const validTargets: ExpandedMisTarget[] = [];
+    for (const target of deduped.values()) {
+      const config = hallConfigs[target.hallId];
+      if (
+        config.type !== "mis" ||
+        target.slice >= config.slices ||
+        target.misUnit >= config.misUnitsPerSlice
+      ) {
+        continue;
+      }
+      validTargets.push(target);
     }
 
-    return expandedMisSlice;
-  }, [expandedMisSlice, hallConfigs]);
+    return validTargets.slice(-2);
+  }, [expandedMisSlices, hallConfigs]);
+
+  const toggleExpandedMisSlice = useCallback((target: ExpandedMisTarget): void => {
+    const targetKey = toExpandedMisKey(target);
+    setExpandedMisSlices((current) => {
+      const existingIndex = current.findIndex(
+        (entry) => toExpandedMisKey(entry) === targetKey,
+      );
+      if (existingIndex !== -1) {
+        return current.filter((entry) => toExpandedMisKey(entry) !== targetKey);
+      }
+
+      const next = [...current, target];
+      return next.slice(-2);
+    });
+  }, []);
 
   const hallPlacement = useMemo(() => {
     const positions: Record<
@@ -537,10 +587,17 @@ export function LayoutViewport({
                   { length: config.misSlotsPerSlice },
                   (_, index) => misSlotId(hallId, slice, misUnit, index),
                 );
+                const openIndex = validExpandedMisSlices.findIndex(
+                  (entry) =>
+                    entry.hallId === hallId &&
+                    entry.slice === slice &&
+                    entry.misUnit === misUnit,
+                );
 
                 const assignedItemIds = slotIds
                   .map((slotId) => slotAssignments[slotId])
                   .filter((itemId): itemId is string => Boolean(itemId));
+                const hasAssignedItems = assignedItemIds.length > 0;
 
                 const previewIds = assignedItemIds.slice(0, 6);
                 const firstSlot = slotIds[0];
@@ -548,7 +605,22 @@ export function LayoutViewport({
                 return (
                   <div
                     key={`${hallId}-mis-${slice}-${misUnit}`}
-                    className="grid min-w-0 grid-rows-[auto_auto_1fr] gap-[0.22rem] rounded-[0.65rem] border border-[rgba(73,97,78,0.45)] bg-[linear-gradient(180deg,rgba(244,250,240,0.95)_0%,rgba(221,235,212,0.95)_100%)] p-[0.32rem]"
+                    className={`grid min-w-0 grid-rows-[auto_auto_1fr] gap-[0.22rem] rounded-[0.65rem] border p-[0.32rem] ${
+                      openIndex === -1
+                        ? "border-[rgba(73,97,78,0.45)] bg-[linear-gradient(180deg,rgba(244,250,240,0.95)_0%,rgba(221,235,212,0.95)_100%)]"
+                        : MIS_OPEN_CARD_CLASSES[openIndex % MIS_OPEN_CARD_CLASSES.length]
+                    }`}
+                    draggable={hasAssignedItems}
+                    onDragStart={(event) => {
+                      if (event.shiftKey || !hasAssignedItems) {
+                        event.preventDefault();
+                        return;
+                      }
+
+                      event.stopPropagation();
+                      onSlotGroupDragStart(event, slotIds, firstSlot);
+                    }}
+                    onDragEnd={onAnyDragEnd}
                     onDragOver={(event) => onSlotDragOver(event, firstSlot)}
                     onDrop={(event) => onSlotDrop(event, firstSlot)}
                     onClick={(event) => {
@@ -558,16 +630,7 @@ export function LayoutViewport({
                       }
 
                       event.stopPropagation();
-                      setExpandedMisSlice((current) => {
-                        if (
-                          current?.hallId === hallId &&
-                          current.slice === slice &&
-                          current.misUnit === misUnit
-                        ) {
-                          return null;
-                        }
-                        return { hallId, slice, misUnit };
-                      });
+                      toggleExpandedMisSlice({ hallId, slice, misUnit });
                     }}
                     title={`Slice ${slice + 1} • MIS ${misUnit + 1} • ${assignedItemIds.length}/${config.misSlotsPerSlice}`}
                     data-slot
@@ -612,29 +675,33 @@ export function LayoutViewport({
     );
   }
 
-  const expandedMisConfig = validExpandedMisSlice
-    ? hallConfigs[validExpandedMisSlice.hallId]
-    : null;
-  const expandedMisSlotIds =
-    validExpandedMisSlice && expandedMisConfig?.type === "mis"
-      ? Array.from(
-          { length: expandedMisConfig.misSlotsPerSlice },
-          (_, index) =>
-            misSlotId(
-              validExpandedMisSlice.hallId,
-              validExpandedMisSlice.slice,
-              validExpandedMisSlice.misUnit,
-              index,
-            ),
-        )
-      : [];
-  const expandedMisColumns =
-    expandedMisConfig && expandedMisConfig.misSlotsPerSlice % 9 === 0
-      ? 9
-      : Math.min(
-          12,
-          Math.max(6, Math.ceil(Math.sqrt(expandedMisConfig?.misSlotsPerSlice ?? 1))),
-        );
+  const expandedMisEntries = useMemo<ExpandedMisEntry[]>(() => {
+    const entries: ExpandedMisEntry[] = [];
+    for (const [colorIndex, target] of validExpandedMisSlices.entries()) {
+      const config = hallConfigs[target.hallId];
+      if (config.type !== "mis") {
+        continue;
+      }
+
+      const slotIds = Array.from(
+        { length: config.misSlotsPerSlice },
+        (_, index) => misSlotId(target.hallId, target.slice, target.misUnit, index),
+      );
+      const columns =
+        config.misSlotsPerSlice % 9 === 0
+          ? 9
+          : Math.min(12, Math.max(6, Math.ceil(Math.sqrt(config.misSlotsPerSlice))));
+
+      entries.push({
+        target,
+        config,
+        slotIds,
+        columns,
+        colorIndex,
+      });
+    }
+    return entries;
+  }, [hallConfigs, validExpandedMisSlices]);
 
   return (
     <div
@@ -825,42 +892,71 @@ export function LayoutViewport({
         </button>
       </div>
 
-      {validExpandedMisSlice && expandedMisConfig?.type === "mis" ? (
-        <section
-          className="absolute left-1/2 top-5 z-30 w-[min(88vw,600px)] -translate-x-1/2 overflow-hidden rounded-[0.85rem] border border-[rgba(58,90,74,0.55)] bg-[linear-gradient(180deg,rgba(244,250,240,0.97)_0%,rgba(223,236,216,0.97)_100%)] shadow-[0_12px_34px_rgba(38,48,33,0.28)]"
+      {expandedMisEntries.length > 0 ? (
+        <div
+          className="absolute left-1/2 top-5 z-30 flex max-w-[92vw] -translate-x-1/2 gap-3 max-[980px]:grid max-[980px]:w-[92vw]"
           data-no-pan
           onClick={(event) => event.stopPropagation()}
         >
-          <header className="flex items-center justify-between border-b border-[rgba(63,88,72,0.28)] px-3 py-2">
-            <div className="grid gap-[0.08rem] text-[#2e5042]">
-              <div className="text-[0.78rem] font-bold uppercase tracking-[0.05em]">
-                {HALL_LABELS[validExpandedMisSlice.hallId]} MIS Slice{" "}
-                {validExpandedMisSlice.slice + 1} • MIS {validExpandedMisSlice.misUnit + 1}
-              </div>
-              <div className="text-[0.68rem] text-[#3e6455]">
-                {expandedMisSlotIds.filter((slotId) => Boolean(slotAssignments[slotId])).length}/
-                {expandedMisConfig.misSlotsPerSlice} assigned
-              </div>
-            </div>
-            <button
-              type="button"
-              className="rounded-[0.4rem] border border-[rgba(82,104,88,0.45)] bg-[rgba(253,255,252,0.92)] px-[0.5rem] py-[0.2rem] text-[0.72rem] font-semibold text-[#2f4b3f]"
-              onClick={() => setExpandedMisSlice(null)}
-            >
-              Close
-            </button>
-          </header>
-          <div className="max-h-[64vh] overflow-auto p-3">
-            <div
-              className="grid content-start gap-[4px]"
-              style={{
-                gridTemplateColumns: `repeat(${expandedMisColumns}, ${SLOT_SIZE}px)`,
-              }}
-            >
-              {expandedMisSlotIds.map((slotId) => renderSlot(slotId))}
-            </div>
-          </div>
-        </section>
+          {expandedMisEntries.map((entry) => {
+            const palette = MIS_OPEN_PANEL_CLASSES[entry.colorIndex % MIS_OPEN_PANEL_CLASSES.length];
+            const targetKey = toExpandedMisKey(entry.target);
+            return (
+              <section
+                key={targetKey}
+                className={`w-[min(38vw,400px)] overflow-hidden rounded-[0.85rem] border shadow-[0_12px_34px_rgba(38,48,33,0.28)] max-[980px]:w-full ${palette}`}
+              >
+                <header
+                  className="flex items-center justify-between border-b border-[rgba(63,88,72,0.28)] px-3 py-2"
+                  draggable={entry.slotIds.some((slotId) => Boolean(slotAssignments[slotId]))}
+                  onDragStart={(event) => {
+                    if (event.shiftKey) {
+                      event.preventDefault();
+                      return;
+                    }
+
+                    onSlotGroupDragStart(event, entry.slotIds, entry.slotIds[0]);
+                  }}
+                  onDragEnd={onAnyDragEnd}
+                >
+                  <div className="grid gap-[0.08rem] text-[#2e5042]">
+                    <div className="text-[0.78rem] font-bold uppercase tracking-[0.05em]">
+                      {HALL_LABELS[entry.target.hallId]} MIS Slice {entry.target.slice + 1} • MIS{" "}
+                      {entry.target.misUnit + 1}
+                    </div>
+                    <div className="text-[0.68rem] text-[#3e6455]">
+                      {entry.slotIds.filter((slotId) => Boolean(slotAssignments[slotId])).length}/
+                      {entry.config.misSlotsPerSlice} assigned
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded-[0.4rem] border border-[rgba(82,104,88,0.45)] bg-[rgba(253,255,252,0.92)] px-[0.5rem] py-[0.2rem] text-[0.72rem] font-semibold text-[#2f4b3f]"
+                    onClick={() => {
+                      setExpandedMisSlices((current) =>
+                        current.filter(
+                          (expanded) => toExpandedMisKey(expanded) !== toExpandedMisKey(entry.target),
+                        ),
+                      );
+                    }}
+                  >
+                    Close
+                  </button>
+                </header>
+                <div className="max-h-[64vh] overflow-auto p-3">
+                  <div
+                    className="grid content-start gap-[4px]"
+                    style={{
+                      gridTemplateColumns: `repeat(${entry.columns}, ${SLOT_SIZE}px)`,
+                    }}
+                  >
+                    {entry.slotIds.map((slotId) => renderSlot(slotId))}
+                  </div>
+                </div>
+              </section>
+            );
+          })}
+        </div>
       ) : null}
 
       <div

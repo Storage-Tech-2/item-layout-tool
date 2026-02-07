@@ -38,6 +38,11 @@ type UseLayoutAssignmentsResult = {
     slotId: string,
     itemId: string,
   ) => void;
+  beginSlotGroupDrag: (
+    event: DragEvent<HTMLElement>,
+    slotIds: string[],
+    originSlotId?: string,
+  ) => void;
   handleSlotDragOver: (event: DragEvent<HTMLElement>, slotId: string) => void;
   handleSlotDrop: (event: DragEvent<HTMLElement>, slotId: string) => void;
   handleViewportDropFallback: (event: DragEvent<HTMLElement>) => void;
@@ -196,6 +201,53 @@ export function useLayoutAssignments({
     if (!isMultiMove) {
       setSelectedSlotIdsState([slotId]);
     }
+  }
+
+  function beginSlotGroupDrag(
+    event: DragEvent<HTMLElement>,
+    slotIds: string[],
+    originSlotId?: string,
+  ): void {
+    const normalizedSlotIds: string[] = [];
+    const seen = new Set<string>();
+    for (const slotId of slotIds) {
+      if (!orderedSlotIdSet.has(slotId) || seen.has(slotId)) {
+        continue;
+      }
+      normalizedSlotIds.push(slotId);
+      seen.add(slotId);
+    }
+
+    const entries = normalizedSlotIds
+      .map((slotId) => ({
+        slotId,
+        itemId: activeSlotAssignments[slotId],
+      }))
+      .filter((entry): entry is { slotId: string; itemId: string } => Boolean(entry.itemId));
+
+    if (entries.length === 0) {
+      event.preventDefault();
+      return;
+    }
+
+    const nextOriginSlotId =
+      originSlotId && entries.some((entry) => entry.slotId === originSlotId)
+        ? originSlotId
+        : entries[0].slotId;
+
+    const payload: DragPayload = {
+      kind: entries.length > 1 ? "category" : "item",
+      itemIds: entries.map((entry) => entry.itemId),
+      source: "layout",
+      originSlotId: nextOriginSlotId,
+      sourceSlotIds: entries.map((entry) => entry.slotId),
+    };
+
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(DRAG_DATA_KEY, JSON.stringify(payload));
+    setActiveDragPayload(payload);
+    setDragPreviews([]);
+    setSelectedSlotIdsState(entries.map((entry) => entry.slotId));
   }
 
   function buildPreviewSet(anchorSlotId: string, payload: DragPayload): PreviewPlacement[] {
@@ -536,6 +588,7 @@ export function useLayoutAssignments({
     beginItemDrag,
     beginCategoryDrag,
     beginSlotItemDrag,
+    beginSlotGroupDrag,
     handleSlotDragOver,
     handleSlotDrop,
     handleViewportDropFallback,

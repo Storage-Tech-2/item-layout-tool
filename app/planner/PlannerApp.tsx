@@ -39,6 +39,7 @@ export function PlannerApp() {
     beginItemDrag,
     beginCategoryDrag,
     beginSlotItemDrag,
+    beginSlotGroupDrag,
     handleSlotDragOver,
     handleSlotDrop,
     handleViewportDropFallback,
@@ -123,6 +124,7 @@ export function PlannerApp() {
           onHallMisCapacityChange={handleHallMisCapacityChange}
           onHallMisUnitsChange={handleHallMisUnitsPerSliceChange}
           onSlotItemDragStart={beginSlotItemDrag}
+          onSlotGroupDragStart={beginSlotGroupDrag}
           onAnyDragEnd={clearDragState}
           onClearSlot={clearSlot}
           draggedSourceSlotIds={draggedSourceSlotIdSet}
