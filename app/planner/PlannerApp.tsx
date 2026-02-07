@@ -40,6 +40,7 @@ export function PlannerApp() {
 
   const [hallConfigs, setHallConfigs] = useState<Record<HallId, HallConfig>>(DEFAULT_HALLS);
   const [slotAssignments, setSlotAssignments] = useState<Record<string, string>>({});
+  const [selectedSlotIds, setSelectedSlotIds] = useState<string[]>([]);
   const [activeDragPayload, setActiveDragPayload] = useState<DragPayload | null>(
     null,
   );
@@ -50,7 +51,6 @@ export function PlannerApp() {
     zoom,
     pan,
     adjustZoom,
-    handleWheel,
     handlePointerDown,
     handlePointerMove,
     handlePointerEnd,
@@ -79,6 +79,19 @@ export function PlannerApp() {
     }
     return used;
   }, [activeSlotAssignments]);
+
+  const selectedSlotIdSet = useMemo(
+    () => new Set(selectedSlotIds),
+    [selectedSlotIds],
+  );
+
+  const selectedSlotsInOrder = useMemo(
+    () =>
+      orderedSlotIds.filter(
+        (slotId) => selectedSlotIdSet.has(slotId) && Boolean(activeSlotAssignments[slotId]),
+      ),
+    [activeSlotAssignments, orderedSlotIds, selectedSlotIdSet],
+  );
 
   function setHallType(hallId: HallId, nextType: HallType): void {
     setHallConfigs((current) => {
@@ -155,6 +168,7 @@ export function PlannerApp() {
 
   function clearLayout(): void {
     setSlotAssignments({});
+    setSelectedSlotIds([]);
   }
 
   function beginItemDrag(event: DragEvent<HTMLElement>, itemId: string): void {
@@ -200,9 +214,17 @@ export function PlannerApp() {
     slotId: string,
     itemId: string,
   ): void {
+    const isMultiMove =
+      selectedSlotIdSet.has(slotId) && selectedSlotsInOrder.length > 1;
+    const selectedItemIds = selectedSlotsInOrder
+      .map((selectedSlotId) => activeSlotAssignments[selectedSlotId])
+      .filter((selectedItemId): selectedItemId is string => Boolean(selectedItemId));
+
+    const dragItemIds = isMultiMove ? selectedItemIds : [itemId];
+
     const payload: DragPayload = {
-      kind: "item",
-      itemIds: [itemId],
+      kind: dragItemIds.length > 1 ? "category" : "item",
+      itemIds: dragItemIds,
       source: "layout",
       originSlotId: slotId,
     };
@@ -210,7 +232,17 @@ export function PlannerApp() {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData(DRAG_DATA_KEY, JSON.stringify(payload));
     setActiveDragPayload(payload);
-    setDragPreviews([{ slotId, itemId }]);
+    if (isMultiMove) {
+      setDragPreviews(
+        selectedSlotsInOrder.map((selectedSlotId, index) => ({
+          slotId: selectedSlotId,
+          itemId: selectedItemIds[index] ?? itemId,
+        })),
+      );
+    } else {
+      setDragPreviews([{ slotId, itemId }]);
+      setSelectedSlotIds([slotId]);
+    }
   }
 
   function clearDragState(): void {
@@ -359,7 +391,11 @@ export function PlannerApp() {
       return;
     }
 
+    const placements = buildPlacements(anchorSlotId, payload, activeSlotAssignments);
     placePayload(anchorSlotId, payload);
+    if (payload.source === "layout") {
+      setSelectedSlotIds(placements.map((placement) => placement.slotId));
+    }
     clearDragState();
   }
 
@@ -394,6 +430,7 @@ export function PlannerApp() {
         }
         return next;
       });
+      setSelectedSlotIds([]);
     }
 
     clearDragState();
@@ -409,6 +446,12 @@ export function PlannerApp() {
       delete next[slotId];
       return next;
     });
+
+    setSelectedSlotIds((current) => current.filter((entry) => entry !== slotId));
+  }
+
+  function handleSelectionChange(nextSelection: string[]): void {
+    setSelectedSlotIds(nextSelection);
   }
 
   return (
@@ -432,7 +475,6 @@ export function PlannerApp() {
           zoom={zoom}
           pan={pan}
           onAdjustZoom={adjustZoom}
-          onWheel={handleWheel}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerEnd={handlePointerEnd}
@@ -442,6 +484,8 @@ export function PlannerApp() {
           onAnyDragEnd={clearDragState}
           onClearSlot={clearSlot}
           dragPreviewPlacements={dragPreviews}
+          selectedSlotIds={selectedSlotIdSet}
+          onSelectionChange={handleSelectionChange}
         />
       </section>
 

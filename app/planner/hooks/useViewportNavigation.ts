@@ -1,7 +1,7 @@
 import {
+  useCallback,
   type PointerEvent,
   type RefObject,
-  type WheelEvent,
   useEffect,
   useRef,
   useState,
@@ -15,18 +15,12 @@ type PanSession = {
   lastY: number;
 };
 
-type ZoomTarget = {
-  viewportX: number;
-  viewportY: number;
-};
-
 export function useViewportNavigation(): {
   viewportRef: RefObject<HTMLDivElement | null>;
   zoom: number;
   pan: { x: number; y: number };
   adjustZoom: (delta: number) => void;
-  handleWheel: (event: WheelEvent<HTMLDivElement>) => void;
-  handlePointerDown: (event: PointerEvent<HTMLDivElement>) => void;
+  handlePointerDown: (event: PointerEvent<HTMLDivElement>) => boolean;
   handlePointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   handlePointerEnd: (event: PointerEvent<HTMLDivElement>) => void;
 } {
@@ -60,26 +54,11 @@ export function useViewportNavigation(): {
     };
   }, []);
 
-  function resolveZoomTarget(
-    rect: DOMRect,
-    rawX: number,
-    rawY: number,
-  ): ZoomTarget {
-    const fallbackX = rect.width / 2;
-    const fallbackY = rect.height / 2;
-
-    const viewportX =
-      Number.isFinite(rawX) && rawX >= 0 && rawX <= rect.width ? rawX : fallbackX;
-    const viewportY =
-      Number.isFinite(rawY) && rawY >= 0 && rawY <= rect.height ? rawY : fallbackY;
-
-    return { viewportX, viewportY };
-  }
-
-  function zoomWithTarget(
-    target: ZoomTarget,
+  const applyZoomAt = useCallback((
+    viewportX: number,
+    viewportY: number,
     getNextZoom: (currentZoom: number) => number,
-  ): void {
+  ): void => {
     setZoom((currentZoom) => {
       const nextZoom = clamp(getNextZoom(currentZoom), MIN_ZOOM, MAX_ZOOM);
       if (nextZoom === currentZoom) {
@@ -89,13 +68,13 @@ export function useViewportNavigation(): {
       const zoomFactor = nextZoom / currentZoom;
 
       setPan((currentPan) => ({
-        x: target.viewportX - (target.viewportX - currentPan.x) * zoomFactor,
-        y: target.viewportY - (target.viewportY - currentPan.y) * zoomFactor,
+        x: viewportX - (viewportX - currentPan.x) * zoomFactor,
+        y: viewportY - (viewportY - currentPan.y) * zoomFactor,
       }));
 
       return nextZoom;
     });
-  }
+  }, []);
 
   function adjustZoom(delta: number): void {
     if (!viewportRef.current) {
@@ -103,36 +82,63 @@ export function useViewportNavigation(): {
     }
 
     const rect = viewportRef.current.getBoundingClientRect();
-    const target = resolveZoomTarget(rect, rect.width / 2, rect.height / 2);
-    zoomWithTarget(target, (currentZoom) => currentZoom + delta);
+    applyZoomAt(rect.width / 2, rect.height / 2, (currentZoom) => currentZoom + delta);
   }
 
-  function handleWheel(event: WheelEvent<HTMLDivElement>): void {
-    event.preventDefault();
-
+  const handleWheelFromViewport = useCallback((
+    clientX: number,
+    clientY: number,
+    deltaY: number,
+  ): void => {
     if (!viewportRef.current) {
       return;
     }
 
     const rect = viewportRef.current.getBoundingClientRect();
-    const target = resolveZoomTarget(
-      rect,
-      event.clientX - rect.left,
-      event.clientY - rect.top,
-    );
+    const rawX = clientX - rect.left;
+    const rawY = clientY - rect.top;
+    const fallbackX = rect.width / 2;
+    const fallbackY = rect.height / 2;
+    const viewportX =
+      Number.isFinite(rawX) && rawX >= 0 && rawX <= rect.width ? rawX : fallbackX;
+    const viewportY =
+      Number.isFinite(rawY) && rawY >= 0 && rawY <= rect.height ? rawY : fallbackY;
 
-    const zoomScale = Math.exp(-event.deltaY * 0.0022);
-    zoomWithTarget(target, (currentZoom) => currentZoom * zoomScale);
-  }
+    const zoomScale = Math.exp(-deltaY * 0.0022);
+    applyZoomAt(viewportX, viewportY, (currentZoom) => currentZoom * zoomScale);
+  }, [applyZoomAt]);
 
-  function handlePointerDown(event: PointerEvent<HTMLDivElement>): void {
-    if (event.button !== 0) {
+  useEffect(() => {
+    const element = viewportRef.current;
+    if (!element) {
       return;
+    }
+
+    const handleNativeWheel = (event: globalThis.WheelEvent): void => {
+      event.preventDefault();
+      event.stopPropagation();
+      handleWheelFromViewport(event.clientX, event.clientY, event.deltaY);
+    };
+
+    element.addEventListener("wheel", handleNativeWheel, { passive: false });
+
+    return () => {
+      element.removeEventListener("wheel", handleNativeWheel);
+    };
+  }, [handleWheelFromViewport]);
+
+  function handlePointerDown(event: PointerEvent<HTMLDivElement>): boolean {
+    if (event.button !== 0) {
+      return false;
     }
 
     const target = event.target as HTMLElement;
     if (target.closest("[data-slot]") || target.closest("[data-no-pan]")) {
-      return;
+      return false;
+    }
+
+    if (!event.shiftKey) {
+      return false;
     }
 
     panSessionRef.current = {
@@ -146,6 +152,7 @@ export function useViewportNavigation(): {
 
     event.currentTarget.setPointerCapture(event.pointerId);
     event.preventDefault();
+    return true;
   }
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>): void {
@@ -186,7 +193,6 @@ export function useViewportNavigation(): {
     zoom,
     pan,
     adjustZoom,
-    handleWheel,
     handlePointerDown,
     handlePointerMove,
     handlePointerEnd,

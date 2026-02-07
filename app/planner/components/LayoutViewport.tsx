@@ -4,8 +4,11 @@ import {
   type PointerEvent,
   type RefObject,
   type ReactNode,
-  type WheelEvent,
+  useCallback,
+  useEffect,
   useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
   CORE_SIZE,
@@ -28,8 +31,7 @@ type LayoutViewportProps = {
   zoom: number;
   pan: { x: number; y: number };
   onAdjustZoom: (delta: number) => void;
-  onWheel: (event: WheelEvent<HTMLDivElement>) => void;
-  onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
+  onPointerDown: (event: PointerEvent<HTMLDivElement>) => boolean;
   onPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerEnd: (event: PointerEvent<HTMLDivElement>) => void;
   onSlotDragOver: (event: DragEvent<HTMLElement>, slotId: string) => void;
@@ -42,6 +44,8 @@ type LayoutViewportProps = {
   onAnyDragEnd: () => void;
   onClearSlot: (slotId: string) => void;
   dragPreviewPlacements: { slotId: string; itemId: string }[];
+  selectedSlotIds: Set<string>;
+  onSelectionChange: (slotIds: string[]) => void;
 };
 
 export function LayoutViewport({
@@ -52,7 +56,6 @@ export function LayoutViewport({
   zoom,
   pan,
   onAdjustZoom,
-  onWheel,
   onPointerDown,
   onPointerMove,
   onPointerEnd,
@@ -62,8 +65,18 @@ export function LayoutViewport({
   onAnyDragEnd,
   onClearSlot,
   dragPreviewPlacements,
+  selectedSlotIds,
+  onSelectionChange,
 }: LayoutViewportProps) {
   const center = STAGE_SIZE / 2;
+  const selectionPointerId = useRef<number | null>(null);
+  const selectionStart = useRef<{ x: number; y: number } | null>(null);
+  const [selectionBox, setSelectionBox] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
 
   const viewportBackgroundStyle = useMemo(
     () => ({
@@ -81,6 +94,61 @@ export function LayoutViewport({
     }
     return map;
   }, [dragPreviewPlacements]);
+
+  const collectSelectionWithinRect = useCallback(
+    (left: number, top: number, right: number, bottom: number): string[] => {
+      const viewport = viewportRef.current;
+      if (!viewport) {
+        return [];
+      }
+
+      const viewportRect = viewport.getBoundingClientRect();
+      const slots = viewport.querySelectorAll<HTMLElement>("[data-slot-id]");
+      const selected: string[] = [];
+
+      for (const slot of slots) {
+        const slotId = slot.dataset.slotId;
+        if (!slotId || !slotAssignments[slotId]) {
+          continue;
+        }
+
+        const slotRect = slot.getBoundingClientRect();
+        const slotLeft = slotRect.left - viewportRect.left;
+        const slotTop = slotRect.top - viewportRect.top;
+        const slotRight = slotLeft + slotRect.width;
+        const slotBottom = slotTop + slotRect.height;
+
+        const intersects =
+          slotRight >= left &&
+          slotLeft <= right &&
+          slotBottom >= top &&
+          slotTop <= bottom;
+
+        if (intersects) {
+          selected.push(slotId);
+        }
+      }
+
+      return selected;
+    },
+    [slotAssignments, viewportRef],
+  );
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) {
+      return;
+    }
+
+    const preventContextMenu = (event: MouseEvent): void => {
+      event.preventDefault();
+    };
+
+    viewport.addEventListener("contextmenu", preventContextMenu);
+    return () => {
+      viewport.removeEventListener("contextmenu", preventContextMenu);
+    };
+  }, [viewportRef]);
 
   const hallPlacement = useMemo(() => {
     const positions: Record<
@@ -142,6 +210,7 @@ export function LayoutViewport({
     const previewItemId = previewBySlot.get(slotId);
     const previewItem = previewItemId ? itemById.get(previewItemId) : undefined;
     const isDropTarget = Boolean(previewItem);
+    const isSelected = selectedSlotIds.has(slotId) && Boolean(assignedItem);
 
     return (
       <button
@@ -151,8 +220,21 @@ export function LayoutViewport({
           assignedItem
             ? "border-[rgba(40,102,110,0.62)] bg-[linear-gradient(145deg,rgba(237,253,249,0.95)_0%,rgba(205,235,226,0.95)_100%)]"
             : "border-[rgba(108,89,62,0.35)] bg-[linear-gradient(145deg,rgba(245,233,216,0.95)_0%,rgba(231,212,184,0.95)_100%)]"
-        } ${isDropTarget ? "border-[rgba(22,132,120,0.92)] shadow-[0_0_0_2px_rgba(85,204,178,0.38)]" : ""}`}
+        } ${isDropTarget ? "border-[rgba(22,132,120,0.92)] shadow-[0_0_0_2px_rgba(85,204,178,0.38)]" : ""} ${isSelected ? "shadow-[0_0_0_2px_rgba(37,99,235,0.55)]" : ""}`}
         draggable={Boolean(assignedItem)}
+        onPointerDown={(event) => {
+          if (event.button === 2) {
+            event.preventDefault();
+            event.stopPropagation();
+            onClearSlot(slotId);
+          }
+        }}
+        onPointerEnter={(event) => {
+          if ((event.buttons & 2) === 2) {
+            event.preventDefault();
+            onClearSlot(slotId);
+          }
+        }}
         onDragStart={(event) => {
           if (!assignedItemId) {
             event.preventDefault();
@@ -174,6 +256,7 @@ export function LayoutViewport({
           onClearSlot(slotId);
         }}
         data-slot
+        data-slot-id={slotId}
         title={
           assignedItem
             ? `${toTitle(assignedItem.id)} (right click to clear)`
@@ -365,18 +448,101 @@ export function LayoutViewport({
       ref={viewportRef}
       className="relative min-h-0 flex-1 cursor-grab select-none overflow-hidden touch-none active:cursor-grabbing"
       style={viewportBackgroundStyle}
-      onWheel={onWheel}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerEnd}
-      onPointerCancel={onPointerEnd}
+      onPointerDown={(event) => {
+        const didStartPan = onPointerDown(event);
+        if (didStartPan || event.button !== 0 || event.shiftKey) {
+          return;
+        }
+
+        const target = event.target as HTMLElement;
+        if (target.closest("[data-slot]") || target.closest("[data-no-pan]")) {
+          return;
+        }
+
+        if (!viewportRef.current) {
+          return;
+        }
+
+        const viewportRect = viewportRef.current.getBoundingClientRect();
+        const x = event.clientX - viewportRect.left;
+        const y = event.clientY - viewportRect.top;
+
+        selectionPointerId.current = event.pointerId;
+        selectionStart.current = { x, y };
+        setSelectionBox({ left: x, top: y, width: 0, height: 0 });
+        onSelectionChange([]);
+
+        event.currentTarget.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      }}
+      onPointerMove={(event) => {
+        onPointerMove(event);
+
+        if (
+          selectionPointerId.current === null ||
+          selectionPointerId.current !== event.pointerId ||
+          !selectionStart.current ||
+          !viewportRef.current
+        ) {
+          return;
+        }
+
+        const viewportRect = viewportRef.current.getBoundingClientRect();
+        const x = event.clientX - viewportRect.left;
+        const y = event.clientY - viewportRect.top;
+        const left = Math.min(selectionStart.current.x, x);
+        const top = Math.min(selectionStart.current.y, y);
+        const right = Math.max(selectionStart.current.x, x);
+        const bottom = Math.max(selectionStart.current.y, y);
+
+        setSelectionBox({
+          left,
+          top,
+          width: right - left,
+          height: bottom - top,
+        });
+
+        const nextSelection = collectSelectionWithinRect(left, top, right, bottom);
+        onSelectionChange(nextSelection);
+      }}
+      onPointerUp={(event) => {
+        onPointerEnd(event);
+
+        if (
+          selectionPointerId.current !== null &&
+          selectionPointerId.current === event.pointerId
+        ) {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+          selectionPointerId.current = null;
+          selectionStart.current = null;
+          setSelectionBox(null);
+        }
+      }}
+      onPointerCancel={(event) => {
+        onPointerEnd(event);
+
+        if (
+          selectionPointerId.current !== null &&
+          selectionPointerId.current === event.pointerId
+        ) {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+          selectionPointerId.current = null;
+          selectionStart.current = null;
+          setSelectionBox(null);
+        }
+      }}
     >
       <div
         className="absolute bottom-4 left-4 z-20 grid gap-[0.1rem] rounded-[0.55rem] border border-[rgba(134,105,67,0.35)] bg-[rgba(255,252,245,0.92)] px-[0.55rem] py-[0.45rem] text-[0.72rem] leading-[1.3] text-[#6d6256]"
         data-no-pan
       >
         <div>Mouse wheel to zoom</div>
-        <div>Drag empty space to pan</div>
+        <div>Shift + drag to pan</div>
+        <div>Drag to box-select slots</div>
         <div>Right-click a placed slot to clear</div>
       </div>
 
@@ -475,6 +641,18 @@ export function LayoutViewport({
           })}
         </div>
       </div>
+
+      {selectionBox ? (
+        <div
+          className="pointer-events-none absolute border border-[rgba(37,99,235,0.9)] bg-[rgba(37,99,235,0.18)]"
+          style={{
+            left: `${selectionBox.left}px`,
+            top: `${selectionBox.top}px`,
+            width: `${selectionBox.width}px`,
+            height: `${selectionBox.height}px`,
+          }}
+        />
+      ) : null}
     </div>
   );
 }
