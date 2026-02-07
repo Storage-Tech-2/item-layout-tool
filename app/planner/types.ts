@@ -37,4 +37,5 @@ export type DragPayload = {
   itemIds: string[];
   source?: "catalog" | "layout";
   originSlotId?: string;
+  sourceSlotIds?: string[];
 };

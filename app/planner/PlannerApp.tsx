@@ -2,15 +2,21 @@
 
 import { type DragEvent, useMemo, useState } from "react";
 import {
+  CORE_SIZE,
   DEFAULT_HALLS,
   DRAG_DATA_KEY,
+  HALL_GAP,
+  HALL_ORIENTATION,
   HALL_ORDER,
   HALL_TYPE_DEFAULTS,
+  SLOT_GAP,
+  SLOT_SIZE,
+  STAGE_SIZE,
 } from "./constants";
 import { useCatalog } from "./hooks/useCatalog";
 import { useViewportNavigation } from "./hooks/useViewportNavigation";
 import type { DragPayload, HallConfig, HallId, HallType } from "./types";
-import { buildOrderedSlotIds, clamp, parseDragPayload } from "./utils";
+import { buildOrderedSlotIds, clamp, getHallSize, parseDragPayload } from "./utils";
 import { LayoutControls } from "./components/LayoutControls";
 import { LayoutViewport } from "./components/LayoutViewport";
 import { ItemLibraryPanel } from "./components/ItemLibraryPanel";
@@ -19,6 +25,101 @@ type PreviewPlacement = {
   slotId: string;
   itemId: string;
 };
+
+type SlotPoint = {
+  x: number;
+  y: number;
+};
+
+function toPointKey(point: SlotPoint): string {
+  return `${Math.round(point.x * 1000)}:${Math.round(point.y * 1000)}`;
+}
+
+function getHallTopLeft(
+  hallId: HallId,
+  hallWidth: number,
+  hallHeight: number,
+): SlotPoint {
+  const center = STAGE_SIZE / 2;
+  if (hallId === "north") {
+    return {
+      x: center - hallWidth / 2,
+      y: center - CORE_SIZE / 2 - HALL_GAP - hallHeight,
+    };
+  }
+
+  if (hallId === "south") {
+    return {
+      x: center - hallWidth / 2,
+      y: center + CORE_SIZE / 2 + HALL_GAP,
+    };
+  }
+
+  if (hallId === "east") {
+    return {
+      x: center + CORE_SIZE / 2 + HALL_GAP,
+      y: center - hallHeight / 2,
+    };
+  }
+
+  return {
+    x: center - CORE_SIZE / 2 - HALL_GAP - hallWidth,
+    y: center - hallHeight / 2,
+  };
+}
+
+function buildSlotCenters(
+  hallConfigs: Record<HallId, HallConfig>,
+): Map<string, SlotPoint> {
+  const slotCenters = new Map<string, SlotPoint>();
+
+  for (const hallId of HALL_ORDER) {
+    const config = hallConfigs[hallId];
+    if (config.type === "mis") {
+      continue;
+    }
+
+    const orientation = HALL_ORIENTATION[hallId];
+    const { width, height } = getHallSize(config, orientation);
+    const hallTopLeft = getHallTopLeft(hallId, width, height);
+    const step = SLOT_SIZE + SLOT_GAP;
+    const sideDepthPx =
+      config.rowsPerSide * SLOT_SIZE + Math.max(0, config.rowsPerSide - 1) * SLOT_GAP;
+
+    if (orientation === "horizontal") {
+      const topGridTop = hallTopLeft.y;
+      const bottomGridTop = hallTopLeft.y + height - sideDepthPx;
+
+      for (let slice = 0; slice < config.slices; slice += 1) {
+        for (let row = 0; row < config.rowsPerSide; row += 1) {
+          const x = hallTopLeft.x + slice * step + SLOT_SIZE / 2;
+          const topY = topGridTop + row * step + SLOT_SIZE / 2;
+          const bottomY = bottomGridTop + row * step + SLOT_SIZE / 2;
+
+          slotCenters.set(`${hallId}:g:${slice}:0:${row}`, { x, y: topY });
+          slotCenters.set(`${hallId}:g:${slice}:1:${row}`, { x, y: bottomY });
+        }
+      }
+      continue;
+    }
+
+    const leftGridLeft = hallTopLeft.x;
+    const rightGridLeft = hallTopLeft.x + width - sideDepthPx;
+
+    for (let slice = 0; slice < config.slices; slice += 1) {
+      for (let row = 0; row < config.rowsPerSide; row += 1) {
+        const y = hallTopLeft.y + slice * step + SLOT_SIZE / 2;
+        const leftX = leftGridLeft + row * step + SLOT_SIZE / 2;
+        const rightX = rightGridLeft + row * step + SLOT_SIZE / 2;
+
+        slotCenters.set(`${hallId}:g:${slice}:0:${row}`, { x: leftX, y });
+        slotCenters.set(`${hallId}:g:${slice}:1:${row}`, { x: rightX, y });
+      }
+    }
+  }
+
+  return slotCenters;
+}
 
 function retainValidAssignments(
   assignments: Record<string, string>,
@@ -57,6 +158,14 @@ export function PlannerApp() {
   } = useViewportNavigation();
 
   const orderedSlotIds = useMemo(() => buildOrderedSlotIds(hallConfigs), [hallConfigs]);
+  const slotCenterById = useMemo(() => buildSlotCenters(hallConfigs), [hallConfigs]);
+  const slotIdByPointKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const [slotId, point] of slotCenterById.entries()) {
+      map.set(toPointKey(point), slotId);
+    }
+    return map;
+  }, [slotCenterById]);
 
   const orderedSlotIdSet = useMemo(() => new Set(orderedSlotIds), [orderedSlotIds]);
 
@@ -227,6 +336,7 @@ export function PlannerApp() {
       itemIds: dragItemIds,
       source: "layout",
       originSlotId: slotId,
+      sourceSlotIds: isMultiMove ? selectedSlotsInOrder : [slotId],
     };
 
     event.dataTransfer.effectAllowed = "move";
@@ -260,7 +370,14 @@ export function PlannerApp() {
       return [];
     }
 
-    const incoming = payload.itemIds.filter((itemId) => itemById.has(itemId));
+    const incomingEntries = payload.itemIds
+      .map((itemId, index) => ({
+        itemId,
+        sourceSlotId: payload.sourceSlotIds?.[index],
+      }))
+      .filter((entry) => itemById.has(entry.itemId));
+
+    const incoming = incomingEntries.map((entry) => entry.itemId);
     if (incoming.length === 0) {
       return [];
     }
@@ -271,6 +388,65 @@ export function PlannerApp() {
     for (const [slotId, itemId] of Object.entries(working)) {
       if (incomingSet.has(itemId)) {
         delete working[slotId];
+      }
+    }
+
+    const canTryShapePlacement =
+      payload.source === "layout" &&
+      payload.kind === "category" &&
+      Boolean(payload.originSlotId) &&
+      Array.isArray(payload.sourceSlotIds) &&
+      payload.sourceSlotIds.length === payload.itemIds.length;
+
+    if (canTryShapePlacement) {
+      const originSlotId = payload.originSlotId as string;
+      const originPoint = slotCenterById.get(originSlotId);
+      const anchorPoint = slotCenterById.get(anchorSlotId);
+
+      if (originPoint && anchorPoint) {
+        const delta = {
+          x: anchorPoint.x - originPoint.x,
+          y: anchorPoint.y - originPoint.y,
+        };
+
+        const shapePlacements: PreviewPlacement[] = [];
+        const usedTargetSlots = new Set<string>();
+
+        for (const entry of incomingEntries) {
+          if (!entry.sourceSlotId) {
+            continue;
+          }
+
+          const sourcePoint = slotCenterById.get(entry.sourceSlotId);
+          if (!sourcePoint) {
+            continue;
+          }
+
+          const targetPoint = {
+            x: sourcePoint.x + delta.x,
+            y: sourcePoint.y + delta.y,
+          };
+          const targetSlotId = slotIdByPointKey.get(toPointKey(targetPoint));
+
+          if (!targetSlotId) {
+            continue;
+          }
+
+          if (usedTargetSlots.has(targetSlotId) || working[targetSlotId]) {
+            continue;
+          }
+
+          shapePlacements.push({
+            slotId: targetSlotId,
+            itemId: entry.itemId,
+          });
+          usedTargetSlots.add(targetSlotId);
+          working[targetSlotId] = entry.itemId;
+        }
+
+        if (shapePlacements.length === incomingEntries.length) {
+          return shapePlacements;
+        }
       }
     }
 

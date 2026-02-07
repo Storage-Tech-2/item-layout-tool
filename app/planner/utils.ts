@@ -146,6 +146,11 @@ export function parseDragPayload(rawPayload: string): DragPayload | null {
           : "catalog",
       originSlotId:
         typeof payload.originSlotId === "string" ? payload.originSlotId : undefined,
+      sourceSlotIds: Array.isArray(payload.sourceSlotIds)
+        ? payload.sourceSlotIds.filter(
+            (entry): entry is string => typeof entry === "string",
+          )
+        : undefined,
     };
   } catch {
     return null;
