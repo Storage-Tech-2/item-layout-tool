@@ -462,7 +462,7 @@ export function LayoutViewport({
       style={viewportBackgroundStyle}
       onPointerDown={(event) => {
         const didStartPan = onPointerDown(event);
-        if (didStartPan || event.button !== 0 || event.shiftKey) {
+        if (didStartPan || event.button !== 0 || !event.shiftKey) {
           return;
         }
 
@@ -553,8 +553,8 @@ export function LayoutViewport({
         data-no-pan
       >
         <div>Mouse wheel to zoom</div>
-        <div>Shift + drag to pan</div>
-        <div>Drag to box-select slots</div>
+        <div>Drag to pan</div>
+        <div>Shift + drag to box-select slots</div>
         <div>Right-click a placed slot to clear</div>
       </div>
 

@@ -15,6 +15,11 @@ type PanSession = {
   lastY: number;
 };
 
+type ViewportState = {
+  zoom: number;
+  pan: { x: number; y: number };
+};
+
 export function useViewportNavigation(): {
   viewportRef: RefObject<HTMLDivElement | null>;
   zoom: number;
@@ -29,8 +34,10 @@ export function useViewportNavigation(): {
   const panSessionRef = useRef<PanSession | null>(null);
   const previousBodyUserSelect = useRef("");
 
-  const [zoom, setZoom] = useState(0.9);
-  const [pan, setPan] = useState({ x: 160, y: 110 });
+  const [state, setState] = useState<ViewportState>({
+    zoom: 0.9,
+    pan: { x: 160, y: 110 },
+  });
 
   useEffect(() => {
     if (didInitializePan.current || !viewportRef.current) {
@@ -38,12 +45,15 @@ export function useViewportNavigation(): {
     }
 
     const rect = viewportRef.current.getBoundingClientRect();
-    setPan({
-      x: rect.width / 2 - (STAGE_SIZE / 2) * zoom,
-      y: rect.height / 2 - (STAGE_SIZE / 2) * zoom,
-    });
+    setState((current) => ({
+      ...current,
+      pan: {
+        x: rect.width / 2 - (STAGE_SIZE / 2) * current.zoom,
+        y: rect.height / 2 - (STAGE_SIZE / 2) * current.zoom,
+      },
+    }));
     didInitializePan.current = true;
-  }, [zoom]);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -54,27 +64,31 @@ export function useViewportNavigation(): {
     };
   }, []);
 
-  const applyZoomAt = useCallback((
-    viewportX: number,
-    viewportY: number,
-    getNextZoom: (currentZoom: number) => number,
-  ): void => {
-    setZoom((currentZoom) => {
-      const nextZoom = clamp(getNextZoom(currentZoom), MIN_ZOOM, MAX_ZOOM);
-      if (nextZoom === currentZoom) {
-        return currentZoom;
-      }
+  const applyZoomAt = useCallback(
+    (
+      viewportX: number,
+      viewportY: number,
+      getNextZoom: (currentZoom: number) => number,
+    ): void => {
+      setState((current) => {
+        const nextZoom = clamp(getNextZoom(current.zoom), MIN_ZOOM, MAX_ZOOM);
+        if (nextZoom === current.zoom) {
+          return current;
+        }
 
-      const zoomFactor = nextZoom / currentZoom;
+        const zoomFactor = nextZoom / current.zoom;
 
-      setPan((currentPan) => ({
-        x: viewportX - (viewportX - currentPan.x) * zoomFactor,
-        y: viewportY - (viewportY - currentPan.y) * zoomFactor,
-      }));
-
-      return nextZoom;
-    });
-  }, []);
+        return {
+          zoom: nextZoom,
+          pan: {
+            x: viewportX - (viewportX - current.pan.x) * zoomFactor,
+            y: viewportY - (viewportY - current.pan.y) * zoomFactor,
+          },
+        };
+      });
+    },
+    [],
+  );
 
   function adjustZoom(delta: number): void {
     if (!viewportRef.current) {
@@ -137,7 +151,7 @@ export function useViewportNavigation(): {
       return false;
     }
 
-    if (!event.shiftKey) {
+    if (event.shiftKey) {
       return false;
     }
 
@@ -167,9 +181,12 @@ export function useViewportNavigation(): {
     session.lastX = event.clientX;
     session.lastY = event.clientY;
 
-    setPan((current) => ({
-      x: current.x + dx,
-      y: current.y + dy,
+    setState((current) => ({
+      ...current,
+      pan: {
+        x: current.pan.x + dx,
+        y: current.pan.y + dy,
+      },
     }));
     event.preventDefault();
   }
@@ -190,8 +207,8 @@ export function useViewportNavigation(): {
 
   return {
     viewportRef,
-    zoom,
-    pan,
+    zoom: state.zoom,
+    pan: state.pan,
     adjustZoom,
     handlePointerDown,
     handlePointerMove,
