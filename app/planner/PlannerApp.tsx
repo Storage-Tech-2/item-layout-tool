@@ -127,10 +127,8 @@ export function PlannerApp() {
           viewportRef={viewportRef}
           zoom={zoom}
           pan={pan}
-          fillDirection={fillDirection}
           onAdjustZoom={adjustZoom}
           onFitViewportToBounds={fitViewportToBounds}
-          onFillDirectionChange={setFillDirection}
           onRecenterViewport={recenterViewport}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -162,6 +160,8 @@ export function PlannerApp() {
         isLoadingCatalog={isLoadingCatalog}
         catalogError={catalogError}
         usedItemIds={usedItemIds}
+        fillDirection={fillDirection}
+        onFillDirectionChange={setFillDirection}
         onItemDragStart={beginItemDrag}
         onCategoryDragStart={beginCategoryDrag}
         onLibraryDragOver={handleLibraryDragOver}

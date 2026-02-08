@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
-import type { CatalogItem } from "../types";
+import type { CatalogItem, FillDirection } from "../types";
 import { buildCategories, toTitle } from "../utils";
 
 type ItemLibraryPanelProps = {
@@ -8,6 +8,8 @@ type ItemLibraryPanelProps = {
   isLoadingCatalog: boolean;
   catalogError: string | null;
   usedItemIds: Set<string>;
+  fillDirection: FillDirection;
+  onFillDirectionChange: (direction: FillDirection) => void;
   onItemDragStart: (event: DragEvent<HTMLElement>, itemId: string) => void;
   onCategoryDragStart: (
     event: DragEvent<HTMLElement>,
@@ -23,6 +25,8 @@ export function ItemLibraryPanel({
   isLoadingCatalog,
   catalogError,
   usedItemIds,
+  fillDirection,
+  onFillDirectionChange,
   onItemDragStart,
   onCategoryDragStart,
   onLibraryDragOver,
@@ -72,6 +76,7 @@ export function ItemLibraryPanel({
     const syncMetrics = (): void => {
       setListHeight(element.clientHeight);
       setListWidth(element.clientWidth);
+      setScrollTop(element.scrollTop);
     };
     syncMetrics();
 
@@ -89,7 +94,7 @@ export function ItemLibraryPanel({
       observer.disconnect();
       element.removeEventListener("scroll", onScroll);
     };
-  }, []);
+  }, [isLoadingCatalog, catalogError]);
 
   const categoryMeta = useMemo(() => {
     return categories.map((category) => {
@@ -189,7 +194,33 @@ export function ItemLibraryPanel({
       data-no-pan
     >
       <div className="grid gap-[0.4rem] border-b border-b-[rgba(134,106,67,0.3)] px-[0.95rem] pb-[0.9rem] pt-4">
-        <h2 className="m-0 text-[1.1rem] tracking-[0.02em]">Item Library</h2>
+        <div className="flex items-start justify-between gap-[0.45rem]">
+          <h2 className="m-0 text-[1.1rem] tracking-[0.02em]">Item Library</h2>
+          <div className="flex items-center gap-[0.2rem] rounded-[0.55rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.95)] p-[0.2rem]">
+            <button
+              type="button"
+              className={`rounded-[0.36rem] border px-[0.34rem] py-[0.16rem] text-[0.64rem] font-semibold ${
+                fillDirection === "row"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+              }`}
+              onClick={() => onFillDirectionChange("row")}
+            >
+              Row
+            </button>
+            <button
+              type="button"
+              className={`rounded-[0.36rem] border px-[0.34rem] py-[0.16rem] text-[0.64rem] font-semibold ${
+                fillDirection === "column"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+              }`}
+              onClick={() => onFillDirectionChange("column")}
+            >
+              Column
+            </button>
+          </div>
+        </div>
         <p className="m-0 text-[0.78rem] text-[#6d6256]">
           {usedItemIds.size} placed / {catalogItems.length} total
         </p>

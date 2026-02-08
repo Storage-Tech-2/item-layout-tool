@@ -25,7 +25,6 @@ import {
 import type { HallSideKey } from "../hooks/useHallConfigs";
 import type {
   CatalogItem,
-  FillDirection,
   HallConfig,
   HallId,
   HallSideConfig,
@@ -41,13 +40,11 @@ type LayoutViewportProps = {
   viewportRef: RefObject<HTMLDivElement | null>;
   zoom: number;
   pan: { x: number; y: number };
-  fillDirection: FillDirection;
   onAdjustZoom: (delta: number) => void;
   onFitViewportToBounds: (
     bounds: { left: number; top: number; right: number; bottom: number },
     padding?: number,
   ) => void;
-  onFillDirectionChange: (direction: FillDirection) => void;
   onRecenterViewport: (focusPoint?: { x: number; y: number }) => void;
   onPointerDown: (event: PointerEvent<HTMLDivElement>) => boolean;
   onPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
@@ -259,10 +256,8 @@ export function LayoutViewport({
   viewportRef,
   zoom,
   pan,
-  fillDirection,
   onAdjustZoom,
   onFitViewportToBounds,
-  onFillDirectionChange,
   onRecenterViewport,
   onPointerDown,
   onPointerMove,
@@ -1417,43 +1412,16 @@ export function LayoutViewport({
           <div className="font-semibold text-[#3a332b]">
             Total Types: {layoutSummary.totalTypes}
           </div>
-          <div className="grid grid-cols-3 gap-x-[0.5rem] gap-y-[0.08rem]">
+          <div className="grid grid-cols-3 gap-x-[0.2rem] gap-y-[0.08rem]">
             <span>Bulk Types: {layoutSummary.bulkTypes}</span>
             <span>Chest Types: {layoutSummary.chestTypes}</span>
             <span>MIS Types: {layoutSummary.misTypes}</span>
-            <span>Bulk Halls: {layoutSummary.bulkHalls}</span>
-            <span>Chest Halls: {layoutSummary.chestHalls}</span>
-            <span>MIS Halls: {layoutSummary.misHalls}</span>
           </div>
         </div>
 
         <div className="grid gap-[0.35rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem]">
           <div className="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-[#5e513f]">
             Layout Options
-          </div>
-          <div className="flex items-center gap-[0.25rem]">
-            <button
-              type="button"
-              className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
-                fillDirection === "row"
-                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
-              }`}
-              onClick={() => onFillDirectionChange("row")}
-            >
-              Fill Row First
-            </button>
-            <button
-              type="button"
-              className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
-                fillDirection === "column"
-                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
-              }`}
-              onClick={() => onFillDirectionChange("column")}
-            >
-              Fill Column First
-            </button>
           </div>
           <div className="flex items-center gap-[0.25rem]">
             <button
@@ -1492,7 +1460,7 @@ export function LayoutViewport({
         </div>
       </div>
 
-      <div className="absolute right-4 top-4 z-20 grid gap-[0.45rem]" data-no-pan>
+      <div className="absolute right-4 top-4 z-20 grid justify-items-end gap-[0.45rem]" data-no-pan>
         <div className="grid gap-[0.45rem]">
           <div className="grid gap-[0.35rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem]">
             <div className="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-[#5e513f]">
@@ -1543,7 +1511,7 @@ export function LayoutViewport({
         </div>
 
         <div
-          className="flex items-center gap-[0.45rem] rounded-full border border-[rgba(134,105,67,0.35)] bg-[rgba(255,250,239,0.92)] px-[0.45rem] py-[0.25rem]"
+          className="w-fit justify-self-end flex items-center gap-[0.45rem] rounded-full border border-[rgba(134,105,67,0.35)] bg-[rgba(255,250,239,0.92)] px-[0.45rem] py-[0.25rem]"
         >
         <button
           type="button"
