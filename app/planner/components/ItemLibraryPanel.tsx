@@ -1,7 +1,119 @@
 import Image from "next/image";
-import { type DragEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type DragEvent,
+  type PointerEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { CatalogItem, FillDirection } from "../types";
 import { buildCategories, toTitle } from "../utils";
+
+type SearchMatcher =
+  | { kind: "none" }
+  | { kind: "text"; normalizedNeedle: string }
+  | { kind: "regex"; regex: RegExp };
+
+function parseSearchMatcher(rawQuery: string): SearchMatcher {
+  const trimmed = rawQuery.trim();
+  if (!trimmed) {
+    return { kind: "none" };
+  }
+
+  if (trimmed.startsWith("/")) {
+    const lastSlash = trimmed.lastIndexOf("/");
+    if (lastSlash > 0) {
+      const pattern = trimmed.slice(1, lastSlash);
+      const flags = trimmed.slice(lastSlash + 1);
+      try {
+        return { kind: "regex", regex: new RegExp(pattern, flags) };
+      } catch {
+        // Treat invalid regex as plain text search to avoid silently failing.
+      }
+    }
+  }
+
+  return { kind: "text", normalizedNeedle: trimmed.toLowerCase() };
+}
+
+function highlightMatches(text: string, matcher: SearchMatcher): ReactNode {
+  if (matcher.kind === "none") {
+    return text;
+  }
+
+  const ranges: Array<{ start: number; end: number }> = [];
+  if (matcher.kind === "text") {
+    const needle = matcher.normalizedNeedle;
+    if (!needle) {
+      return text;
+    }
+    const source = text.toLowerCase();
+    let cursor = 0;
+    while (cursor < source.length) {
+      const index = source.indexOf(needle, cursor);
+      if (index < 0) {
+        break;
+      }
+      ranges.push({ start: index, end: index + needle.length });
+      cursor = index + needle.length;
+    }
+  } else {
+    if (matcher.regex.flags.includes("g")) {
+      const regex = new RegExp(matcher.regex.source, matcher.regex.flags);
+      for (const match of text.matchAll(regex)) {
+        if (match.index === undefined) {
+          continue;
+        }
+        if (!match[0]) {
+          // Avoid pathological highlighting for zero-length matches.
+          return text;
+        }
+        ranges.push({ start: match.index, end: match.index + match[0].length });
+      }
+    } else {
+      const regex = new RegExp(matcher.regex.source, matcher.regex.flags.replace(/g/g, ""));
+      const match = regex.exec(text);
+      if (match?.index !== undefined && match[0]) {
+        ranges.push({ start: match.index, end: match.index + match[0].length });
+      }
+    }
+  }
+
+  if (ranges.length === 0) {
+    return text;
+  }
+
+  const fragments: ReactNode[] = [];
+  let start = 0;
+  for (let index = 0; index < ranges.length; index += 1) {
+    const range = ranges[index];
+    if (range.start > start) {
+      fragments.push(
+        <span key={`plain-${index}-${start}`}>{text.slice(start, range.start)}</span>,
+      );
+    }
+    fragments.push(
+      <mark
+        key={`match-${index}-${range.start}`}
+        className="rounded-[0.2rem] bg-[rgba(255,224,138,0.72)] px-[0.06rem] text-inherit"
+      >
+        {text.slice(range.start, range.end)}
+      </mark>,
+    );
+    start = range.end;
+  }
+  if (start < text.length) {
+    fragments.push(<span key={`tail-${start}`}>{text.slice(start)}</span>);
+  }
+  return fragments;
+}
+
+function regexMatches(regex: RegExp, value: string): boolean {
+  const flags = regex.flags.replace(/g/g, "");
+  return new RegExp(regex.source, flags).test(value);
+}
 
 type ItemLibraryPanelProps = {
   catalogItems: CatalogItem[];
@@ -64,44 +176,29 @@ export function ItemLibraryPanel({
   );
 
   const trimmedSearch = searchQuery.trim();
+  const searchMatcher = useMemo(() => parseSearchMatcher(searchQuery), [searchQuery]);
 
-  const visibleItems = (() => {
-    if (!trimmedSearch) {
+  const visibleItems = useMemo(() => {
+    if (searchMatcher.kind === "none") {
       return availableItems;
     }
 
-    let regex: RegExp | null = null;
-    if (trimmedSearch.startsWith("/")) {
-      const lastSlash = trimmedSearch.lastIndexOf("/");
-      if (lastSlash > 0) {
-        const pattern = trimmedSearch.slice(1, lastSlash);
-        const flags = trimmedSearch.slice(lastSlash + 1);
-        try {
-          regex = new RegExp(pattern, flags);
-        } catch {
-          regex = null;
-        }
-      }
-    }
-
-    if (regex) {
+    if (searchMatcher.kind === "regex") {
       return availableItems.filter((item) => {
         const title = toTitle(item.id);
-        regex.lastIndex = 0;
-        if (regex.test(item.id)) {
+        if (regexMatches(searchMatcher.regex, item.id)) {
           return true;
         }
-        regex.lastIndex = 0;
-        return regex.test(title);
+        return regexMatches(searchMatcher.regex, title);
       });
     }
 
-    const normalized = trimmedSearch.toLowerCase();
+    const normalized = searchMatcher.normalizedNeedle;
     return availableItems.filter((item) => {
       const title = toTitle(item.id).toLowerCase();
       return item.id.toLowerCase().includes(normalized) || title.includes(normalized);
     });
-  })();
+  }, [availableItems, searchMatcher]);
 
   const categories = buildCategories(visibleItems);
   const categoryColumns = listWidth <= 860 ? 1 : 2;
@@ -612,7 +709,7 @@ export function ItemLibraryPanel({
                           unoptimized
                         />
                         <span className="text-[0.74rem] leading-[1.2]">
-                          {toTitle(item.id)}
+                          {highlightMatches(toTitle(item.id), searchMatcher)}
                         </span>
                       </button>
                     ))}
