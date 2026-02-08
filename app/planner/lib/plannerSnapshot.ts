@@ -28,6 +28,25 @@ export type PlannerSaveFile = PlannerSnapshot & {
   savedAt: string;
 };
 
+type RecordDelta<T> = {
+  set: Record<string, T>;
+  remove: string[];
+};
+
+export type PlannerLabelNamesDelta = {
+  hallNames?: RecordDelta<string>;
+  sectionNames?: RecordDelta<string>;
+  misNames?: RecordDelta<string>;
+};
+
+export type PlannerSnapshotDelta = {
+  storageLayoutPreset?: StorageLayoutPreset;
+  fillDirection?: FillDirection;
+  hallConfigs?: RecordDelta<HallConfig>;
+  slotAssignments?: RecordDelta<string>;
+  labelNames?: PlannerLabelNamesDelta;
+};
+
 export function sectionNameKey(hallId: HallId, sectionIndex: number): string {
   return `${hallId}:${sectionIndex}`;
 }
@@ -87,22 +106,26 @@ function defaultSideConfig(type: HallType): HallSideConfig {
   }
 }
 
+function cloneHallConfig(hallConfig: HallConfig): HallConfig {
+  const nextConfig: HallConfig = {
+    sections: hallConfig.sections.map((section) => ({
+      slices: section.slices,
+      sideLeft: { ...section.sideLeft },
+      sideRight: { ...section.sideRight },
+    })),
+  };
+  if (typeof hallConfig.name === "string") {
+    nextConfig.name = hallConfig.name;
+  }
+  return nextConfig;
+}
+
 export function cloneHallConfigs(hallConfigs: Record<HallId, HallConfig>): Record<HallId, HallConfig> {
   const normalized: Record<HallId, HallConfig> = {};
   const entries = Object.entries(hallConfigs).sort((a, b) => Number(a[0]) - Number(b[0]));
   for (const [hallIdRaw, hallConfig] of entries) {
     const hallId = Number(hallIdRaw);
-    const nextConfig: HallConfig = {
-      sections: hallConfig.sections.map((section) => ({
-        slices: section.slices,
-        sideLeft: { ...section.sideLeft },
-        sideRight: { ...section.sideRight },
-      })),
-    };
-    if (typeof hallConfig.name === "string") {
-      nextConfig.name = hallConfig.name;
-    }
-    normalized[hallId] = nextConfig;
+    normalized[hallId] = cloneHallConfig(hallConfig);
   }
   return normalized;
 }
@@ -168,6 +191,250 @@ export function buildPlannerSnapshot(input: PlannerSnapshot): PlannerSnapshot {
 
 export function snapshotToKey(snapshot: PlannerSnapshot): string {
   return JSON.stringify(snapshot);
+}
+
+function createRecordDelta<T>(): RecordDelta<T> {
+  return {
+    set: {},
+    remove: [],
+  };
+}
+
+function hasRecordDelta<T>(delta: RecordDelta<T>): boolean {
+  return Object.keys(delta.set).length > 0 || delta.remove.length > 0;
+}
+
+function isHallSideConfigEqual(a: HallSideConfig, b: HallSideConfig): boolean {
+  return (
+    a.type === b.type &&
+    a.rowsPerSlice === b.rowsPerSlice &&
+    a.misSlotsPerSlice === b.misSlotsPerSlice &&
+    a.misUnitsPerSlice === b.misUnitsPerSlice &&
+    a.misWidth === b.misWidth
+  );
+}
+
+function isHallConfigEqual(a: HallConfig, b: HallConfig): boolean {
+  if ((a.name ?? "") !== (b.name ?? "")) {
+    return false;
+  }
+  if (a.sections.length !== b.sections.length) {
+    return false;
+  }
+
+  for (let index = 0; index < a.sections.length; index += 1) {
+    const aSection = a.sections[index];
+    const bSection = b.sections[index];
+    if (
+      aSection.slices !== bSection.slices ||
+      !isHallSideConfigEqual(aSection.sideLeft, bSection.sideLeft) ||
+      !isHallSideConfigEqual(aSection.sideRight, bSection.sideRight)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function diffStringRecord(
+  previous: Record<string, string>,
+  next: Record<string, string>,
+): RecordDelta<string> | null {
+  const delta = createRecordDelta<string>();
+
+  const nextEntries = Object.entries(next).sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [key, value] of nextEntries) {
+    if (previous[key] !== value) {
+      delta.set[key] = value;
+    }
+  }
+
+  const removedKeys = Object.keys(previous)
+    .filter((key) => !(key in next))
+    .sort((a, b) => a.localeCompare(b));
+  delta.remove.push(...removedKeys);
+
+  return hasRecordDelta(delta) ? delta : null;
+}
+
+function applyStringRecordDelta(
+  base: Record<string, string>,
+  delta: RecordDelta<string>,
+): Record<string, string> {
+  const next = { ...base };
+  for (const key of delta.remove) {
+    delete next[key];
+  }
+  for (const [key, value] of Object.entries(delta.set)) {
+    next[key] = value;
+  }
+  return next;
+}
+
+function diffHallConfigs(
+  previous: Record<HallId, HallConfig>,
+  next: Record<HallId, HallConfig>,
+): RecordDelta<HallConfig> | null {
+  const delta = createRecordDelta<HallConfig>();
+  const previousByKey = new Map<string, HallConfig>(
+    Object.entries(previous).map(([hallId, hallConfig]) => [String(Number(hallId)), hallConfig]),
+  );
+  const nextEntries = Object.entries(next)
+    .map(([hallId, hallConfig]) => [Number(hallId), hallConfig] as const)
+    .sort((a, b) => a[0] - b[0]);
+
+  for (const [hallId, hallConfig] of nextEntries) {
+    const key = String(hallId);
+    const previousHallConfig = previousByKey.get(key);
+    if (!previousHallConfig || !isHallConfigEqual(previousHallConfig, hallConfig)) {
+      delta.set[key] = cloneHallConfig(hallConfig);
+    }
+    previousByKey.delete(key);
+  }
+
+  const removedKeys = Array.from(previousByKey.keys()).sort((a, b) => Number(a) - Number(b));
+  delta.remove.push(...removedKeys);
+
+  return hasRecordDelta(delta) ? delta : null;
+}
+
+function applyHallConfigDelta(
+  base: Record<HallId, HallConfig>,
+  delta: RecordDelta<HallConfig>,
+): Record<HallId, HallConfig> {
+  const next = { ...base };
+  for (const key of delta.remove) {
+    delete next[Number(key)];
+  }
+  for (const [key, value] of Object.entries(delta.set)) {
+    next[Number(key)] = cloneHallConfig(value);
+  }
+  return next;
+}
+
+function diffHallNameRecord(
+  previous: Record<HallId, string>,
+  next: Record<HallId, string>,
+): RecordDelta<string> | null {
+  const delta = createRecordDelta<string>();
+  const previousByKey = new Map<string, string>(
+    Object.entries(previous).map(([hallId, hallName]) => [String(Number(hallId)), hallName]),
+  );
+  const nextEntries = Object.entries(next)
+    .map(([hallId, hallName]) => [Number(hallId), hallName] as const)
+    .sort((a, b) => a[0] - b[0]);
+
+  for (const [hallId, hallName] of nextEntries) {
+    const key = String(hallId);
+    if (previousByKey.get(key) !== hallName) {
+      delta.set[key] = hallName;
+    }
+    previousByKey.delete(key);
+  }
+
+  const removedKeys = Array.from(previousByKey.keys()).sort((a, b) => Number(a) - Number(b));
+  delta.remove.push(...removedKeys);
+
+  return hasRecordDelta(delta) ? delta : null;
+}
+
+function applyHallNameDelta(
+  base: Record<HallId, string>,
+  delta: RecordDelta<string>,
+): Record<HallId, string> {
+  const next = { ...base };
+  for (const key of delta.remove) {
+    delete next[Number(key)];
+  }
+  for (const [key, value] of Object.entries(delta.set)) {
+    next[Number(key)] = value;
+  }
+  return next;
+}
+
+function diffPlannerLabelNames(
+  previous: PlannerLabelNames,
+  next: PlannerLabelNames,
+): PlannerLabelNamesDelta | null {
+  const hallNames = diffHallNameRecord(previous.hallNames, next.hallNames);
+  const sectionNames = diffStringRecord(previous.sectionNames, next.sectionNames);
+  const misNames = diffStringRecord(previous.misNames, next.misNames);
+
+  if (!hallNames && !sectionNames && !misNames) {
+    return null;
+  }
+
+  return {
+    hallNames: hallNames ?? undefined,
+    sectionNames: sectionNames ?? undefined,
+    misNames: misNames ?? undefined,
+  };
+}
+
+function applyPlannerLabelNamesDelta(
+  base: PlannerLabelNames,
+  delta: PlannerLabelNamesDelta,
+): PlannerLabelNames {
+  return {
+    hallNames: delta.hallNames ? applyHallNameDelta(base.hallNames, delta.hallNames) : base.hallNames,
+    sectionNames: delta.sectionNames
+      ? applyStringRecordDelta(base.sectionNames, delta.sectionNames)
+      : base.sectionNames,
+    misNames: delta.misNames
+      ? applyStringRecordDelta(base.misNames, delta.misNames)
+      : base.misNames,
+  };
+}
+
+export function diffPlannerSnapshot(
+  previous: PlannerSnapshot,
+  next: PlannerSnapshot,
+): PlannerSnapshotDelta | null {
+  const delta: PlannerSnapshotDelta = {};
+
+  if (previous.storageLayoutPreset !== next.storageLayoutPreset) {
+    delta.storageLayoutPreset = next.storageLayoutPreset;
+  }
+  if (previous.fillDirection !== next.fillDirection) {
+    delta.fillDirection = next.fillDirection;
+  }
+
+  const hallConfigs = diffHallConfigs(previous.hallConfigs, next.hallConfigs);
+  if (hallConfigs) {
+    delta.hallConfigs = hallConfigs;
+  }
+
+  const slotAssignments = diffStringRecord(previous.slotAssignments, next.slotAssignments);
+  if (slotAssignments) {
+    delta.slotAssignments = slotAssignments;
+  }
+
+  const labelNames = diffPlannerLabelNames(previous.labelNames, next.labelNames);
+  if (labelNames) {
+    delta.labelNames = labelNames;
+  }
+
+  return Object.keys(delta).length > 0 ? delta : null;
+}
+
+export function applyPlannerSnapshotDelta(
+  base: PlannerSnapshot,
+  delta: PlannerSnapshotDelta,
+): PlannerSnapshot {
+  return buildPlannerSnapshot({
+    storageLayoutPreset: delta.storageLayoutPreset ?? base.storageLayoutPreset,
+    fillDirection: delta.fillDirection ?? base.fillDirection,
+    hallConfigs: delta.hallConfigs
+      ? applyHallConfigDelta(base.hallConfigs, delta.hallConfigs)
+      : base.hallConfigs,
+    slotAssignments: delta.slotAssignments
+      ? applyStringRecordDelta(base.slotAssignments, delta.slotAssignments)
+      : base.slotAssignments,
+    labelNames: delta.labelNames
+      ? applyPlannerLabelNamesDelta(base.labelNames, delta.labelNames)
+      : base.labelNames,
+  });
 }
 
 function parseStorageLayoutPreset(value: unknown): StorageLayoutPreset | null {
