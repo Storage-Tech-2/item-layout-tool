@@ -162,58 +162,97 @@ export function PlannerApp() {
   }
 
   return (
-    <div className="flex h-screen min-h-screen overflow-hidden bg-[radial-gradient(circle_at_15%_12%,#fff8e8_0%,rgba(255,248,232,0)_35%),radial-gradient(circle_at_88%_8%,#e2f1ee_0%,rgba(226,241,238,0)_30%),linear-gradient(180deg,#f9f4ea_0%,#f2eadd_100%)] text-[#1f1a16] max-[1200px]:h-auto max-[1200px]:flex-col max-[1200px]:overflow-auto">
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r border-r-[rgba(114,88,46,0.24)] max-[1200px]:min-h-[62vh] max-[1200px]:border-r-0 max-[1200px]:border-b max-[1200px]:border-b-[rgba(114,88,46,0.24)]">
-        <LayoutViewport
-          storageLayoutPreset={storageLayoutPreset}
-          onStorageLayoutPresetChange={applyPresetChange}
-          hallConfigs={hallConfigs}
-          slotAssignments={activeSlotAssignments}
-          itemById={itemById}
-          viewportRef={viewportRef}
-          zoom={zoom}
-          pan={pan}
-          onAdjustZoom={adjustZoom}
-          onFitViewportToBounds={fitViewportToBounds}
-          onRecenterViewport={recenterViewport}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerEnd={handlePointerEnd}
-          onSlotDragOver={handleSlotDragOver}
-          onSlotDrop={handleSlotDrop}
-          onViewportDropFallback={handleViewportDropFallback}
-          onSectionSlicesChange={handleSectionSlicesChange}
-          onSectionSideTypeChange={handleSectionSideTypeChange}
-          onSectionSideRowsChange={handleSectionSideRowsChange}
-          onSectionSideMisCapacityChange={handleSectionSideMisCapacityChange}
-          onSectionSideMisUnitsChange={handleSectionSideMisUnitsChange}
-          onSectionSideMisWidthChange={handleSectionSideMisWidthChange}
-          onAddSection={handleAddSection}
-          onRemoveSection={handleRemoveSection}
-          onSlotItemDragStart={beginSlotItemDrag}
-          onSlotGroupDragStart={beginSlotGroupDrag}
-          onAnyDragEnd={clearDragState}
-          onClearSlot={clearSlot}
-          draggedSourceSlotIds={draggedSourceSlotIdSet}
-          dragPreviewPlacements={dragPreviews}
-          selectedSlotIds={selectedSlotIdSet}
-          onSelectionChange={setSelectedSlotIds}
-        />
-      </section>
+    <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_15%_12%,#fff8e8_0%,rgba(255,248,232,0)_35%),radial-gradient(circle_at_88%_8%,#e2f1ee_0%,rgba(226,241,238,0)_30%),linear-gradient(180deg,#f9f4ea_0%,#f2eadd_100%)] text-[#1f1a16] max-[1200px]:h-auto max-[1200px]:overflow-auto">
+      <header className="flex shrink-0 items-center justify-between border-b border-b-[rgba(114,88,46,0.28)] bg-[linear-gradient(180deg,rgba(255,252,245,0.94)_0%,rgba(249,241,226,0.9)_100%)] px-4 py-[0.55rem]">
+        <div className="flex items-center gap-[0.45rem]">
+          <button
+            type="button"
+            className="rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.9)] px-[0.72rem] py-[0.32rem] text-[0.74rem] font-semibold text-[#3b2f22] shadow-[0_1px_0_rgba(255,255,255,0.55)]"
+          >
+            Open
+          </button>
+          <button
+            type="button"
+            className="rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.9)] px-[0.72rem] py-[0.32rem] text-[0.74rem] font-semibold text-[#3b2f22] shadow-[0_1px_0_rgba(255,255,255,0.55)]"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            className="rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.9)] px-[0.72rem] py-[0.32rem] text-[0.74rem] font-semibold text-[#3b2f22] shadow-[0_1px_0_rgba(255,255,255,0.55)]"
+          >
+            Export
+          </button>
+        </div>
+        <div className="flex items-center gap-[0.45rem]">
+          <button
+            type="button"
+            className="rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.9)] px-[0.72rem] py-[0.32rem] text-[0.74rem] font-semibold text-[#3b2f22] shadow-[0_1px_0_rgba(255,255,255,0.55)]"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            className="rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.9)] px-[0.72rem] py-[0.32rem] text-[0.74rem] font-semibold text-[#3b2f22] shadow-[0_1px_0_rgba(255,255,255,0.55)]"
+          >
+            Redo
+          </button>
+        </div>
+      </header>
 
-      <ItemLibraryPanel
-        catalogItems={catalogItems}
-        isLoadingCatalog={isLoadingCatalog}
-        catalogError={catalogError}
-        usedItemIds={usedItemIds}
-        fillDirection={fillDirection}
-        onFillDirectionChange={setFillDirection}
-        onItemDragStart={beginItemDrag}
-        onCategoryDragStart={beginCategoryDrag}
-        onLibraryDragOver={handleLibraryDragOver}
-        onLibraryDrop={handleLibraryDrop}
-        onAnyDragEnd={clearDragState}
-      />
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden max-[1200px]:flex-col">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r border-r-[rgba(114,88,46,0.24)] max-[1200px]:min-h-[62vh] max-[1200px]:border-r-0 max-[1200px]:border-b max-[1200px]:border-b-[rgba(114,88,46,0.24)]">
+          <LayoutViewport
+            storageLayoutPreset={storageLayoutPreset}
+            onStorageLayoutPresetChange={applyPresetChange}
+            hallConfigs={hallConfigs}
+            slotAssignments={activeSlotAssignments}
+            itemById={itemById}
+            viewportRef={viewportRef}
+            zoom={zoom}
+            pan={pan}
+            onAdjustZoom={adjustZoom}
+            onFitViewportToBounds={fitViewportToBounds}
+            onRecenterViewport={recenterViewport}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerEnd={handlePointerEnd}
+            onSlotDragOver={handleSlotDragOver}
+            onSlotDrop={handleSlotDrop}
+            onViewportDropFallback={handleViewportDropFallback}
+            onSectionSlicesChange={handleSectionSlicesChange}
+            onSectionSideTypeChange={handleSectionSideTypeChange}
+            onSectionSideRowsChange={handleSectionSideRowsChange}
+            onSectionSideMisCapacityChange={handleSectionSideMisCapacityChange}
+            onSectionSideMisUnitsChange={handleSectionSideMisUnitsChange}
+            onSectionSideMisWidthChange={handleSectionSideMisWidthChange}
+            onAddSection={handleAddSection}
+            onRemoveSection={handleRemoveSection}
+            onSlotItemDragStart={beginSlotItemDrag}
+            onSlotGroupDragStart={beginSlotGroupDrag}
+            onAnyDragEnd={clearDragState}
+            onClearSlot={clearSlot}
+            draggedSourceSlotIds={draggedSourceSlotIdSet}
+            dragPreviewPlacements={dragPreviews}
+            selectedSlotIds={selectedSlotIdSet}
+            onSelectionChange={setSelectedSlotIds}
+          />
+        </section>
+
+        <ItemLibraryPanel
+          catalogItems={catalogItems}
+          isLoadingCatalog={isLoadingCatalog}
+          catalogError={catalogError}
+          usedItemIds={usedItemIds}
+          fillDirection={fillDirection}
+          onFillDirectionChange={setFillDirection}
+          onItemDragStart={beginItemDrag}
+          onCategoryDragStart={beginCategoryDrag}
+          onLibraryDragOver={handleLibraryDragOver}
+          onLibraryDrop={handleLibraryDrop}
+          onAnyDragEnd={clearDragState}
+        />
+      </div>
 
       {pendingLayoutChange ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[rgba(27,22,16,0.42)] px-4">
