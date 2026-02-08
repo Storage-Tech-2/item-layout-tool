@@ -1187,113 +1187,116 @@ export function LayoutViewport({
         <div>Right-click a placed slot to clear</div>
       </div>
 
-      <div
-        className="absolute left-4 top-4 z-20 grid gap-[0.35rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem]"
-        data-no-pan
-      >
-        <div className="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-[#5e513f]">
-          View Controls
-        </div>
-        <div className="flex flex-wrap gap-[0.28rem]">
-        </div>
-        <div className="flex items-center gap-[0.25rem]">
-          <button
-            type="button"
-            className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
-              fillDirection === "row"
-                ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
-            }`}
-            onClick={() => onFillDirectionChange("row")}
-          >
-            Fill Row First
-          </button>
-          <button
-            type="button"
-            className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
-              fillDirection === "column"
-                ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
-            }`}
-            onClick={() => onFillDirectionChange("column")}
-          >
-            Fill Column First
-          </button>
-        </div>
-        <div className="flex items-center gap-[0.25rem]">
-          <button
-            type="button"
-            className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
-              viewMode === "storage"
-                ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
-            }`}
-            onClick={() => {
-              if (viewMode === "storage") {
-                return;
-              }
-              setViewMode("storage");
-              onRecenterViewport();
-            }}
-          >
-            Storage View
-          </button>
-          <button
-            type="button"
-            className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
-              viewMode === "flat"
-                ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
-            }`}
-            onClick={() => {
-              if (viewMode === "flat") {
-                return;
-              }
-              const flatLayout = buildFlatLayoutMetrics(hallIds, hallConfigs, center);
-              setViewMode("flat");
-              const controlAnchorX = flatLayout.left + Math.min(180, flatLayout.maxWidth * 0.22);
-              onRecenterViewport({
-                x: controlAnchorX,
-                y: flatLayout.top + flatLayout.totalHeight / 2,
-              });
-            }}
-          >
-            Flat View
-          </button>
-        </div>
-        <div className="flex items-center gap-[0.25rem]">
-          <button
-            type="button"
-            className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
-              storageLayoutPreset === "cross"
-                ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
-            }`}
-            onClick={() => {
-              setStorageLayoutPreset("cross");
-              if (viewMode === "storage") {
+      <div className="absolute left-4 top-4 z-20 grid gap-[0.45rem]" data-no-pan>
+        <div className="grid gap-[0.35rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem]">
+          <div className="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-[#5e513f]">
+            View Controls
+          </div>
+          <div className="flex items-center gap-[0.25rem]">
+            <button
+              type="button"
+              className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
+                viewMode === "storage"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+              }`}
+              onClick={() => {
+                if (viewMode === "storage") {
+                  return;
+                }
+                setViewMode("storage");
                 onRecenterViewport();
-              }
-            }}
-          >
-            Cross Layout
-          </button>
-          <button
-            type="button"
-            className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
-              storageLayoutPreset === "h"
-                ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
-            }`}
-            onClick={() => {
-              setStorageLayoutPreset("h");
-              if (viewMode === "storage") {
-                onRecenterViewport();
-              }
-            }}
-          >
-            H Layout
-          </button>
+              }}
+            >
+              Storage View
+            </button>
+            <button
+              type="button"
+              className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
+                viewMode === "flat"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+              }`}
+              onClick={() => {
+                if (viewMode === "flat") {
+                  return;
+                }
+                const flatLayout = buildFlatLayoutMetrics(hallIds, hallConfigs, center);
+                setViewMode("flat");
+                const controlAnchorX = flatLayout.left + Math.min(180, flatLayout.maxWidth * 0.22);
+                onRecenterViewport({
+                  x: controlAnchorX,
+                  y: flatLayout.top + flatLayout.totalHeight / 2,
+                });
+              }}
+            >
+              Flat View
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-[0.35rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem]">
+          <div className="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-[#5e513f]">
+            Layout Options
+          </div>
+          <div className="flex items-center gap-[0.25rem]">
+            <button
+              type="button"
+              className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
+                fillDirection === "row"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+              }`}
+              onClick={() => onFillDirectionChange("row")}
+            >
+              Fill Row First
+            </button>
+            <button
+              type="button"
+              className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
+                fillDirection === "column"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+              }`}
+              onClick={() => onFillDirectionChange("column")}
+            >
+              Fill Column First
+            </button>
+          </div>
+          <div className="flex items-center gap-[0.25rem]">
+            <button
+              type="button"
+              className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
+                storageLayoutPreset === "cross"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+              }`}
+              onClick={() => {
+                setStorageLayoutPreset("cross");
+                if (viewMode === "storage") {
+                  onRecenterViewport();
+                }
+              }}
+            >
+              Cross Layout
+            </button>
+            <button
+              type="button"
+              className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
+                storageLayoutPreset === "h"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+              }`}
+              onClick={() => {
+                setStorageLayoutPreset("h");
+                if (viewMode === "storage") {
+                  onRecenterViewport();
+                }
+              }}
+            >
+              H Layout
+            </button>
+          </div>
         </div>
       </div>
 

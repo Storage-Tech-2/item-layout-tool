@@ -129,7 +129,7 @@ const H_LAYOUT: StorageLayoutDefinition = {
     core: {
         name: "Main Core",
         shape: "rectangle",
-        width: Math.max(Math.round(CORE_SIZE * 2.1), 320),
+        width: Math.max(Math.round(CORE_SIZE * 3), 320),
         height: Math.max(Math.round(CORE_SIZE * 0.5), 92),
         halls: [
             {
