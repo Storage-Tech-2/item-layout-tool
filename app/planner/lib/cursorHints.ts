@@ -100,6 +100,8 @@ export function buildCursorMovementHint(
   fillDirection: FillDirection,
   mode: CursorHintMode,
 ): CursorMovementHint | null {
+  void mode;
+
   if (!fromSlotId || !toSlotId || fromSlotId === toSlotId) {
     return null;
   }
@@ -110,7 +112,10 @@ export function buildCursorMovementHint(
     return null;
   }
 
-  if (fromMeta.slice === toMeta.slice) {
+
+  const fromRow = fromMeta.row ?? fromMeta.misUnit ?? 0;
+  const toRow = toMeta.row ?? toMeta.misUnit ?? 0;
+  if (fromMeta.slice === toMeta.slice && fromMeta.hallId === toMeta.hallId && fromMeta.side === toMeta.side && fromRow === toRow) {
     return null;
   }
 
@@ -133,8 +138,6 @@ export function buildCursorMovementHint(
     };
   }
 
-  const fromRow = fromMeta.row ?? fromMeta.misUnit ?? 0;
-  const toRow = toMeta.row ?? toMeta.misUnit ?? 0;
 
   if (fillDirection === "row") {
     if (fromRow !== toRow) {
@@ -172,45 +175,62 @@ export function buildCursorMovementHint(
 }
 
 export function buildPopupCursorHint(
- fromSlotId: string,
-  toSlotId: string,
-  fillDirection: FillDirection,
+  slotId: string,
   mode: CursorHintMode,
   popupColumnsBySlotId: Map<string, number>,
+  popupNextSlotIdBySlotId: Map<string, string | null>,
 ): CursorMovementHint | null {
+  if (mode !== "popup") {
+    return null;
+  }
+
+  if (!slotId) {
+    return null;
+  }
+
   const columns = popupColumnsBySlotId.get(slotId);
   if (!columns || columns <= 1) {
-    return hint;
+    return null;
   }
-  const fromMeta = parseMisSlotIdValue(hint.fromSlotId);
-  const toMeta = parseMisSlotIdValue(hint.toSlotId);
-  if (!fromMeta || !toMeta) {
-    return hint;
-  }
-  const sameMisUnit =
-    fromMeta.hallId === toMeta.hallId &&
-    fromMeta.slice === toMeta.slice &&
-    fromMeta.side === toMeta.side &&
-    fromMeta.misUnit === toMeta.misUnit;
-  const atEndOfRow = (fromMeta.index + 1) % columns === 0;
 
+  const fromMeta = parseMisSlotIdValue(slotId);
+  if (!fromMeta) {
+    return null;
+  }
+
+  const nextSlotId =
+    popupNextSlotIdBySlotId.has(slotId)
+      ? (popupNextSlotIdBySlotId.get(slotId) ?? null)
+      : null;
+
+  const atEndOfRow = (fromMeta.index + 1) % columns === 0;
   if (!atEndOfRow) {
+    if (!nextSlotId) {
+      return null;
+    }
     return {
-      ...hint,
+      fromSlotId: slotId,
+      toSlotId: nextSlotId,
       style: "straight",
       direction: "right",
-      turnToDirection: undefined,
     };
   }
 
-  const hasAnotherRowInSameUnit =
-    sameMisUnit &&
+  const toMeta = nextSlotId ? parseMisSlotIdValue(nextSlotId) : null;
+  const hasAnotherRowInSameUnit = Boolean(
+    toMeta &&
+    fromMeta.hallId === toMeta.hallId &&
+    fromMeta.slice === toMeta.slice &&
+    fromMeta.side === toMeta.side &&
+    fromMeta.misUnit === toMeta.misUnit &&
     toMeta.index > fromMeta.index &&
-    Math.floor(toMeta.index / columns) > Math.floor(fromMeta.index / columns);
+    Math.floor(toMeta.index / columns) > Math.floor(fromMeta.index / columns),
+  );
 
   if (hasAnotherRowInSameUnit) {
     return {
-      ...hint,
+      fromSlotId: slotId,
+      toSlotId: nextSlotId ?? slotId,
       style: "turn",
       direction: "down",
       turnToDirection: "left",
@@ -218,9 +238,9 @@ export function buildPopupCursorHint(
   }
 
   return {
-    ...hint,
+    fromSlotId: slotId,
+    toSlotId: nextSlotId ?? slotId,
     style: "hall-jump",
     direction: "down",
-    turnToDirection: undefined,
   };
 }

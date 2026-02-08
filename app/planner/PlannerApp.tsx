@@ -98,7 +98,6 @@ export function PlannerApp() {
     usedItemIds,
     cursorSlotId,
     cursorMovementHint,
-    popupCursorMovementHint,
     selectedSlotIdSet,
     draggedSourceSlotIdSet,
     dragPreviews,
@@ -598,7 +597,6 @@ export function PlannerApp() {
             misNames={labelNames.misNames}
             cursorSlotId={cursorSlotId}
             cursorMovementHint={cursorMovementHint}
-            popupCursorMovementHint={popupCursorMovementHint}
             viewportRef={viewportRef}
             zoom={zoom}
             pan={pan}

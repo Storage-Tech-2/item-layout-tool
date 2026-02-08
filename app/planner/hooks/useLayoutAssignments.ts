@@ -32,7 +32,6 @@ type UseLayoutAssignmentsResult = {
   usedItemIds: Set<string>;
   cursorSlotId: string | null;
   cursorMovementHint: CursorMovementHint | null;
-  popupCursorMovementHint: CursorMovementHint | null;
   selectedSlotIdSet: Set<string>;
   draggedSourceSlotIdSet: Set<string>;
   dragPreviews: PreviewPlacement[];
@@ -280,7 +279,6 @@ export function useLayoutAssignments({
   }
 
   const cursorMovementHint = resolveCursorMovementHint("layout");
-  const popupCursorMovementHint = resolveCursorMovementHint("popup");
 
   function placeLibraryItemAtCursor(itemId: string): boolean {
     if (!itemById.has(itemId)) {
@@ -908,7 +906,6 @@ export function useLayoutAssignments({
     usedItemIds,
     cursorSlotId,
     cursorMovementHint,
-    popupCursorMovementHint,
     selectedSlotIdSet,
     draggedSourceSlotIdSet,
     dragPreviews,

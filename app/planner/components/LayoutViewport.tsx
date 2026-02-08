@@ -53,7 +53,6 @@ type LayoutViewportProps = {
   misNames: Record<string, string>;
   cursorSlotId: string | null;
   cursorMovementHint: CursorMovementHint | null;
-  popupCursorMovementHint: CursorMovementHint | null;
   viewportRef: RefObject<HTMLDivElement | null>;
   zoom: number;
   pan: { x: number; y: number };
@@ -411,7 +410,6 @@ export function LayoutViewport({
   misNames,
   cursorSlotId,
   cursorMovementHint,
-  popupCursorMovementHint,
   viewportRef,
   zoom,
   pan,
@@ -866,6 +864,17 @@ export function LayoutViewport({
     return map;
   }, [expandedMisPanels]);
 
+  const popupNextSlotIdBySlotId = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const panel of expandedMisPanels) {
+      for (let index = 0; index < panel.slotIds.length; index += 1) {
+        const slotId = panel.slotIds[index];
+        map.set(slotId, panel.slotIds[index + 1] ?? null);
+      }
+    }
+    return map;
+  }, [expandedMisPanels]);
+
   const toggleExpandedMis = useCallback((target: ExpandedMisTarget): void => {
     const targetKey = expandedMisKey(target);
     setExpandedMisTargets((current) => {
@@ -899,14 +908,18 @@ export function LayoutViewport({
     const showAssignedItem = Boolean(assignedItem) && !showPreviewItem && !isDraggedSource;
     const isSelected = selectedSlotIds.has(slotId) && Boolean(assignedItem);
     const isCursorSlot = cursorSlotId === slotId;
-    const baseMovementHint = useHallDirectionMapping ? cursorMovementHint : popupCursorMovementHint;
     const slotMovementHint =
-      isCursorSlot && baseMovementHint?.fromSlotId === slotId
-        ? baseMovementHint
-        : null;
+      isCursorSlot && cursorMovementHint?.fromSlotId === slotId ? cursorMovementHint : null;
     const displayMovementHint = useHallDirectionMapping
       ? slotMovementHint
-      : buildPopupCursorHint(slotMovementHint, slotId, popupColumnsBySlotId);
+      : isCursorSlot
+        ? buildPopupCursorHint(
+          slotId,
+          "popup",
+          popupColumnsBySlotId,
+          popupNextSlotIdBySlotId,
+        )
+        : null;
 
     const indicatorHallDirections = useHallDirectionMapping
       ? hallLayout.directions
