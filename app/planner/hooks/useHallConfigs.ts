@@ -18,6 +18,10 @@ type UseHallConfigsResult = {
   storageLayoutPreset: StorageLayoutPreset;
   hallConfigs: Record<HallId, HallConfig>;
   applyLayoutPreset: (preset: StorageLayoutPreset) => void;
+  setLayoutState: (
+    preset: StorageLayoutPreset,
+    nextHallConfigs: Record<HallId, HallConfig>,
+  ) => void;
   setSectionSlices: (hallId: HallId, sectionIndex: number, rawValue: string) => void;
   setSectionSideType: (
     hallId: HallId,
@@ -134,6 +138,14 @@ export function useHallConfigs(): UseHallConfigsResult {
   function applyLayoutPreset(preset: StorageLayoutPreset): void {
     setStorageLayoutPreset(preset);
     setHallConfigs(buildInitialHallConfigs(preset));
+  }
+
+  function setLayoutState(
+    preset: StorageLayoutPreset,
+    nextHallConfigs: Record<HallId, HallConfig>,
+  ): void {
+    setStorageLayoutPreset(preset);
+    setHallConfigs(nextHallConfigs);
   }
 
   function setSectionSlices(hallId: HallId, sectionIndex: number, rawValue: string): void {
@@ -288,6 +300,7 @@ export function useHallConfigs(): UseHallConfigsResult {
     storageLayoutPreset,
     hallConfigs,
     applyLayoutPreset,
+    setLayoutState,
     setSectionSlices,
     setSectionSideType,
     setSectionSideRows,

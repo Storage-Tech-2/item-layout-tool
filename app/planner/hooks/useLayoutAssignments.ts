@@ -54,6 +54,7 @@ type UseLayoutAssignmentsResult = {
     previousConfigs: Record<HallId, HallConfig>,
     nextConfigs: Record<HallId, HallConfig>,
   ) => void;
+  replaceSlotAssignments: (assignments: Record<string, string>) => void;
   clearSlot: (slotId: string) => void;
   setSelectedSlotIds: (slotIds: string[]) => void;
 };
@@ -635,6 +636,12 @@ export function useLayoutAssignments({
     setSelectedSlotIdsState(slotIds);
   }
 
+  function replaceSlotAssignments(assignments: Record<string, string>): void {
+    setSlotAssignments({ ...assignments });
+    setSelectedSlotIdsState([]);
+    clearDragState();
+  }
+
   function preserveAssignmentsForConfigChange(
     previousConfigs: Record<HallId, HallConfig>,
     nextConfigs: Record<HallId, HallConfig>,
@@ -775,6 +782,7 @@ export function useLayoutAssignments({
     handleLibraryDragOver,
     handleLibraryDrop,
     preserveAssignmentsForConfigChange,
+    replaceSlotAssignments,
     clearSlot,
     setSelectedSlotIds,
   };

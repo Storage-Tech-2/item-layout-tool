@@ -24,6 +24,12 @@ export type HallConfig = {
   sections: HallSectionConfig[];
 };
 
+export type PlannerLabelNames = {
+  hallNames: Record<HallId, string>;
+  sectionNames: Record<string, string>;
+  misNames: Record<string, string>;
+};
+
 export type LegacyHallConfig = {
   type: HallType;
   slices: number;

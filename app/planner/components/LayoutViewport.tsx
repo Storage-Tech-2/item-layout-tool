@@ -39,6 +39,9 @@ type LayoutViewportProps = {
   hallConfigs: Record<HallId, HallConfig>;
   slotAssignments: Record<string, string>;
   itemById: Map<string, CatalogItem>;
+  hallNames: Record<HallId, string>;
+  sectionNames: Record<string, string>;
+  misNames: Record<string, string>;
   viewportRef: RefObject<HTMLDivElement | null>;
   zoom: number;
   pan: { x: number; y: number };
@@ -84,6 +87,15 @@ type LayoutViewportProps = {
     sectionIndex: number,
     side: HallSideKey,
     value: string,
+  ) => void;
+  onHallNameChange: (hallId: HallId, rawName: string) => void;
+  onSectionNameChange: (hallId: HallId, sectionIndex: number, rawName: string) => void;
+  onMisNameChange: (
+    hallId: HallId,
+    slice: number,
+    side: 0 | 1,
+    misUnit: number,
+    rawName: string,
   ) => void;
   onAddSection: (hallId: HallId) => void;
   onRemoveSection: (hallId: HallId, sectionIndex: number) => void;
@@ -167,6 +179,10 @@ function defaultHallLabel(hallId: HallId): string {
 
 function expandedMisKey(target: ExpandedMisTarget): string {
   return `${target.hallId}:${target.slice}:${target.side}:${target.misUnit}`;
+}
+
+function sectionNameKey(hallId: HallId, sectionIndex: number): string {
+  return `${hallId}:${sectionIndex}`;
 }
 
 function misPreviewLayout(cardWidth: number, cardHeight: number): { columns: number; maxItems: number } {
@@ -257,6 +273,9 @@ export function LayoutViewport({
   hallConfigs,
   slotAssignments,
   itemById,
+  hallNames,
+  sectionNames,
+  misNames,
   viewportRef,
   zoom,
   pan,
@@ -275,6 +294,9 @@ export function LayoutViewport({
   onSectionSideMisCapacityChange,
   onSectionSideMisUnitsChange,
   onSectionSideMisWidthChange,
+  onHallNameChange,
+  onSectionNameChange,
+  onMisNameChange,
   onAddSection,
   onRemoveSection,
   onSlotItemDragStart,
@@ -345,7 +367,6 @@ export function LayoutViewport({
   } | null>(null);
   const [viewMode, setViewMode] = useState<LayoutViewMode>("storage");
   const [expandedMisTargets, setExpandedMisTargets] = useState<ExpandedMisTarget[]>([]);
-  const [hallNames, setHallNames] = useState<Record<HallId, string>>({});
   const hallIds = useMemo(() => Object.keys(hallConfigs).map((key) => Number(key)), [hallConfigs]);
 
   const visibleWorldBounds = useMemo<WorldBounds | null>(() => {
@@ -473,19 +494,8 @@ export function LayoutViewport({
   }, [viewportRef]);
 
   const updateHallName = useCallback((hallId: HallId, rawName: string): void => {
-    const trimmed = rawName.trim();
-    setHallNames((current) => {
-      if (trimmed.length === 0) {
-        const next = { ...current };
-        delete next[hallId];
-        return next;
-      }
-      return {
-        ...current,
-        [hallId]: trimmed,
-      };
-    });
-  }, []);
+    onHallNameChange(hallId, rawName);
+  }, [onHallNameChange]);
 
   const hallDisplayName = useCallback(
     (hallId: HallId): string =>
@@ -493,6 +503,26 @@ export function LayoutViewport({
       getLayoutHallName(storageLayoutPreset, hallId) ??
       defaultHallLabel(hallId),
     [hallNames, storageLayoutPreset],
+  );
+
+  const updateSectionName = useCallback((hallId: HallId, sectionIndex: number, rawName: string): void => {
+    onSectionNameChange(hallId, sectionIndex, rawName);
+  }, [onSectionNameChange]);
+
+  const sectionDisplayName = useCallback(
+    (hallId: HallId, sectionIndex: number): string =>
+      sectionNames[sectionNameKey(hallId, sectionIndex)] ?? `Section ${sectionIndex + 1}`,
+    [sectionNames],
+  );
+
+  const updateMisName = useCallback((target: ExpandedMisTarget, rawName: string): void => {
+    onMisNameChange(target.hallId, target.slice, target.side, target.misUnit, rawName);
+  }, [onMisNameChange]);
+
+  const misDisplayName = useCallback(
+    (target: ExpandedMisTarget, fallbackLabel: string): string =>
+      misNames[expandedMisKey(target)] ?? fallbackLabel,
+    [misNames],
   );
 
   const layoutSummary = useMemo(() => {
@@ -941,7 +971,8 @@ export function LayoutViewport({
         const first = sectionSlices[0];
         const last = sectionSlices[sectionSlices.length - 1];
         return {
-          name: `Section ${sectionIndex + 1}`,
+          sectionIndex,
+          name: sectionDisplayName(hallId, sectionIndex),
           start: mapMainStart(first.mainStart, last.mainStart + last.mainSize - first.mainStart),
           end:
             mapMainStart(first.mainStart, last.mainStart + last.mainSize - first.mainStart) +
@@ -950,7 +981,13 @@ export function LayoutViewport({
         };
       })
       .filter(
-        (entry): entry is { name: string; start: number; end: number; rawStart: number } =>
+        (entry): entry is {
+          sectionIndex: number;
+          name: string;
+          start: number;
+          end: number;
+          rawStart: number;
+        } =>
           entry !== null,
       );
 
@@ -1048,12 +1085,15 @@ export function LayoutViewport({
             const firstSlot = unitSlotIds[0];
             const nextEmptySlot =
               unitSlotIds.find((slotId) => !slotAssignments[slotId]) ?? firstSlot;
+            const misTarget: ExpandedMisTarget = {
+              hallId,
+              slice: misSlice,
+              side,
+              misUnit,
+            };
+            const misTargetKey = expandedMisKey(misTarget);
             const expandedIndex = expandedMisTargets.findIndex(
-              (entry) =>
-                entry.hallId === hallId &&
-                entry.slice === misSlice &&
-                entry.side === side &&
-                entry.misUnit === misUnit,
+              (entry) => expandedMisKey(entry) === misTargetKey,
             );
             const misCardSurfaceClass =
               expandedIndex === 0
@@ -1104,16 +1144,31 @@ export function LayoutViewport({
                   onDrop={(event) => onSlotDrop(event, nextEmptySlot)}
                   onClick={(event) => {
                     event.stopPropagation();
-                    toggleExpandedMis({
-                      hallId,
-                      slice: misSlice,
-                      side,
-                      misUnit,
-                    });
+                    toggleExpandedMis(misTarget);
                   }}
                 >
-                  <div className="leading-none text-[0.5rem] font-bold uppercase tracking-[0.02em] text-[#355039]">
-                    MIS {misGroupNumber}
+                  <div className="leading-none text-[0.5rem] font-bold tracking-[0.02em] text-[#355039]">
+                    <span
+                      className="inline-block min-w-[1.6rem] rounded-[0.18rem] px-[0.06rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none"
+                      contentEditable
+                      suppressContentEditableWarning
+                      role="textbox"
+                      tabIndex={0}
+                      title="Click to rename MIS"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => event.stopPropagation()}
+                      onBlur={(event) =>
+                        updateMisName(misTarget, event.currentTarget.textContent ?? "")
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          event.currentTarget.blur();
+                        }
+                      }}
+                    >
+                      {misDisplayName(misTarget, `MIS ${misGroupNumber}`)}
+                    </span>
                   </div>
                   <div className="leading-none text-[0.48rem] font-semibold text-[#33524f]">
                     {previewEntries.length}/{sideConfig.misSlotsPerSlice}
@@ -1192,16 +1247,31 @@ export function LayoutViewport({
                   onDrop={(event) => onSlotDrop(event, nextEmptySlot)}
                   onClick={(event) => {
                     event.stopPropagation();
-                    toggleExpandedMis({
-                      hallId,
-                      slice: misSlice,
-                      side,
-                      misUnit,
-                    });
+                    toggleExpandedMis(misTarget);
                   }}
                 >
-                  <div className="leading-nonee text-[0.5rem] font-bold uppercase tracking-[0.02em] text-[#355039]">
-                    MIS {misGroupNumber}
+                  <div className="leading-none text-[0.5rem] font-bold tracking-[0.02em] text-[#355039]">
+                    <span
+                      className="inline-block min-w-[1.6rem] rounded-[0.18rem] px-[0.06rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none"
+                      contentEditable
+                      suppressContentEditableWarning
+                      role="textbox"
+                      tabIndex={0}
+                      title="Click to rename MIS"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => event.stopPropagation()}
+                      onBlur={(event) =>
+                        updateMisName(misTarget, event.currentTarget.textContent ?? "")
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          event.currentTarget.blur();
+                        }
+                      }}
+                    >
+                      {misDisplayName(misTarget, `MIS ${misGroupNumber}`)}
+                    </span>
                   </div>
                   <div className="leading-none text-[0.48rem] font-semibold text-[#33524f]">
                     {previewEntries.length}/{sideConfig.misSlotsPerSlice}
@@ -1296,7 +1366,7 @@ export function LayoutViewport({
             style={{ left: maxLeftDepth, width: Math.max(8, hallWidth - maxLeftDepth - maxRightDepth) }}
           />
         )}
-        {sectionRanges.length > 1 ? sectionRanges.map((section, index) => {
+        {sectionRanges.length > 0 ? sectionRanges.map((section, index) => {
           const center = section.start + (section.end - section.start) / 2;
           const boundary =
             index > 0
@@ -1314,10 +1384,31 @@ export function LayoutViewport({
                   />
                 ) : null}
                 <div
-                  className="absolute -translate-x-1/2 rounded-[0.3rem] border border-[rgba(64,50,27,0.26)] bg-[rgba(255,246,227,0.9)] px-[0.2rem] py-[0.04rem] text-[0.5rem] font-bold uppercase tracking-[0.03em] text-[rgba(72,56,33,0.8)]"
+                  className="pointer-events-auto absolute -translate-x-1/2 rounded-[0.3rem] border border-[rgba(64,50,27,0.26)] bg-[rgba(255,246,227,0.9)] px-[0.2rem] py-[0.04rem] text-[0.5rem] font-bold tracking-[0.03em] text-[rgba(72,56,33,0.8)]"
                   style={{ left: center, top: maxLeftDepth + 2 }}
+                  data-no-pan
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={(event) => event.stopPropagation()}
                 >
-                  {section.name}
+                  <span
+                    className="inline-block min-w-[2.1rem] whitespace-nowrap rounded-[0.2rem] px-[0.1rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none"
+                    contentEditable
+                    suppressContentEditableWarning
+                    role="textbox"
+                    tabIndex={0}
+                    title="Click to rename section"
+                    onBlur={(event) =>
+                      updateSectionName(hallId, section.sectionIndex, event.currentTarget.textContent ?? "")
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        event.currentTarget.blur();
+                      }
+                    }}
+                  >
+                    {section.name}
+                  </span>
                 </div>
               </div>
             );
@@ -1331,10 +1422,31 @@ export function LayoutViewport({
                 />
               ) : null}
               <div
-                className="absolute -translate-x-1/2 -translate-y-1/2 -rotate-90 rounded-[0.3rem] border border-[rgba(64,50,27,0.26)] bg-[rgba(255,246,227,0.9)] px-[0.2rem] py-[0.04rem] text-[0.5rem] font-bold uppercase tracking-[0.03em] text-[rgba(72,56,33,0.8)]"
+                className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 -rotate-90 rounded-[0.3rem] border border-[rgba(64,50,27,0.26)] bg-[rgba(255,246,227,0.9)] px-[0.2rem] py-[0.04rem] text-[0.5rem] font-bold tracking-[0.03em] text-[rgba(72,56,33,0.8)]"
                 style={{ left: aisleCenterX, top: center }}
+                data-no-pan
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => event.stopPropagation()}
               >
-                {section.name}
+                <span
+                  className="inline-block min-w-[2.1rem] whitespace-nowrap rounded-[0.2rem] px-[0.1rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none"
+                  contentEditable
+                  suppressContentEditableWarning
+                  role="textbox"
+                  tabIndex={0}
+                  title="Click to rename section"
+                  onBlur={(event) =>
+                    updateSectionName(hallId, section.sectionIndex, event.currentTarget.textContent ?? "")
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      event.currentTarget.blur();
+                    }
+                  }}
+                >
+                  {section.name}
+                </span>
               </div>
             </div>
           );
@@ -1611,6 +1723,12 @@ export function LayoutViewport({
               ? "border-[rgba(82,104,88,0.45)] bg-[rgba(253,255,252,0.92)] text-[#2f4b3f]"
               : "border-[rgba(86,100,130,0.45)] bg-[rgba(252,254,255,0.92)] text-[#334d70]";
             const panelKey = expandedMisKey(panel);
+            const panelTarget: ExpandedMisTarget = {
+              hallId: panel.hallId,
+              slice: panel.slice,
+              side: panel.side,
+              misUnit: panel.misUnit,
+            };
             return (
               <div
                 key={panelKey}
@@ -1632,7 +1750,28 @@ export function LayoutViewport({
                   <div className="grid gap-[0.08rem]">
                     <div className="text-[0.78rem] font-bold uppercase tracking-[0.05em]">
                       {hallDisplayName(panel.hallId)} Slice {panel.slice + 1} •{" "}
-                      {panel.side === 0 ? "Left" : "Right"} MIS {panel.misUnit + 1}
+                      {panel.side === 0 ? "Left" : "Right"}{" "}
+                      <span
+                        className="rounded-[0.22rem] px-[0.12rem] normal-case focus:bg-[rgba(255,255,255,0.84)] focus:outline-none"
+                        contentEditable
+                        suppressContentEditableWarning
+                        role="textbox"
+                        tabIndex={0}
+                        title="Click to rename MIS"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => event.stopPropagation()}
+                        onBlur={(event) =>
+                          updateMisName(panelTarget, event.currentTarget.textContent ?? "")
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            event.currentTarget.blur();
+                          }
+                        }}
+                      >
+                        {misDisplayName(panelTarget, `MIS ${panel.misUnit + 1}`)}
+                      </span>
                     </div>
                     <div className={`text-[0.68rem] ${subTextClass}`}>
                       {panel.slotIds.filter((slotId) => Boolean(slotAssignments[slotId])).length}/
