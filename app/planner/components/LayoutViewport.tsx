@@ -90,6 +90,15 @@ type ExpandedMisEntry = {
 };
 
 type LayoutViewMode = "storage" | "flat";
+type StorageLayoutPreset = "cross" | "h";
+
+type HallPlacement = {
+  left: number;
+  top: number;
+  transform: string;
+  width: number;
+  height: number;
+};
 
 type FlatLayoutMetrics = {
   dimensions: Array<{ hallId: HallId; width: number; height: number }>;
@@ -100,6 +109,12 @@ type FlatLayoutMetrics = {
 };
 
 const FLAT_VIEW_HALL_GAP = 56;
+
+type HallLayoutState = {
+  positions: Record<HallId, HallPlacement>;
+  orientations: Record<HallId, "horizontal" | "vertical">;
+  core: { left: number; top: number; width: number; height: number; label: string } | null;
+};
 
 function toExpandedMisKey(target: ExpandedMisTarget): string {
   return `${target.hallId}:${target.slice}:${target.misUnit}`;
@@ -119,12 +134,36 @@ function getVisualSliceOrder(
   hallId: HallId,
   slices: number,
   viewMode: LayoutViewMode,
+  storageLayoutPreset: StorageLayoutPreset,
 ): number[] {
   const order = Array.from({ length: slices }, (_, index) => index);
-  if (viewMode === "storage" && (hallId === "north" || hallId === "west")) {
+  if (
+    viewMode === "storage" &&
+    storageLayoutPreset === "cross" &&
+    (hallId === "north" || hallId === "west")
+  ) {
     order.reverse();
   }
   return order;
+}
+
+function emptyHallPlacements(): Record<HallId, HallPlacement> {
+  return {
+    north: { left: 0, top: 0, transform: "", width: 0, height: 0 },
+    east: { left: 0, top: 0, transform: "", width: 0, height: 0 },
+    south: { left: 0, top: 0, transform: "", width: 0, height: 0 },
+    west: { left: 0, top: 0, transform: "", width: 0, height: 0 },
+  };
+}
+
+function storageOrientationForHall(
+  storageLayoutPreset: StorageLayoutPreset,
+  hallId: HallId,
+): "horizontal" | "vertical" {
+  if (storageLayoutPreset === "h") {
+    return "vertical";
+  }
+  return HALL_ORIENTATION[hallId];
 }
 
 function buildFlatLayoutMetrics(
@@ -238,6 +277,7 @@ export function LayoutViewport({
   } | null>(null);
   const [expandedMisSlices, setExpandedMisSlices] = useState<ExpandedMisTarget[]>([]);
   const [viewMode, setViewMode] = useState<LayoutViewMode>("storage");
+  const [storageLayoutPreset, setStorageLayoutPreset] = useState<StorageLayoutPreset>("cross");
   const [hallNames, setHallNames] = useState<Record<HallId, string>>({
     north: HALL_LABELS.north,
     east: HALL_LABELS.east,
@@ -365,18 +405,9 @@ export function LayoutViewport({
     }));
   }, []);
 
-  const hallPlacement = useMemo(() => {
-    const positions: Record<
-      HallId,
-      { left: number; top: number; transform: string; width: number; height: number }
-    > = {
-      north: { left: 0, top: 0, transform: "", width: 0, height: 0 },
-      east: { left: 0, top: 0, transform: "", width: 0, height: 0 },
-      south: { left: 0, top: 0, transform: "", width: 0, height: 0 },
-      west: { left: 0, top: 0, transform: "", width: 0, height: 0 },
-    };
-
+  const hallLayout = useMemo<HallLayoutState>(() => {
     if (viewMode === "flat") {
+      const positions = emptyHallPlacements();
       const flatLayout = buildFlatLayoutMetrics(hallConfigs, center);
       let currentTop = flatLayout.top;
       const leftAlignedX = flatLayout.left;
@@ -395,51 +426,161 @@ export function LayoutViewport({
         };
         currentTop += hall.height + FLAT_VIEW_HALL_GAP;
       }
-      return positions;
+
+      return {
+        positions,
+        orientations: {
+          north: "horizontal",
+          east: "horizontal",
+          south: "horizontal",
+          west: "horizontal",
+        },
+        core: null,
+      };
+    }
+
+    const positions = emptyHallPlacements();
+    const dimensions = new Map<
+      HallId,
+      { width: number; height: number; orientation: "horizontal" | "vertical" }
+    >();
+    for (const hallId of HALL_ORDER) {
+      const orientation = storageOrientationForHall(storageLayoutPreset, hallId);
+      const size = getHallSize(hallConfigs[hallId], orientation);
+      dimensions.set(hallId, { width: size.width, height: size.height, orientation });
+    }
+
+    if (storageLayoutPreset === "h") {
+      const coreWidth = Math.max(Math.round(CORE_SIZE * 2.1), 320);
+      const coreHeight = Math.max(Math.round(CORE_SIZE * 0.5), 92);
+      const coreLeft = center - coreWidth / 2;
+      const coreTop = center - coreHeight / 2;
+      const leftAnchor = coreLeft - HALL_GAP;
+      const rightAnchor = coreLeft + coreWidth + HALL_GAP;
+      const topAnchor = coreTop - HALL_GAP;
+      const bottomAnchor = coreTop + coreHeight + HALL_GAP;
+
+      const north = dimensions.get("north");
+      const south = dimensions.get("south");
+      const east = dimensions.get("east");
+      const west = dimensions.get("west");
+      if (!north || !south || !east || !west) {
+        return {
+          positions,
+          orientations: {
+            north: "vertical",
+            east: "vertical",
+            south: "vertical",
+            west: "vertical",
+          },
+          core: null,
+        };
+      }
+
+      positions.north = {
+        left: leftAnchor,
+        top: topAnchor,
+        transform: "translate(-100%, -100%)",
+        width: north.width,
+        height: north.height,
+      };
+      positions.south = {
+        left: leftAnchor,
+        top: bottomAnchor,
+        transform: "translate(-100%, 0)",
+        width: south.width,
+        height: south.height,
+      };
+      positions.east = {
+        left: rightAnchor,
+        top: topAnchor,
+        transform: "translate(0, -100%)",
+        width: east.width,
+        height: east.height,
+      };
+      positions.west = {
+        left: rightAnchor,
+        top: bottomAnchor,
+        transform: "translate(0, 0)",
+        width: west.width,
+        height: west.height,
+      };
+
+      return {
+        positions,
+        orientations: {
+          north: "vertical",
+          east: "vertical",
+          south: "vertical",
+          west: "vertical",
+        },
+        core: {
+          left: coreLeft,
+          top: coreTop,
+          width: coreWidth,
+          height: coreHeight,
+          label: "Main Core",
+        },
+      };
     }
 
     for (const hallId of HALL_ORDER) {
-      const config = hallConfigs[hallId];
-      const orientation = HALL_ORIENTATION[hallId];
-      const { width, height } = getHallSize(config, orientation);
-
+      const hall = dimensions.get(hallId);
+      if (!hall) {
+        continue;
+      }
       if (hallId === "north") {
         positions[hallId] = {
           left: center,
           top: center - CORE_SIZE / 2 - HALL_GAP,
           transform: "translate(-50%, -100%)",
-          width,
-          height,
+          width: hall.width,
+          height: hall.height,
         };
       } else if (hallId === "south") {
         positions[hallId] = {
           left: center,
           top: center + CORE_SIZE / 2 + HALL_GAP,
           transform: "translate(-50%, 0%)",
-          width,
-          height,
+          width: hall.width,
+          height: hall.height,
         };
       } else if (hallId === "east") {
         positions[hallId] = {
           left: center + CORE_SIZE / 2 + HALL_GAP,
           top: center,
           transform: "translate(0%, -50%)",
-          width,
-          height,
+          width: hall.width,
+          height: hall.height,
         };
       } else {
         positions[hallId] = {
           left: center - CORE_SIZE / 2 - HALL_GAP,
           top: center,
           transform: "translate(-100%, -50%)",
-          width,
-          height,
+          width: hall.width,
+          height: hall.height,
         };
       }
     }
 
-    return positions;
-  }, [center, hallConfigs, viewMode]);
+    return {
+      positions,
+      orientations: {
+        north: HALL_ORIENTATION.north,
+        east: HALL_ORIENTATION.east,
+        south: HALL_ORIENTATION.south,
+        west: HALL_ORIENTATION.west,
+      },
+      core: {
+        left: center - CORE_SIZE / 2,
+        top: center - CORE_SIZE / 2,
+        width: CORE_SIZE,
+        height: CORE_SIZE,
+        label: "Core",
+      },
+    };
+  }, [center, hallConfigs, storageLayoutPreset, viewMode]);
 
   function renderSlot(slotId: string): ReactNode {
     const assignedItemId = slotAssignments[slotId];
@@ -579,7 +720,12 @@ export function LayoutViewport({
   ): ReactNode {
     const sideDepth = config.rowsPerSide;
     const mainSlices = config.slices;
-    const sliceOrder = getVisualSliceOrder(hallId, mainSlices, viewMode);
+    const sliceOrder = getVisualSliceOrder(
+      hallId,
+      mainSlices,
+      viewMode,
+      storageLayoutPreset,
+    );
 
     if (orientation === "horizontal") {
       return (
@@ -663,7 +809,12 @@ export function LayoutViewport({
   ): ReactNode {
     const directionClass =
       orientation === "horizontal" ? "flex-row" : "flex-col";
-    const sliceOrder = getVisualSliceOrder(hallId, config.slices, viewMode);
+    const sliceOrder = getVisualSliceOrder(
+      hallId,
+      config.slices,
+      viewMode,
+      storageLayoutPreset,
+    );
 
     return (
       <div className={`absolute inset-0 flex gap-1 ${directionClass}`}>
@@ -984,6 +1135,40 @@ export function LayoutViewport({
             Flat View
           </button>
         </div>
+        <div className="flex items-center gap-[0.25rem]">
+          <button
+            type="button"
+            className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
+              storageLayoutPreset === "cross"
+                ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+            }`}
+            onClick={() => {
+              setStorageLayoutPreset("cross");
+              if (viewMode === "storage") {
+                onRecenterViewport();
+              }
+            }}
+          >
+            Cross Layout
+          </button>
+          <button
+            type="button"
+            className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
+              storageLayoutPreset === "h"
+                ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+            }`}
+            onClick={() => {
+              setStorageLayoutPreset("h");
+              if (viewMode === "storage") {
+                onRecenterViewport();
+              }
+            }}
+          >
+            H Layout
+          </button>
+        </div>
       </div>
 
       <div
@@ -1090,27 +1275,26 @@ export function LayoutViewport({
             transform: `scale(${zoom})`,
           }}
         >
-          {viewMode === "storage" ? (
+          {viewMode === "storage" && hallLayout.core ? (
             <div
               className="absolute grid place-items-center rounded-[1.1rem] border-2 border-dashed border-[rgba(41,86,92,0.7)] bg-[repeating-linear-gradient(-45deg,rgba(186,225,222,0.45)_0,rgba(186,225,222,0.45)_8px,rgba(210,234,231,0.6)_8px,rgba(210,234,231,0.6)_16px)] text-[0.875rem] font-bold uppercase tracking-[0.08em] text-[#18444c]"
               style={{
-                width: `${CORE_SIZE}px`,
-                height: `${CORE_SIZE}px`,
-                left: `${center - CORE_SIZE / 2}px`,
-                top: `${center - CORE_SIZE / 2}px`,
+                width: `${hallLayout.core.width}px`,
+                height: `${hallLayout.core.height}px`,
+                left: `${hallLayout.core.left}px`,
+                top: `${hallLayout.core.top}px`,
               }}
             >
-              Core
+              {hallLayout.core.label}
             </div>
           ) : null}
 
           {HALL_ORDER.map((hallId) => {
             const hall = hallConfigs[hallId];
-            const orientation =
-              viewMode === "flat" ? "horizontal" : HALL_ORIENTATION[hallId];
-            const placement = hallPlacement[hallId];
+            const orientation = hallLayout.orientations[hallId];
+            const placement = hallLayout.positions[hallId];
             const controlAnchorStyle =
-              viewMode === "flat"
+              viewMode === "flat" || storageLayoutPreset === "h"
                 ? { left: "0", top: "-0.36rem", transform: "translate(0, -100%)" }
                 : hallId === "north"
                 ? { left: "50%", top: "-0.36rem", transform: "translate(-50%, -100%)" }
@@ -1124,13 +1308,15 @@ export function LayoutViewport({
               hall.type === "mis"
                 ? misSlotId(
                     hallId,
-                    getVisualSliceOrder(hallId, hall.slices, viewMode)[0] ?? 0,
+                    getVisualSliceOrder(hallId, hall.slices, viewMode, storageLayoutPreset)[0] ??
+                      0,
                     0,
                     0,
                   )
                 : nonMisSlotId(
                     hallId,
-                    getVisualSliceOrder(hallId, hall.slices, viewMode)[0] ?? 0,
+                    getVisualSliceOrder(hallId, hall.slices, viewMode, storageLayoutPreset)[0] ??
+                      0,
                     0,
                     0,
                   );
