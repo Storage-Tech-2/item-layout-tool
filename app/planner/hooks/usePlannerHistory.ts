@@ -25,6 +25,8 @@ type UsePlannerHistoryResult = {
   restoreHistoryState: (state: PlannerHistoryState) => void;
 };
 
+const MAX_HISTORY_ENTRIES = 50;
+
 function cloneSnapshotDelta(delta: PlannerSnapshotDelta): PlannerSnapshotDelta {
   if (typeof structuredClone === "function") {
     return structuredClone(delta);
@@ -139,7 +141,12 @@ export function usePlannerHistory({
       backward,
       key: snapshotKey,
     });
-    const nextIndex = index + 1;
+    let nextIndex = index + 1;
+    if (history.length > MAX_HISTORY_ENTRIES) {
+      const overflow = history.length - MAX_HISTORY_ENTRIES;
+      history.splice(0, overflow);
+      nextIndex = Math.max(0, nextIndex - overflow);
+    }
     historyIndexRef.current = nextIndex;
     currentSnapshotRef.current = snapshot;
     currentSnapshotKeyRef.current = snapshotKey;
@@ -200,7 +207,11 @@ export function usePlannerHistory({
   const restoreHistoryState = useCallback(
     (state: PlannerHistoryState): void => {
       const entries = cloneHistoryEntries(state.entries);
-      const index = clampHistoryIndex(state.index, entries.length);
+      const overflow = Math.max(0, entries.length - MAX_HISTORY_ENTRIES);
+      if (overflow > 0) {
+        entries.splice(0, overflow);
+      }
+      const index = clampHistoryIndex(state.index - overflow, entries.length);
       const currentSnapshot = buildPlannerSnapshot(state.currentSnapshot);
       const currentSnapshotKey = snapshotToKey(currentSnapshot);
 

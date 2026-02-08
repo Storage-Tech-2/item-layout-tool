@@ -33,6 +33,17 @@ const TOOLBAR_BUTTON_CLASS =
   "rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.9)] px-[0.72rem] py-[0.32rem] text-[0.74rem] font-semibold text-[#3b2f22] shadow-[0_1px_0_rgba(255,255,255,0.55)] disabled:cursor-not-allowed disabled:opacity-45";
 const AUTOSAVE_DEBOUNCE_MS = 800;
 
+function shouldIgnoreHistoryHotkeys(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  if (target.isContentEditable) {
+    return true;
+  }
+  const tagName = target.tagName.toLowerCase();
+  return tagName === "input" || tagName === "textarea" || tagName === "select";
+}
+
 function formatAutosaveTimestamp(savedAt: string): string {
   const date = new Date(savedAt);
   if (Number.isFinite(date.getTime())) {
@@ -173,6 +184,37 @@ export function PlannerApp() {
     snapshotKey: plannerSnapshotKey,
     onApplySnapshot: applyHistorySnapshot,
   });
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent): void {
+      if (event.key.toLowerCase() !== "z") {
+        return;
+      }
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) {
+        return;
+      }
+      if (shouldIgnoreHistoryHotkeys(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
+      if (event.shiftKey) {
+        if (canRedo) {
+          redo();
+        }
+        return;
+      }
+
+      if (canUndo) {
+        undo();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [canRedo, canUndo, redo, undo]);
 
   useEffect(() => {
     let isCancelled = false;
