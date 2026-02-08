@@ -58,6 +58,13 @@ type UseLayoutAssignmentsResult = {
   setSelectedSlotIds: (slotIds: string[]) => void;
 };
 
+type ParsedMisUnit = {
+  hallId: HallId;
+  slice: number;
+  side: number;
+  misUnit: number;
+};
+
 export function useLayoutAssignments({
   catalogItems,
   hallConfigs,
@@ -128,6 +135,148 @@ export function useLayoutAssignments({
       ),
     [activeSlotAssignments, orderedSlotIds, selectedSlotIdSet],
   );
+
+  function parseMisUnit(slotId: string): ParsedMisUnit | null {
+    const parts = slotId.split(":");
+    if (parts.length < 6 || parts[1] !== "m") {
+      return null;
+    }
+    const hallId = Number(parts[0]);
+    const slice = Number(parts[2]);
+    const side = Number(parts[3]);
+    const misUnit = Number(parts[4]);
+    if (
+      !Number.isFinite(hallId) ||
+      !Number.isFinite(slice) ||
+      !Number.isFinite(side) ||
+      !Number.isFinite(misUnit)
+    ) {
+      return null;
+    }
+    return { hallId, slice, side, misUnit };
+  }
+
+  function isSameMisUnit(a: ParsedMisUnit, b: ParsedMisUnit): boolean {
+    return (
+      a.hallId === b.hallId &&
+      a.slice === b.slice &&
+      a.side === b.side &&
+      a.misUnit === b.misUnit
+    );
+  }
+
+  function getMisUnitSlotIds(unit: ParsedMisUnit, slotIds: string[]): string[] {
+    return slotIds
+      .filter((slotId) => {
+        const parsed = parseMisUnit(slotId);
+        return parsed ? isSameMisUnit(parsed, unit) : false;
+      })
+      .sort((a, b) => {
+        const ai = Number(a.split(":")[5]);
+        const bi = Number(b.split(":")[5]);
+        return ai - bi;
+      });
+  }
+
+  function buildMisSwapPreview(
+    anchorSlotId: string,
+    payload: DragPayload,
+    assignments: Record<string, string>,
+  ): PreviewPlacement[] | null {
+    if (payload.source !== "layout" || !payload.originSlotId) {
+      return null;
+    }
+
+    const sourceUnit = parseMisUnit(payload.originSlotId);
+    const targetUnit = parseMisUnit(anchorSlotId);
+    if (!sourceUnit || !targetUnit || isSameMisUnit(sourceUnit, targetUnit)) {
+      return null;
+    }
+
+    const sourceSlotIds = getMisUnitSlotIds(sourceUnit, orderedSlotIds);
+    const targetSlotIds = getMisUnitSlotIds(targetUnit, orderedSlotIds);
+    if (sourceSlotIds.length === 0 || targetSlotIds.length === 0) {
+      return null;
+    }
+
+    const swapCount = Math.min(sourceSlotIds.length, targetSlotIds.length);
+    const previews: PreviewPlacement[] = [];
+    for (let index = 0; index < swapCount; index += 1) {
+      const sourceSlotId = sourceSlotIds[index];
+      const targetSlotId = targetSlotIds[index];
+      const sourceItemId = assignments[sourceSlotId];
+      const targetItemId = assignments[targetSlotId];
+
+      if (sourceItemId) {
+        previews.push({
+          slotId: targetSlotId,
+          itemId: sourceItemId,
+          kind: "place",
+        });
+      }
+      if (targetItemId) {
+        previews.push({
+          slotId: sourceSlotId,
+          itemId: targetItemId,
+          kind: "swap",
+        });
+      }
+    }
+
+    return previews;
+  }
+
+  function placeMisUnitSwap(anchorSlotId: string, payload: DragPayload): boolean {
+    if (payload.source !== "layout" || !payload.originSlotId) {
+      return false;
+    }
+
+    const sourceUnit = parseMisUnit(payload.originSlotId);
+    const targetUnit = parseMisUnit(anchorSlotId);
+    if (!sourceUnit || !targetUnit || isSameMisUnit(sourceUnit, targetUnit)) {
+      return false;
+    }
+
+    const sourceSlotIds = getMisUnitSlotIds(sourceUnit, orderedSlotIds);
+    const targetSlotIds = getMisUnitSlotIds(targetUnit, orderedSlotIds);
+    if (sourceSlotIds.length === 0 || targetSlotIds.length === 0) {
+      return false;
+    }
+
+    const swapCount = Math.min(sourceSlotIds.length, targetSlotIds.length);
+    setSlotAssignments((current) => {
+      const next = retainValidAssignments(current, orderedSlotIdSet);
+      const sourceItems = sourceSlotIds.map((slotId) => next[slotId]);
+      const targetItems = targetSlotIds.map((slotId) => next[slotId]);
+
+      for (let index = 0; index < swapCount; index += 1) {
+        const sourceSlotId = sourceSlotIds[index];
+        const targetSlotId = targetSlotIds[index];
+        const sourceItemId = sourceItems[index];
+        const targetItemId = targetItems[index];
+
+        if (sourceItemId) {
+          next[targetSlotId] = sourceItemId;
+        } else {
+          delete next[targetSlotId];
+        }
+
+        if (targetItemId) {
+          next[sourceSlotId] = targetItemId;
+        } else {
+          delete next[sourceSlotId];
+        }
+      }
+
+      return next;
+    });
+
+    const selected = targetSlotIds
+      .slice(0, swapCount)
+      .filter((slotId, index) => Boolean(activeSlotAssignments[sourceSlotIds[index]]));
+    setSelectedSlotIdsState(selected);
+    return true;
+  }
 
   function clearLayout(): void {
     setSlotAssignments({});
@@ -281,6 +430,14 @@ export function useLayoutAssignments({
     event.dataTransfer.dropEffect = payload.source === "layout" ? "move" : "copy";
     setActiveDragPayload(payload);
 
+    const misSwapPreview = buildMisSwapPreview(slotId, payload, activeSlotAssignments);
+    if (misSwapPreview && misSwapPreview.length > 0) {
+      setDragPreviews((current) =>
+        arePreviewsEqual(current, misSwapPreview) ? current : misSwapPreview,
+      );
+      return;
+    }
+
     const nextPreviews = buildPreviewSet(slotId, payload);
     setDragPreviews((current) =>
       arePreviewsEqual(current, nextPreviews) ? current : nextPreviews,
@@ -346,6 +503,11 @@ export function useLayoutAssignments({
 
     const payload = getPayloadFromDragEvent(event);
     if (!payload) {
+      clearDragState();
+      return;
+    }
+
+    if (placeMisUnitSwap(anchorSlotId, payload)) {
       clearDragState();
       return;
     }
