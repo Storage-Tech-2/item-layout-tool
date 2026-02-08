@@ -153,6 +153,15 @@ type ExpandedMisPanel = ExpandedMisTarget & {
   capacity: number;
 };
 
+type WorldBounds = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+
+const VISIBILITY_OVERSCAN = 80;
+
 function defaultHallLabel(hallId: HallId): string {
   return `Hall ${hallId}`;
 }
@@ -279,6 +288,10 @@ export function LayoutViewport({
   onSelectionChange,
 }: LayoutViewportProps) {
   const didInitialFit = useRef(false);
+  const [viewportSize, setViewportSize] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
 
   function resolvePlacementTopLeft(placement: HallPlacement): { left: number; top: number } {
     const match = /translate\(([-\d.]+)%\s*,\s*([-\d.]+)%\)/.exec(placement.transform);
@@ -321,6 +334,19 @@ export function LayoutViewport({
   const [expandedMisTargets, setExpandedMisTargets] = useState<ExpandedMisTarget[]>([]);
   const [hallNames, setHallNames] = useState<Record<HallId, string>>({});
   const hallIds = useMemo(() => Object.keys(hallConfigs).map((key) => Number(key)), [hallConfigs]);
+
+  const visibleWorldBounds = useMemo<WorldBounds | null>(() => {
+    if (zoom <= 0 || viewportSize.width <= 0 || viewportSize.height <= 0) {
+      return null;
+    }
+
+    return {
+      left: -pan.x / zoom,
+      top: -pan.y / zoom,
+      right: (viewportSize.width - pan.x) / zoom,
+      bottom: (viewportSize.height - pan.y) / zoom,
+    };
+  }, [pan.x, pan.y, viewportSize.height, viewportSize.width, zoom]);
 
   const viewportBackgroundStyle = useMemo(
     () => ({
@@ -411,12 +437,24 @@ export function LayoutViewport({
       return;
     }
 
+    const syncSize = (): void => {
+      const rect = viewport.getBoundingClientRect();
+      setViewportSize({ width: rect.width, height: rect.height });
+    };
+    syncSize();
+
+    const resizeObserver = new ResizeObserver(() => {
+      syncSize();
+    });
+    resizeObserver.observe(viewport);
+
     const preventContextMenu = (event: MouseEvent): void => {
       event.preventDefault();
     };
 
     viewport.addEventListener("contextmenu", preventContextMenu);
     return () => {
+      resizeObserver.disconnect();
       viewport.removeEventListener("contextmenu", preventContextMenu);
     };
   }, [viewportRef]);
@@ -786,6 +824,8 @@ export function LayoutViewport({
     config: HallConfig,
     layoutDirection: HallDirection,
     orientation: "horizontal" | "vertical",
+    hallTopLeft: { left: number; top: number },
+    visibleBounds: WorldBounds | null,
     hallWidth: number,
     hallHeight: number,
   ): ReactNode {
@@ -830,6 +870,26 @@ export function LayoutViewport({
       );
 
     const slots: ReactNode[] = [];
+    const isLocalRectVisible = (
+      localLeft: number,
+      localTop: number,
+      width: number,
+      height: number,
+    ): boolean => {
+      if (!visibleBounds) {
+        return true;
+      }
+      const left = hallTopLeft.left + localLeft;
+      const top = hallTopLeft.top + localTop;
+      const right = left + width;
+      const bottom = top + height;
+      return (
+        right >= visibleBounds.left - VISIBILITY_OVERSCAN &&
+        left <= visibleBounds.right + VISIBILITY_OVERSCAN &&
+        bottom >= visibleBounds.top - VISIBILITY_OVERSCAN &&
+        top <= visibleBounds.bottom + VISIBILITY_OVERSCAN
+      );
+    };
     const swapSidesForDirection = layoutDirection === "south" || layoutDirection === "west";
     const reverseCrossAxisForDirection = layoutDirection === "south" || layoutDirection === "west";
     for (const slice of visualSlices) {
@@ -895,6 +955,9 @@ export function LayoutViewport({
               const y = baseTop + visualMisUnit * (unitCrossSize + SLOT_GAP) + 2;
               const cardWidth = Math.max(12, misMainSize - 4);
               const cardHeight = Math.max(42, unitCrossSize - 4);
+              if (!isLocalRectVisible(x, y, cardWidth, cardHeight)) {
+                return;
+              }
               const previewLayout = misPreviewLayout(cardWidth, cardHeight);
               const previewColumns = previewLayout.columns;
               const previewIds = assignedIds.slice(0, previewLayout.maxItems);
@@ -973,6 +1036,9 @@ export function LayoutViewport({
               const y = misMainStart + 2;
               const cardWidth = Math.max(42, unitCrossSize - 4);
               const cardHeight = Math.max(12, misMainSize - 4);
+              if (!isLocalRectVisible(x, y, cardWidth, cardHeight)) {
+                return;
+              }
               const previewLayout = misPreviewLayout(cardWidth, cardHeight);
               const previewColumns = previewLayout.columns;
               const previewIds = assignedIds.slice(0, previewLayout.maxItems);
@@ -1056,6 +1122,9 @@ export function LayoutViewport({
             const baseTop = visualSide === 0 ? 0 : hallHeight - sideDepth;
             const x = mainStart + (slice.mainSize - SLOT_SIZE) / 2;
             const y = baseTop + visualRow * (SLOT_SIZE + SLOT_GAP);
+            if (!isLocalRectVisible(x, y, SLOT_SIZE, SLOT_SIZE)) {
+              continue;
+            }
             slots.push(
               <div key={slotKey} className="absolute" style={{ left: x, top: y }}>
                 {renderSlot(slotKey)}
@@ -1065,6 +1134,9 @@ export function LayoutViewport({
             const baseLeft = visualSide === 0 ? 0 : hallWidth - sideDepth;
             const x = baseLeft + visualRow * (SLOT_SIZE + SLOT_GAP);
             const y = mainStart + (slice.mainSize - SLOT_SIZE) / 2;
+            if (!isLocalRectVisible(x, y, SLOT_SIZE, SLOT_SIZE)) {
+              continue;
+            }
             slots.push(
               <div key={slotKey} className="absolute" style={{ left: x, top: y }}>
                 {renderSlot(slotKey)}
@@ -1526,6 +1598,16 @@ export function LayoutViewport({
                 : directionOrientation(hallLayout.directions[hallId]);
             const placement = hallLayout.positions[hallId];
             const layoutDirection = hallLayout.directions[hallId];
+            const hallTopLeft = resolvePlacementTopLeft(placement);
+            const hallVisible =
+              !visibleWorldBounds ||
+              (hallTopLeft.left + placement.width >= visibleWorldBounds.left - VISIBILITY_OVERSCAN &&
+                hallTopLeft.left <= visibleWorldBounds.right + VISIBILITY_OVERSCAN &&
+                hallTopLeft.top + placement.height >= visibleWorldBounds.top - VISIBILITY_OVERSCAN &&
+                hallTopLeft.top <= visibleWorldBounds.bottom + VISIBILITY_OVERSCAN);
+            if (!hallVisible) {
+              return null;
+            }
             const controlAnchorStyle = (() => {
               if (viewMode === "flat") {
                 return { left: "-0.36rem", top: "50%", transform: "translate(-100%, -50%)" };
@@ -1636,6 +1718,8 @@ export function LayoutViewport({
                   hall,
                   layoutDirection,
                   orientation,
+                  hallTopLeft,
+                  visibleWorldBounds,
                   placement.width,
                   placement.height,
                 )}
