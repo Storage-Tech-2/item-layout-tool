@@ -206,7 +206,7 @@ export function ItemLibraryPanel({
               }`}
               onClick={() => onFillDirectionChange("row")}
             >
-              Row
+              Fill Row
             </button>
             <button
               type="button"
@@ -217,7 +217,7 @@ export function ItemLibraryPanel({
               }`}
               onClick={() => onFillDirectionChange("column")}
             >
-              Column
+              Fill Column
             </button>
           </div>
         </div>
