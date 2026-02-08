@@ -45,10 +45,46 @@ export const WOOD_PREFIXES = [
   "oak",
 ] as const;
 
+export const STONE_PREFIXES = [
+  "andesite",
+  "blackstone",
+  "brick",
+  "cobbled_deepslate",
+  "cobblestone",
+  "dark_prismarine",
+  "deepslate",
+  "diorite",
+  "end_stone_brick",
+  "granite",
+  "mossy_cobblestone",
+  "mossy_stone_brick",
+  "mud_brick",
+  "polished_andesite",
+  "polished_blackstone",
+  "polished_deepslate",
+  "polished_diorite",
+  "polished_granite",
+  "polished_tuff",
+  "prismarine_brick",
+  "prismarine",
+  "purpur",
+  "quartz",
+  "smooth_quartz",
+  "stone",
+  "tuff",
+  "tuff_brick",
+  "stone_brick",
+  'resin_brick'
+] as const;
+
 export const COLOR_INDEX = new Map<string, number>(
   COLOR_PREFIXES.map((prefix, index) => [prefix, index]),
 );
 
 export const WOOD_INDEX = new Map<string, number>(
   WOOD_PREFIXES.map((prefix, index) => [prefix, index]),
+);
+
+const STONE_INDEX = new Map<string, number>(
+  STONE_PREFIXES.map((prefix, index) => [prefix, index]),
 );

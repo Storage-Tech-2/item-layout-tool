@@ -2299,9 +2299,14 @@ function omitNullOrFalseProperties(value: unknown): unknown {
 }
 
 function shouldIncludeInPlannerCatalog(
+  itemId: string,
   parsedItem: ParsedItem | null,
   creativeTabs: string[],
 ): boolean {
+  if (itemId === "ender_dragon_spawn_egg" || itemId === "wither_spawn_egg") {
+    return false;
+  }
+
   if (parsedItem?.maxStackSize === 1) {
     return false;
   }
@@ -2396,7 +2401,7 @@ async function main(): Promise<void> {
     const creativeTabs = parsedItem
       ? Array.from(creativeTabIdsByItemId.get(parsedItem.id) ?? [])
       : [];
-    if (!shouldIncludeInPlannerCatalog(parsedItem, creativeTabs)) {
+    if (!shouldIncludeInPlannerCatalog(itemId, parsedItem, creativeTabs)) {
       skippedFilteredItems.push(itemId);
       skippedCount += 1;
       processedCount += 1;
