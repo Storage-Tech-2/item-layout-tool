@@ -109,6 +109,11 @@ type AnimationMeta = {
   };
 };
 
+type SpecialTextureEntry = {
+  absolutePath: string;
+  filename: string;
+};
+
 const LOCAL_ASSETS_ROOT_OVERRIDE = process.env.ITEMFETCH_ASSETS_LOCAL_DIR
   ? path.resolve(process.cwd(), process.env.ITEMFETCH_ASSETS_LOCAL_DIR)
   : null;
@@ -116,6 +121,7 @@ let activeAssetsRoot: string | null = LOCAL_ASSETS_ROOT_OVERRIDE;
 
 const ITEM_INDEX_ASSET_PATH = "assets/minecraft/items/_all.json";
 const ITEMS_DIRECTORY_ASSET_PATH = "assets/minecraft/items";
+const SPECIAL_TEXTURE_ROOT = path.resolve(process.cwd(), "itemfetch/special");
 
 const OUTPUT_ROOT = path.resolve(process.cwd(), "public/items");
 const OUTPUT_TEXTURE_ROOT = path.join(OUTPUT_ROOT, "textures");
@@ -170,9 +176,92 @@ const renderedModelTextureCache = new Map<
   string,
   Promise<{ textureRef: string; bytes: Buffer } | null>
 >();
+let specialTextureMapPromise: Promise<Map<string, SpecialTextureEntry>> | null = null;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeSpecialTextureKey(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
+}
+
+async function loadSpecialTextureMap(): Promise<Map<string, SpecialTextureEntry>> {
+  if (specialTextureMapPromise) {
+    return specialTextureMapPromise;
+  }
+
+  specialTextureMapPromise = (async () => {
+    const map = new Map<string, SpecialTextureEntry>();
+    if (!(await pathExists(SPECIAL_TEXTURE_ROOT))) {
+      return map;
+    }
+
+    const entries = await readdir(SPECIAL_TEXTURE_ROOT, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith(".png")) {
+        continue;
+      }
+
+      const filename = entry.name;
+      const key = normalizeSpecialTextureKey(filename.slice(0, -".png".length));
+      if (!key || map.has(key)) {
+        continue;
+      }
+
+      map.set(key, {
+        absolutePath: path.join(SPECIAL_TEXTURE_ROOT, filename),
+        filename,
+      });
+    }
+
+    return map;
+  })();
+
+  return specialTextureMapPromise;
+}
+
+function hasSpecialRenderer(node: unknown): boolean {
+  if (Array.isArray(node)) {
+    return node.some((value) => hasSpecialRenderer(value));
+  }
+
+  if (!isRecord(node)) {
+    return false;
+  }
+
+  if (node.type === "minecraft:special") {
+    return true;
+  }
+
+  for (const value of Object.values(node)) {
+    if (hasSpecialRenderer(value)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function resolveSpecialTextureForItem(
+  itemId: string,
+): Promise<{ textureRef: string; sourceModel: string | null; bytes: Buffer } | null> {
+  const specialTextureMap = await loadSpecialTextureMap();
+  const key = normalizeSpecialTextureKey(itemId);
+  const specialTexture = specialTextureMap.get(key);
+  if (!specialTexture) {
+    return null;
+  }
+
+  return {
+    textureRef: `special/${specialTexture.filename}`,
+    sourceModel: "minecraft:special",
+    bytes: await readFile(specialTexture.absolutePath),
+  };
 }
 
 function parseNamespacedRef(
@@ -1965,6 +2054,13 @@ async function resolveItemTexture(
   itemId: string,
   itemDefinition: Record<string, unknown>,
 ): Promise<{ textureRef: string; sourceModel: string | null; bytes: Buffer } | null> {
+  if (hasSpecialRenderer(itemDefinition.model)) {
+    const specialTexture = await resolveSpecialTextureForItem(itemId);
+    if (specialTexture) {
+      return specialTexture;
+    }
+  }
+
   const rawCandidates: Candidate[] = [];
   collectCandidates(itemDefinition.model, rawCandidates);
   const candidates = dedupeCandidates(rawCandidates);
@@ -2268,12 +2364,14 @@ async function main(): Promise<void> {
 
   const outputItems: OutputItem[] = new Array(itemIds.length);
   const missingTextureItems: string[] = [];
+  const otherSpecialItems: string[] = [];
 
   let processedCount = 0;
   let texturedCount = 0;
 
   await mapWithConcurrency(itemIds, CONCURRENCY, async (itemId, index) => {
     const definition = itemIndex[itemId] ?? {};
+    const hasSpecial = hasSpecialRenderer(definition.model);
     const resolved = await resolveItemTexture(itemId, definition);
     const parsedItem = parsedItemById.get(itemId) ?? null;
     const parsedFood = resolveParsedFood(
@@ -2288,6 +2386,9 @@ async function main(): Promise<void> {
     if (resolved) {
       const textureFilename = `${itemId}.png`;
       await writeFile(path.join(OUTPUT_TEXTURE_ROOT, textureFilename), resolved.bytes);
+      if (hasSpecial && resolved.sourceModel !== "minecraft:special") {
+        otherSpecialItems.push(itemId);
+      }
 
       outputItems[index] = toOutputItem(
         itemId,
@@ -2302,6 +2403,9 @@ async function main(): Promise<void> {
       );
       texturedCount += 1;
     } else {
+      if (hasSpecial) {
+        otherSpecialItems.push(itemId);
+      }
       outputItems[index] = toOutputItem(
         itemId,
         {
@@ -2358,6 +2462,13 @@ async function main(): Promise<void> {
     const suffix = missingTextureItems.length > 12 ? ", ..." : "";
     console.warn(
       `Missing texture for ${missingTextureItems.length} items: ${sample}${suffix}`,
+    );
+  }
+
+  if (otherSpecialItems.length > 0) {
+    const sorted = Array.from(new Set(otherSpecialItems)).sort();
+    console.warn(
+      `Special-render items without special folder render (${sorted.length}): ${sorted.join(", ")}`,
     );
   }
 }
