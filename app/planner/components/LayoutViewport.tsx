@@ -1412,10 +1412,19 @@ export function LayoutViewport({
           <div className="font-semibold text-[#3a332b]">
             Total Types: {layoutSummary.totalTypes}
           </div>
-          <div className="grid grid-cols-3 gap-x-[0.2rem] gap-y-[0.08rem]">
-            <span>Bulk Types: {layoutSummary.bulkTypes}</span>
-            <span>Chest Types: {layoutSummary.chestTypes}</span>
-            <span>MIS Types: {layoutSummary.misTypes}</span>
+          <div className="grid grid-cols-3 gap-[0.2rem]">
+            <div className="grid justify-items-center rounded-[0.35rem] border border-[rgba(137,107,67,0.28)] bg-[rgba(255,255,255,0.62)] px-[0.2rem] py-[0.14rem] text-center">
+              <span>Bulk</span>
+              <span className="font-semibold text-[#2f5f4a]">{layoutSummary.bulkTypes}</span>
+            </div>
+            <div className="grid justify-items-center rounded-[0.35rem] border border-[rgba(137,107,67,0.28)] bg-[rgba(255,255,255,0.62)] px-[0.2rem] py-[0.14rem] text-center">
+              <span>Chest</span>
+              <span className="font-semibold text-[#2f5f4a]">{layoutSummary.chestTypes}</span>
+            </div>
+            <div className="grid justify-items-center rounded-[0.35rem] border border-[rgba(137,107,67,0.28)] bg-[rgba(255,255,255,0.62)] px-[0.2rem] py-[0.14rem] text-center">
+              <span>MIS</span>
+              <span className="font-semibold text-[#2f5f4a]">{layoutSummary.misTypes}</span>
+            </div>
           </div>
         </div>
 
@@ -1463,9 +1472,6 @@ export function LayoutViewport({
       <div className="absolute right-4 top-4 z-20 grid justify-items-end gap-[0.45rem]" data-no-pan>
         <div className="grid gap-[0.45rem]">
           <div className="grid gap-[0.35rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem]">
-            <div className="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-[#5e513f]">
-              View Controls
-            </div>
             <div className="flex items-center gap-[0.25rem]">
               <button
                 type="button"
