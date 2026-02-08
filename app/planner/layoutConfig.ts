@@ -314,10 +314,6 @@ function directionAnchor(direction: HallDirection): HallAnchor {
     }
 }
 
-function laneOffset(index: number, count: number, spacing: number): number {
-    return (index - (count - 1) / 2) * spacing;
-}
-
 export function resolveStorageLayout(
     preset: StorageLayoutPreset,
     hallConfigs: Record<HallId, HallConfig>,
@@ -344,12 +340,12 @@ export function resolveStorageLayout(
     for (const [direction, hallIds] of byDirection.entries()) {
         const anchor = directionAnchor(direction);
         const orientation = directionOrientation(direction);
-        const maxPerpSpan = hallIds.reduce((max, hallId) => {
-            const size = getHallSize(hallConfigs[hallId], orientation);
-            const perpendicular = orientation === "vertical" ? size.width : size.height;
-            return Math.max(max, perpendicular);
-        }, 0);
-        const spacing = maxPerpSpan + HALL_GAP;
+        const availablePerpendicularSpan =
+            direction === "north" || direction === "south"
+                ? definition.core.width
+                : definition.core.height;
+        const laneStep =
+            hallIds.length <= 1 ? 0 : availablePerpendicularSpan / hallIds.length;
 
         for (const [index, hallId] of hallIds.entries()) {
             const size = getHallSize(hallConfigs[hallId], orientation);
@@ -357,7 +353,10 @@ export function resolveStorageLayout(
                 anchorCoordinate(coreLeft, definition.core.width, anchor.x) + anchor.offsetX;
             const baseY =
                 anchorCoordinateY(coreTop, definition.core.height, anchor.y) + anchor.offsetY;
-            const offset = laneOffset(index, hallIds.length, spacing);
+            const offset =
+                hallIds.length <= 1
+                    ? 0
+                    : (index - (hallIds.length - 1) / 2) * laneStep;
             const offsetX = direction === "north" || direction === "south" ? offset : 0;
             const offsetY = direction === "east" || direction === "west" ? offset : 0;
 
