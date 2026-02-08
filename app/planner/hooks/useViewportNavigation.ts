@@ -25,7 +25,7 @@ export function useViewportNavigation(): {
   zoom: number;
   pan: { x: number; y: number };
   adjustZoom: (delta: number) => void;
-  recenterViewport: () => void;
+  recenterViewport: (focusPoint?: { x: number; y: number }) => void;
   handlePointerDown: (event: PointerEvent<HTMLDivElement>) => boolean;
   handlePointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   handlePointerEnd: (event: PointerEvent<HTMLDivElement>) => void;
@@ -100,17 +100,19 @@ export function useViewportNavigation(): {
     applyZoomAt(rect.width / 2, rect.height / 2, (currentZoom) => currentZoom + delta);
   }
 
-  const recenterViewport = useCallback((): void => {
+  const recenterViewport = useCallback((focusPoint?: { x: number; y: number }): void => {
     if (!viewportRef.current) {
       return;
     }
 
     const rect = viewportRef.current.getBoundingClientRect();
+    const focusX = focusPoint?.x ?? STAGE_SIZE / 2;
+    const focusY = focusPoint?.y ?? STAGE_SIZE / 2;
     setState((current) => ({
       ...current,
       pan: {
-        x: rect.width / 2 - (STAGE_SIZE / 2) * current.zoom,
-        y: rect.height / 2 - (STAGE_SIZE / 2) * current.zoom,
+        x: rect.width / 2 - focusX * current.zoom,
+        y: rect.height / 2 - focusY * current.zoom,
       },
     }));
   }, []);

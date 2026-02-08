@@ -37,7 +37,7 @@ type LayoutViewportProps = {
   zoom: number;
   pan: { x: number; y: number };
   onAdjustZoom: (delta: number) => void;
-  onRecenterViewport: () => void;
+  onRecenterViewport: (focusPoint?: { x: number; y: number }) => void;
   onPointerDown: (event: PointerEvent<HTMLDivElement>) => boolean;
   onPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerEnd: (event: PointerEvent<HTMLDivElement>) => void;
@@ -93,6 +93,14 @@ type ExpandedMisEntry = {
 
 type LayoutViewMode = "storage" | "flat";
 
+type FlatLayoutMetrics = {
+  dimensions: Array<{ hallId: HallId; width: number; height: number }>;
+  totalHeight: number;
+  maxWidth: number;
+  left: number;
+  top: number;
+};
+
 function toExpandedMisKey(target: ExpandedMisTarget): string {
   return `${target.hallId}:${target.slice}:${target.misUnit}`;
 }
@@ -117,6 +125,30 @@ function getVisualSliceOrder(
     order.reverse();
   }
   return order;
+}
+
+function buildFlatLayoutMetrics(
+  hallConfigs: Record<HallId, HallConfig>,
+  center: number,
+): FlatLayoutMetrics {
+  const verticalGap = 34;
+  const dimensions = HALL_ORDER.map((hallId) => {
+    const config = hallConfigs[hallId];
+    const orientation: "horizontal" | "vertical" = "horizontal";
+    const { width, height } = getHallSize(config, orientation);
+    return { hallId, width, height };
+  });
+  const totalHeight =
+    dimensions.reduce((sum, hall) => sum + hall.height, 0) +
+    Math.max(0, dimensions.length - 1) * verticalGap;
+  const maxWidth = dimensions.reduce((max, hall) => Math.max(max, hall.width), 0);
+  return {
+    dimensions,
+    totalHeight,
+    maxWidth,
+    left: center - maxWidth / 2,
+    top: center - totalHeight / 2,
+  };
 }
 
 function DeferredNumberInput({
@@ -317,20 +349,24 @@ export function LayoutViewport({
     };
 
     if (viewMode === "flat") {
-      let currentTop = 140;
       const verticalGap = 34;
+      const flatLayout = buildFlatLayoutMetrics(hallConfigs, center);
+      let currentTop = flatLayout.top;
+      const leftAlignedX = flatLayout.left;
+
       for (const hallId of HALL_ORDER) {
-        const config = hallConfigs[hallId];
-        const orientation: "horizontal" | "vertical" = "horizontal";
-        const { width, height } = getHallSize(config, orientation);
+        const hall = flatLayout.dimensions.find((entry) => entry.hallId === hallId);
+        if (!hall) {
+          continue;
+        }
         positions[hallId] = {
-          left: center,
+          left: leftAlignedX,
           top: currentTop,
-          transform: "translate(-50%, 0)",
-          width,
-          height,
+          transform: "translate(0, 0)",
+          width: hall.width,
+          height: hall.height,
         };
-        currentTop += height + verticalGap;
+        currentTop += hall.height + verticalGap;
       }
       return positions;
     }
@@ -935,8 +971,13 @@ export function LayoutViewport({
               if (viewMode === "flat") {
                 return;
               }
+              const flatLayout = buildFlatLayoutMetrics(hallConfigs, center);
               setViewMode("flat");
-              onRecenterViewport();
+              const controlAnchorX = flatLayout.left + Math.min(180, flatLayout.maxWidth * 0.22);
+              onRecenterViewport({
+                x: controlAnchorX,
+                y: flatLayout.top + flatLayout.totalHeight / 2,
+              });
             }}
           >
             Flat View
@@ -1148,7 +1189,7 @@ export function LayoutViewport({
                     <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
                       <span>S</span>
                       <DeferredNumberInput
-                        className="w-[2.2rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
+                        className="w-[3.1rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
                         min={1}
                         max={200}
                         value={hall.slices}
@@ -1159,7 +1200,7 @@ export function LayoutViewport({
                       <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
                         <span>C</span>
                         <DeferredNumberInput
-                          className="w-[2.55rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
+                          className="w-[3.3rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
                           min={1}
                           max={200}
                           value={hall.misSlotsPerSlice}
@@ -1172,7 +1213,7 @@ export function LayoutViewport({
                       <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
                         <span>R</span>
                         <DeferredNumberInput
-                          className="w-[2rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
+                          className="w-[2.8rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
                           min={1}
                           max={9}
                           value={hall.rowsPerSide}
@@ -1184,7 +1225,7 @@ export function LayoutViewport({
                       <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
                         <span>M</span>
                         <DeferredNumberInput
-                          className="w-[2rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
+                          className="w-[2.8rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
                           min={1}
                           max={8}
                           value={hall.misUnitsPerSlice}
