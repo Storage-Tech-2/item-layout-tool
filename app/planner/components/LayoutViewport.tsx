@@ -37,6 +37,7 @@ type LayoutViewportProps = {
   zoom: number;
   pan: { x: number; y: number };
   onAdjustZoom: (delta: number) => void;
+  onRecenterViewport: () => void;
   onPointerDown: (event: PointerEvent<HTMLDivElement>) => boolean;
   onPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   onPointerEnd: (event: PointerEvent<HTMLDivElement>) => void;
@@ -90,6 +91,8 @@ type ExpandedMisEntry = {
   colorIndex: number;
 };
 
+type LayoutViewMode = "storage" | "flat";
+
 function toExpandedMisKey(target: ExpandedMisTarget): string {
   return `${target.hallId}:${target.slice}:${target.misUnit}`;
 }
@@ -104,9 +107,13 @@ const MIS_OPEN_PANEL_CLASSES = [
   "border-[rgba(139,88,31,0.55)] bg-[linear-gradient(180deg,rgba(255,248,233,0.97)_0%,rgba(245,229,198,0.97)_100%)]",
 ] as const;
 
-function getVisualSliceOrder(hallId: HallId, slices: number): number[] {
+function getVisualSliceOrder(
+  hallId: HallId,
+  slices: number,
+  viewMode: LayoutViewMode,
+): number[] {
   const order = Array.from({ length: slices }, (_, index) => index);
-  if (hallId === "north" || hallId === "west") {
+  if (viewMode === "storage" && (hallId === "north" || hallId === "west")) {
     order.reverse();
   }
   return order;
@@ -151,6 +158,7 @@ export function LayoutViewport({
   zoom,
   pan,
   onAdjustZoom,
+  onRecenterViewport,
   onPointerDown,
   onPointerMove,
   onPointerEnd,
@@ -183,6 +191,7 @@ export function LayoutViewport({
     height: number;
   } | null>(null);
   const [expandedMisSlices, setExpandedMisSlices] = useState<ExpandedMisTarget[]>([]);
+  const [viewMode, setViewMode] = useState<LayoutViewMode>("storage");
 
   const viewportBackgroundStyle = useMemo(
     () => ({
@@ -307,6 +316,25 @@ export function LayoutViewport({
       west: { left: 0, top: 0, transform: "", width: 0, height: 0 },
     };
 
+    if (viewMode === "flat") {
+      let currentTop = 140;
+      const verticalGap = 34;
+      for (const hallId of HALL_ORDER) {
+        const config = hallConfigs[hallId];
+        const orientation: "horizontal" | "vertical" = "horizontal";
+        const { width, height } = getHallSize(config, orientation);
+        positions[hallId] = {
+          left: center,
+          top: currentTop,
+          transform: "translate(-50%, 0)",
+          width,
+          height,
+        };
+        currentTop += height + verticalGap;
+      }
+      return positions;
+    }
+
     for (const hallId of HALL_ORDER) {
       const config = hallConfigs[hallId];
       const orientation = HALL_ORIENTATION[hallId];
@@ -348,7 +376,7 @@ export function LayoutViewport({
     }
 
     return positions;
-  }, [center, hallConfigs]);
+  }, [center, hallConfigs, viewMode]);
 
   function renderSlot(slotId: string): ReactNode {
     const assignedItemId = slotAssignments[slotId];
@@ -488,7 +516,7 @@ export function LayoutViewport({
   ): ReactNode {
     const sideDepth = config.rowsPerSide;
     const mainSlices = config.slices;
-    const sliceOrder = getVisualSliceOrder(hallId, mainSlices);
+    const sliceOrder = getVisualSliceOrder(hallId, mainSlices, viewMode);
 
     if (orientation === "horizontal") {
       return (
@@ -572,7 +600,7 @@ export function LayoutViewport({
   ): ReactNode {
     const directionClass =
       orientation === "horizontal" ? "flex-row" : "flex-col";
-    const sliceOrder = getVisualSliceOrder(hallId, config.slices);
+    const sliceOrder = getVisualSliceOrder(hallId, config.slices, viewMode);
 
     return (
       <div className={`absolute inset-0 flex gap-1 ${directionClass}`}>
@@ -878,6 +906,42 @@ export function LayoutViewport({
             Clear Layout
           </button>
         </div>
+        <div className="flex items-center gap-[0.25rem]">
+          <button
+            type="button"
+            className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
+              viewMode === "storage"
+                ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+            }`}
+            onClick={() => {
+              if (viewMode === "storage") {
+                return;
+              }
+              setViewMode("storage");
+              onRecenterViewport();
+            }}
+          >
+            Storage View
+          </button>
+          <button
+            type="button"
+            className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
+              viewMode === "flat"
+                ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+            }`}
+            onClick={() => {
+              if (viewMode === "flat") {
+                return;
+              }
+              setViewMode("flat");
+              onRecenterViewport();
+            }}
+          >
+            Flat View
+          </button>
+        </div>
       </div>
 
       <div
@@ -984,24 +1048,29 @@ export function LayoutViewport({
             transform: `scale(${zoom})`,
           }}
         >
-          <div
-            className="absolute grid place-items-center rounded-[1.1rem] border-2 border-dashed border-[rgba(41,86,92,0.7)] bg-[repeating-linear-gradient(-45deg,rgba(186,225,222,0.45)_0,rgba(186,225,222,0.45)_8px,rgba(210,234,231,0.6)_8px,rgba(210,234,231,0.6)_16px)] text-[0.875rem] font-bold uppercase tracking-[0.08em] text-[#18444c]"
-            style={{
-              width: `${CORE_SIZE}px`,
-              height: `${CORE_SIZE}px`,
-              left: `${center - CORE_SIZE / 2}px`,
-              top: `${center - CORE_SIZE / 2}px`,
-            }}
-          >
-            Core
-          </div>
+          {viewMode === "storage" ? (
+            <div
+              className="absolute grid place-items-center rounded-[1.1rem] border-2 border-dashed border-[rgba(41,86,92,0.7)] bg-[repeating-linear-gradient(-45deg,rgba(186,225,222,0.45)_0,rgba(186,225,222,0.45)_8px,rgba(210,234,231,0.6)_8px,rgba(210,234,231,0.6)_16px)] text-[0.875rem] font-bold uppercase tracking-[0.08em] text-[#18444c]"
+              style={{
+                width: `${CORE_SIZE}px`,
+                height: `${CORE_SIZE}px`,
+                left: `${center - CORE_SIZE / 2}px`,
+                top: `${center - CORE_SIZE / 2}px`,
+              }}
+            >
+              Core
+            </div>
+          ) : null}
 
           {HALL_ORDER.map((hallId) => {
             const hall = hallConfigs[hallId];
-            const orientation = HALL_ORIENTATION[hallId];
+            const orientation =
+              viewMode === "flat" ? "horizontal" : HALL_ORIENTATION[hallId];
             const placement = hallPlacement[hallId];
             const controlAnchorStyle =
-              hallId === "north"
+              viewMode === "flat"
+                ? { left: "0", top: "-0.36rem", transform: "translate(0, -100%)" }
+                : hallId === "north"
                 ? { left: "50%", top: "-0.36rem", transform: "translate(-50%, -100%)" }
                 : hallId === "south"
                   ? { left: "50%", bottom: "-0.36rem", transform: "translate(-50%, 100%)" }
@@ -1013,13 +1082,13 @@ export function LayoutViewport({
               hall.type === "mis"
                 ? misSlotId(
                     hallId,
-                    hallId === "north" || hallId === "west" ? hall.slices - 1 : 0,
+                    getVisualSliceOrder(hallId, hall.slices, viewMode)[0] ?? 0,
                     0,
                     0,
                   )
                 : nonMisSlotId(
                     hallId,
-                    hallId === "north" || hallId === "west" ? hall.slices - 1 : 0,
+                    getVisualSliceOrder(hallId, hall.slices, viewMode)[0] ?? 0,
                     0,
                     0,
                   );

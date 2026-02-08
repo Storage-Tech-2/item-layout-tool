@@ -25,6 +25,7 @@ export function useViewportNavigation(): {
   zoom: number;
   pan: { x: number; y: number };
   adjustZoom: (delta: number) => void;
+  recenterViewport: () => void;
   handlePointerDown: (event: PointerEvent<HTMLDivElement>) => boolean;
   handlePointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   handlePointerEnd: (event: PointerEvent<HTMLDivElement>) => void;
@@ -98,6 +99,21 @@ export function useViewportNavigation(): {
     const rect = viewportRef.current.getBoundingClientRect();
     applyZoomAt(rect.width / 2, rect.height / 2, (currentZoom) => currentZoom + delta);
   }
+
+  const recenterViewport = useCallback((): void => {
+    if (!viewportRef.current) {
+      return;
+    }
+
+    const rect = viewportRef.current.getBoundingClientRect();
+    setState((current) => ({
+      ...current,
+      pan: {
+        x: rect.width / 2 - (STAGE_SIZE / 2) * current.zoom,
+        y: rect.height / 2 - (STAGE_SIZE / 2) * current.zoom,
+      },
+    }));
+  }, []);
 
   const handleWheelFromViewport = useCallback((
     clientX: number,
@@ -210,6 +226,7 @@ export function useViewportNavigation(): {
     zoom: state.zoom,
     pan: state.pan,
     adjustZoom,
+    recenterViewport,
     handlePointerDown,
     handlePointerMove,
     handlePointerEnd,

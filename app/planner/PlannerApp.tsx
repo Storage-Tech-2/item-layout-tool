@@ -58,6 +58,7 @@ export function PlannerApp() {
     zoom,
     pan,
     adjustZoom,
+    recenterViewport,
     handlePointerDown,
     handlePointerMove,
     handlePointerEnd,
@@ -110,6 +111,7 @@ export function PlannerApp() {
           zoom={zoom}
           pan={pan}
           onAdjustZoom={adjustZoom}
+          onRecenterViewport={recenterViewport}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerEnd={handlePointerEnd}
