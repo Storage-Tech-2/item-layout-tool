@@ -525,7 +525,7 @@ export function PlannerApp() {
       </div>
 
       {pendingAutosaveRestore ? (
-        <div className="fixed inset-0 z-[70] grid place-items-center bg-[rgba(19,15,10,0.45)] px-4">
+        <div className="fixed inset-0 z-70 grid place-items-center bg-[rgba(19,15,10,0.45)] px-4">
           <div className="w-full max-w-md rounded-[0.9rem] border border-[rgba(126,101,67,0.46)] bg-[linear-gradient(180deg,rgba(255,252,244,0.98)_0%,rgba(247,236,217,0.98)_100%)] p-4 shadow-[0_16px_42px_rgba(23,19,13,0.35)]">
             <h3 className="m-0 text-[1rem] font-bold text-[#3b3126]">Restore Autosave?</h3>
             <p className="mt-2 text-[0.84rem] leading-[1.35] text-[#5f5446]">

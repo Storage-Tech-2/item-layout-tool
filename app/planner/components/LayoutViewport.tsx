@@ -23,6 +23,14 @@ import {
   type StorageLayoutPreset,
 } from "../layoutConfig";
 import type { HallSideKey } from "../hooks/useHallConfigs";
+import { CursorMovementIndicator } from "./layoutViewport/CursorMovementIndicator";
+import { DeferredNumberInput } from "./layoutViewport/DeferredNumberInput";
+import {
+  ExpandedMisPanelsOverlay,
+  type ExpandedMisPanel,
+  type ExpandedMisTarget,
+} from "./layoutViewport/ExpandedMisPanelsOverlay";
+import type { CursorMovementHint } from "./layoutViewport/types";
 import type {
   CatalogItem,
   HallConfig,
@@ -121,14 +129,6 @@ type LayoutViewportProps = {
   onSelectionChange: (slotIds: string[]) => void;
 };
 
-type DeferredNumberInputProps = {
-  value: number;
-  min: number;
-  max: number;
-  className: string;
-  onCommit: (value: string) => void;
-};
-
 type LayoutViewMode = "storage" | "flat";
 
 type HallPlacement = {
@@ -153,27 +153,6 @@ type HallLayoutState = {
   positions: Record<HallId, HallPlacement>;
   directions: Record<HallId, HallDirection>;
   core: { left: number; top: number; width: number; height: number; label: string } | null;
-};
-
-type ExpandedMisTarget = {
-  hallId: HallId;
-  slice: number;
-  side: 0 | 1;
-  misUnit: number;
-};
-
-type ExpandedMisPanel = ExpandedMisTarget & {
-  slotIds: string[];
-  columns: number;
-  capacity: number;
-};
-
-type CursorMovementHint = {
-  fromSlotId: string;
-  toSlotId: string;
-  style: "straight" | "turn" | "hall-jump";
-  direction: "right" | "left" | "up" | "down";
-  turnToDirection?: "right" | "left" | "up" | "down";
 };
 
 type WorldBounds = {
@@ -216,94 +195,6 @@ function sideDepthPx(side: HallSideConfig): number {
   return side.rowsPerSlice * SLOT_SIZE + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
 }
 
-type CardinalDirection = CursorMovementHint["direction"];
-
-function parseHallIdFromSlotId(slotId: string): HallId | null {
-  const [hallPart] = slotId.split(":");
-  const hallId = Number(hallPart);
-  if (!Number.isFinite(hallId)) {
-    return null;
-  }
-  return hallId;
-}
-
-function directionVector(direction: CardinalDirection): { x: number; y: number } {
-  switch (direction) {
-    case "left":
-      return { x: -1, y: 0 };
-    case "up":
-      return { x: 0, y: -1 };
-    case "down":
-      return { x: 0, y: 1 };
-    case "right":
-    default:
-      return { x: 1, y: 0 };
-  }
-}
-
-function vectorDirection(x: number, y: number): CardinalDirection {
-  if (Math.abs(x) >= Math.abs(y)) {
-    return x >= 0 ? "right" : "left";
-  }
-  return y >= 0 ? "down" : "up";
-}
-
-function mapLogicalDirectionToHall(
-  direction: CardinalDirection,
-  hallDirection: HallDirection,
-): CardinalDirection {
-  const vector = directionVector(direction);
-  switch (hallDirection) {
-    case "west":
-      return vectorDirection(-vector.x, -vector.y);
-    case "north":
-      return vectorDirection(vector.y, -vector.x);
-    case "south":
-      return vectorDirection(-vector.y, vector.x);
-    case "east":
-    default:
-      return direction;
-  }
-}
-
-function arrowHeadPoints(
-  endX: number,
-  endY: number,
-  direction: CardinalDirection,
-): string {
-  switch (direction) {
-    case "left":
-      return `${endX + 2.8},${endY - 2.2} ${endX},${endY} ${endX + 2.8},${endY + 2.2}`;
-    case "up":
-      return `${endX - 2.2},${endY + 2.8} ${endX},${endY} ${endX + 2.2},${endY + 2.8}`;
-    case "down":
-      return `${endX - 2.2},${endY - 2.8} ${endX},${endY} ${endX + 2.2},${endY - 2.8}`;
-    case "right":
-    default:
-      return `${endX - 2.8},${endY - 2.2} ${endX},${endY} ${endX - 2.8},${endY + 2.2}`;
-  }
-}
-
-function indicatorAnchorStyle(direction: CardinalDirection): {
-  left?: string;
-  right?: string;
-  top?: string;
-  bottom?: string;
-  transform?: string;
-} {
-  switch (direction) {
-    case "left":
-      return { left: "-1.12rem", top: "50%", transform: "translateY(-50%)" };
-    case "up":
-      return { top: "-1.12rem", left: "50%", transform: "translateX(-50%)" };
-    case "down":
-      return { bottom: "-1.12rem", left: "50%", transform: "translateX(-50%)" };
-    case "right":
-    default:
-      return { right: "-1.12rem", top: "50%", transform: "translateY(-50%)" };
-  }
-}
-
 function emptyHallPlacements(hallIds: HallId[]): Record<HallId, HallPlacement> {
   const positions: Record<HallId, HallPlacement> = {};
   for (const hallId of hallIds) {
@@ -336,35 +227,118 @@ function buildFlatLayoutMetrics(
   };
 }
 
-function DeferredNumberInput({
-  value,
-  min,
-  max,
-  className,
-  onCommit,
-}: DeferredNumberInputProps) {
-  const [draftValue, setDraftValue] = useState(String(value));
+function resolveHallControlAnchorStyle(
+  viewMode: LayoutViewMode,
+  hallIds: HallId[],
+  hallDirections: Record<HallId, HallDirection>,
+  hallId: HallId,
+  layoutDirection: HallDirection,
+): { left?: string; right?: string; top?: string; bottom?: string; transform: string } {
+  if (viewMode === "flat") {
+    return { left: "-0.36rem", top: "50%", transform: "translate(-100%, -50%)" };
+  }
 
-  useEffect(() => {
-    setDraftValue(String(value));
-  }, [value]);
-
-  return (
-    <input
-      className={className}
-      type="number"
-      min={min}
-      max={max}
-      value={draftValue}
-      onChange={(event) => setDraftValue(event.target.value)}
-      onBlur={() => onCommit(draftValue)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") {
-          event.currentTarget.blur();
-        }
-      }}
-    />
+  const sameDirectionHalls = hallIds.filter(
+    (otherHallId) => hallDirections[otherHallId] === layoutDirection,
   );
+  const sameDirectionHallIndex = sameDirectionHalls.indexOf(hallId);
+  switch (layoutDirection) {
+    case "south":
+      if (sameDirectionHalls.length === 1) {
+        return {
+          left: "50%",
+          bottom: "-0.36rem",
+          transform: "translate(-50%, 100%)",
+        };
+      }
+      if (sameDirectionHalls.length === 2) {
+        if (sameDirectionHallIndex === 0) {
+          return {
+            right: "0",
+            bottom: "-0.36rem",
+            transform: "translate(0, 100%)",
+          };
+        }
+        return {
+          left: "0",
+          bottom: "-0.36rem",
+          transform: "translate(0, 100%)",
+        };
+      }
+      break;
+    case "north":
+      if (sameDirectionHalls.length === 1) {
+        return {
+          left: "50%",
+          top: "-0.36rem",
+          transform: "translate(-50%, -100%)",
+        };
+      }
+      if (sameDirectionHalls.length === 2) {
+        if (sameDirectionHallIndex === 0) {
+          return {
+            right: "0",
+            top: "-0.36rem",
+            transform: "translate(0, -100%)",
+          };
+        }
+        return {
+          left: "0",
+          top: "-0.36rem",
+          transform: "translate(0, -100%)",
+        };
+      }
+      break;
+    case "east":
+      if (sameDirectionHalls.length === 1) {
+        return {
+          right: "0",
+          top: "-0.36rem",
+          transform: "translate(0, -100%)",
+        };
+      }
+      if (sameDirectionHalls.length === 2) {
+        if (sameDirectionHallIndex === 0) {
+          return {
+            right: "0",
+            top: "-0.36rem",
+            transform: "translate(0, -100%)",
+          };
+        }
+        return {
+          right: "0",
+          bottom: "-0.36rem",
+          transform: "translate(0, 100%)",
+        };
+      }
+      break;
+    case "west":
+    default:
+      if (sameDirectionHalls.length === 1) {
+        return {
+          left: "0",
+          top: "-0.36rem",
+          transform: "translate(0, -100%)",
+        };
+      }
+      if (sameDirectionHalls.length === 2) {
+        if (sameDirectionHallIndex === 0) {
+          return {
+            left: "0",
+            top: "-0.36rem",
+            transform: "translate(0, -100%)",
+          };
+        }
+        return {
+          left: "0",
+          bottom: "-0.36rem",
+          transform: "translate(0, 100%)",
+        };
+      }
+      break;
+  }
+
+  return { left: "-0.36rem", top: "50%", transform: "translate(-100%, -50%)" };
 }
 
 export function LayoutViewport({
@@ -899,121 +873,6 @@ export function LayoutViewport({
     });
   }, []);
 
-  function renderCursorMovementIndicator(hint: CursorMovementHint): ReactNode {
-    const hallId = parseHallIdFromSlotId(hint.fromSlotId);
-    const hallDirection = hallId === null ? "east" : (hallLayout.directions[hallId] ?? "east");
-    const primaryDirection = mapLogicalDirectionToHall(hint.direction, hallDirection);
-    const secondaryDirection = hint.turnToDirection
-      ? mapLogicalDirectionToHall(hint.turnToDirection, hallDirection)
-      : null;
-    const anchorStyle = indicatorAnchorStyle(primaryDirection);
-
-    const indicatorSize = 26;
-    const start = { x: 13, y: 13 };
-    const primaryVector = directionVector(primaryDirection);
-    const first = {
-      x: start.x + primaryVector.x * 5,
-      y: start.y + primaryVector.y * 5,
-    };
-
-    if (hint.style === "hall-jump") {
-      const circleCenter = {
-        x: first.x + primaryVector.x * 4,
-        y: first.y + primaryVector.y * 4,
-      };
-      const circleRadius = 2.6;
-      const end = {
-        x: circleCenter.x - primaryVector.x * (circleRadius + 1.4),
-        y: circleCenter.y - primaryVector.y * (circleRadius + 1.4),
-      };
-      return (
-        <span className="pointer-events-none absolute z-[30]" style={anchorStyle}>
-          <svg width={indicatorSize} height={indicatorSize} viewBox={`0 0 ${indicatorSize} ${indicatorSize}`} aria-hidden="true">
-            <path
-              d={`M${start.x} ${start.y} L${end.x} ${end.y}`}
-              fill="none"
-              stroke="rgba(146,64,14,0.95)"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            />
-            <polyline
-              points={arrowHeadPoints(end.x, end.y, primaryDirection)}
-              fill="none"
-              stroke="rgba(146,64,14,0.95)"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <circle
-              cx={circleCenter.x}
-              cy={circleCenter.y}
-              r={circleRadius}
-              fill="none"
-              stroke="rgba(146,64,14,0.95)"
-              strokeWidth="1.4"
-            />
-          </svg>
-        </span>
-      );
-    }
-
-    if (hint.style === "turn" && secondaryDirection) {
-      const secondaryVector = directionVector(secondaryDirection);
-      const end = {
-        x: first.x + secondaryVector.x * 6.4,
-        y: first.y + secondaryVector.y * 6.4,
-      };
-      return (
-        <span className="pointer-events-none absolute z-[30]" style={anchorStyle}>
-          <svg width={indicatorSize} height={indicatorSize} viewBox={`0 0 ${indicatorSize} ${indicatorSize}`} aria-hidden="true">
-            <path
-              d={`M${start.x} ${start.y} L${first.x} ${first.y} L${end.x} ${end.y}`}
-              fill="none"
-              stroke="rgba(146,64,14,0.95)"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <polyline
-              points={arrowHeadPoints(end.x, end.y, secondaryDirection)}
-              fill="none"
-              stroke="rgba(146,64,14,0.95)"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </span>
-      );
-    }
-
-    const end = {
-      x: first.x + primaryVector.x * 4,
-      y: first.y + primaryVector.y * 4,
-    };
-    return (
-      <span className="pointer-events-none absolute z-[30]" style={anchorStyle}>
-        <svg width={indicatorSize} height={indicatorSize} viewBox={`0 0 ${indicatorSize} ${indicatorSize}`} aria-hidden="true">
-          <path
-            d={`M${start.x} ${start.y} L${end.x} ${end.y}`}
-            fill="none"
-            stroke="rgba(146,64,14,0.95)"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-          />
-          <polyline
-            points={arrowHeadPoints(end.x, end.y, primaryDirection)}
-            fill="none"
-            stroke="rgba(146,64,14,0.95)"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </span>
-    );
-  }
-
   function renderSlot(slotId: string): ReactNode {
     const assignedItemId = slotAssignments[slotId];
     const assignedItem = assignedItemId ? itemById.get(assignedItemId) : undefined;
@@ -1166,7 +1025,12 @@ export function LayoutViewport({
         {isCursorSlot ? (
           <span className="pointer-events-none absolute -right-[0.12rem] -top-[0.12rem] z-3 h-[0.45rem] w-[0.45rem] rounded-full border border-[rgba(120,53,15,0.9)] bg-[rgba(245,158,11,0.96)]" />
         ) : null}
-        {slotMovementHint ? renderCursorMovementIndicator(slotMovementHint) : null}
+        {slotMovementHint ? (
+          <CursorMovementIndicator
+            hint={slotMovementHint}
+            hallDirections={hallLayout.directions}
+          />
+        ) : null}
       </button>
     );
   }
@@ -1392,7 +1256,12 @@ export function LayoutViewport({
                     toggleExpandedMis(misTarget);
                   }}
                 >
-                  {misCardMovementHint ? renderCursorMovementIndicator(misCardMovementHint) : null}
+                  {misCardMovementHint ? (
+                    <CursorMovementIndicator
+                      hint={misCardMovementHint}
+                      hallDirections={hallLayout.directions}
+                    />
+                  ) : null}
                   <div className="leading-none text-[0.5rem] font-bold tracking-[0.02em] text-[#355039]">
                     <span
                       className="inline-block min-w-[1.6rem] rounded-[0.18rem] px-[0.06rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none"
@@ -1495,7 +1364,12 @@ export function LayoutViewport({
                     toggleExpandedMis(misTarget);
                   }}
                 >
-                  {misCardMovementHint ? renderCursorMovementIndicator(misCardMovementHint) : null}
+                  {misCardMovementHint ? (
+                    <CursorMovementIndicator
+                      hint={misCardMovementHint}
+                      hallDirections={hallLayout.directions}
+                    />
+                  ) : null}
                   <div className="leading-none text-[0.5rem] font-bold tracking-[0.02em] text-[#355039]">
                     <span
                       className="inline-block min-w-[1.6rem] rounded-[0.18rem] px-[0.06rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none"
@@ -1948,106 +1822,20 @@ export function LayoutViewport({
         </div>
       </div>
 
-      {expandedMisPanels.length > 0 ? (
-        <div
-          className="absolute left-1/2 top-5 z-30 flex max-w-[96vw] -translate-x-1/2 items-start gap-3"
-          data-no-pan
-          onClick={(event) => event.stopPropagation()}
-        >
-          {expandedMisPanels.map((panel, index) => {
-            const isPrimary = index === 0;
-            const frameClass = isPrimary
-              ? "border-[rgba(58,90,74,0.55)] bg-[linear-gradient(180deg,rgba(244,250,240,0.97)_0%,rgba(223,236,216,0.97)_100%)]"
-              : "border-[rgba(64,78,112,0.55)] bg-[linear-gradient(180deg,rgba(240,246,255,0.97)_0%,rgba(217,228,246,0.97)_100%)]";
-            const headerClass = isPrimary
-              ? "border-[rgba(63,88,72,0.28)] text-[#2e5042]"
-              : "border-[rgba(64,82,108,0.28)] text-[#2d4464]";
-            const subTextClass = isPrimary ? "text-[#3e6455]" : "text-[#45608a]";
-            const closeClass = isPrimary
-              ? "border-[rgba(82,104,88,0.45)] bg-[rgba(253,255,252,0.92)] text-[#2f4b3f]"
-              : "border-[rgba(86,100,130,0.45)] bg-[rgba(252,254,255,0.92)] text-[#334d70]";
-            const panelKey = expandedMisKey(panel);
-            const panelTarget: ExpandedMisTarget = {
-              hallId: panel.hallId,
-              slice: panel.slice,
-              side: panel.side,
-              misUnit: panel.misUnit,
-            };
-            return (
-              <div
-                key={panelKey}
-                className={`w-[min(30vw,360px)] overflow-hidden rounded-[0.85rem] border shadow-[0_12px_34px_rgba(38,48,33,0.28)] max-[980px]:w-[78vw] ${frameClass}`}
-                data-mis-panel
-              >
-                <header
-                  className={`flex items-center justify-between border-b px-3 py-2 ${headerClass}`}
-                  draggable={panel.slotIds.some((slotId) => Boolean(slotAssignments[slotId]))}
-                  onDragStart={(event) => {
-                    if (event.shiftKey) {
-                      event.preventDefault();
-                      return;
-                    }
-                    onSlotGroupDragStart(event, panel.slotIds, panel.slotIds[0]);
-                  }}
-                  onDragEnd={onAnyDragEnd}
-                >
-                  <div className="grid gap-[0.08rem]">
-                    <div className="text-[0.78rem] font-bold tracking-[0.02em]">
-                      <span
-                        className="rounded-[0.22rem] px-[0.12rem] normal-case focus:bg-[rgba(255,255,255,0.84)] focus:outline-none"
-                        contentEditable
-                        suppressContentEditableWarning
-                        role="textbox"
-                        tabIndex={0}
-                        title="Click to rename MIS"
-                        onPointerDown={(event) => event.stopPropagation()}
-                        onClick={(event) => event.stopPropagation()}
-                        onBlur={(event) =>
-                          updateMisName(panelTarget, event.currentTarget.textContent ?? "")
-                        }
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            event.currentTarget.blur();
-                          }
-                        }}
-                      >{misDisplayName(panelTarget, `MIS ${panel.misUnit + 1}`)}</span>
-                    </div>
-                    <div className={`text-[0.68rem] ${subTextClass}`}>
-                      {panel.slotIds.filter((slotId) => Boolean(slotAssignments[slotId])).length}/
-                      {panel.capacity} assigned
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className={`rounded-[0.4rem] border px-2 py-[0.2rem] text-[0.72rem] font-semibold ${closeClass}`}
-                    onClick={() =>
-                      setExpandedMisTargets((current) =>
-                        current.filter(
-                          (entry) =>
-                            expandedMisKey(entry) !== panelKey,
-                        ),
-                      )
-                    }
-                  >
-                    Close
-                  </button>
-                </header>
-                <div className="max-h-[64vh] overflow-auto p-3">
-                  <div
-                    className="grid content-start gap-1"
-                    style={{
-                      gridTemplateColumns: `repeat(${panel.columns}, ${SLOT_SIZE}px)`,
-                    }}
-                  >
-                    {panel.slotIds.map((slotId) => renderSlot(slotId))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
+      <ExpandedMisPanelsOverlay
+        panels={expandedMisPanels}
+        slotAssignments={slotAssignments}
+        onSlotGroupDragStart={onSlotGroupDragStart}
+        onAnyDragEnd={onAnyDragEnd}
+        onClosePanel={(target) =>
+          setExpandedMisTargets((current) =>
+            current.filter((entry) => expandedMisKey(entry) !== expandedMisKey(target)),
+          )
+        }
+        onRenameMis={updateMisName}
+        misDisplayName={misDisplayName}
+        renderSlot={renderSlot}
+      />
 
       <div
         className="absolute left-0 top-0 origin-top-left"
@@ -2096,104 +1884,13 @@ export function LayoutViewport({
             if (!hallVisible) {
               return null;
             }
-            const controlAnchorStyle = (() => {
-              if (viewMode === "flat") {
-                return { left: "-0.36rem", top: "50%", transform: "translate(-100%, -50%)" };
-              }
-
-              const sameDirectionHalls = hallIds.filter(
-                (otherHallId) =>
-                  hallLayout.directions[otherHallId] === layoutDirection,
-              );
-              const sameDirectionHallIndex = sameDirectionHalls.indexOf(hallId);
-              switch (layoutDirection) {
-                case "south":
-                  if (sameDirectionHalls.length === 1) {
-                    return {
-                      left: "50%",
-                      bottom: `-0.36rem`,
-                      transform: "translate(-50%, 100%)",
-                    };
-                  } else if (sameDirectionHalls.length === 2) {
-                    if (sameDirectionHallIndex === 0) {
-                      return {
-                        right: "0",
-                        bottom: `-0.36rem`,
-                        transform: "translate(0, 100%)",
-                      };
-                    }
-                    return {
-                      left: "0",
-                      bottom: `-0.36rem`,
-                      transform: "translate(0, 100%)",
-                    };
-                  }
-                case "north":
-                  if (sameDirectionHalls.length === 1) {
-                    return {
-                      left: "50%",
-                      top: `-0.36rem`,
-                      transform: "translate(-50%, -100%)",
-                    };
-                  } else if (sameDirectionHalls.length === 2) {
-                    if (sameDirectionHallIndex === 0) {
-                      return {
-                        right: "0",
-                        top: `-0.36rem`,
-                        transform: "translate(0, -100%)",
-                      };
-                    }
-                    return {
-                      left: "0",
-                      top: `-0.36rem`,
-                      transform: "translate(0, -100%)",
-                    };
-                  }
-                case "east":
-                  if (sameDirectionHalls.length === 1) {
-                    return {
-                      right: "0",
-                      top: `-0.36rem`,
-                      transform: "translate(0, -100%)",
-                    };
-                  } else if (sameDirectionHalls.length === 2) {
-                    if (sameDirectionHallIndex === 0) {
-                      return {
-                        right: "0",
-                        top: `-0.36rem`,
-                        transform: "translate(0, -100%)",
-                      };
-                    }
-                    return {
-                      right: "0",
-                      bottom: "-0.36rem",
-                      transform: "translate(0, 100%)",
-                    };
-                  }
-                case "west":
-                default:
-                  if (sameDirectionHalls.length === 1) {
-                    return {
-                      left: "0",
-                      top: `-0.36rem`,
-                      transform: "translate(0, -100%)",
-                    };
-                  } else if (sameDirectionHalls.length === 2) {
-                    if (sameDirectionHallIndex === 0) {
-                      return {
-                        left: "0",
-                        top: `-0.36rem`,
-                        transform: "translate(0, -100%)",
-                      };
-                    }
-                    return {
-                      left: "0",
-                      bottom: "-0.36rem",
-                      transform: "translate(0, 100%)",
-                    };
-                  }
-              }
-            })();
+            const controlAnchorStyle = resolveHallControlAnchorStyle(
+              viewMode,
+              hallIds,
+              hallLayout.directions,
+              hallId,
+              layoutDirection,
+            );
 
             return (
               <section
