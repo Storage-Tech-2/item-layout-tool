@@ -44,12 +44,33 @@ function shouldIgnoreHistoryHotkeys(target: EventTarget | null): boolean {
   return tagName === "input" || tagName === "textarea" || tagName === "select";
 }
 
+function isEditableElement(element: HTMLElement): boolean {
+  const tagName = element.tagName.toLowerCase();
+  return (
+    element.isContentEditable ||
+    tagName === "input" ||
+    tagName === "textarea" ||
+    tagName === "select"
+  );
+}
+
 function formatAutosaveTimestamp(savedAt: string): string {
   const date = new Date(savedAt);
   if (Number.isFinite(date.getTime())) {
     return date.toLocaleString();
   }
   return savedAt;
+}
+
+function toFilenameSegment(rawName: string): string {
+  const normalized = rawName
+    .trim()
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^\.+|\.+$/g, "")
+    .replace(/^-+|-+$/g, "");
+  return normalized.length > 0 ? normalized : "planner-layout";
 }
 
 export function PlannerApp() {
@@ -216,6 +237,35 @@ export function PlannerApp() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [canRedo, canUndo, redo, undo]);
+
+  useEffect(() => {
+    const handleDocumentPointerDown = (event: PointerEvent): void => {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement) || !isEditableElement(active)) {
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (active === target || active.contains(target)) {
+        return;
+      }
+
+      if (target instanceof HTMLElement && isEditableElement(target)) {
+        return;
+      }
+
+      active.blur();
+    };
+
+    document.addEventListener("pointerdown", handleDocumentPointerDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", handleDocumentPointerDown, true);
+    };
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
@@ -424,7 +474,8 @@ export function PlannerApp() {
     const downloadUrl = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = downloadUrl;
-    anchor.download = `planner-layout-${saveFile.savedAt.replace(/[:]/g, "-")}.json`;
+    const layoutFileName = toFilenameSegment(labelNames.layoutName);
+    anchor.download = `${layoutFileName}-${saveFile.savedAt.replace(/[:]/g, "-")}.json`;
     anchor.click();
     URL.revokeObjectURL(downloadUrl);
   }
@@ -449,6 +500,9 @@ export function PlannerApp() {
       // Ignore draft-clear failures and continue with a fresh session.
     }
   }
+
+  const autosaveLayoutName =
+    pendingAutosaveRestore?.snapshot.labelNames.layoutName || "Untitled Layout";
 
   return (
     <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_15%_12%,#fff8e8_0%,rgba(255,248,232,0)_35%),radial-gradient(circle_at_88%_8%,#e2f1ee_0%,rgba(226,241,238,0)_30%),linear-gradient(180deg,#f9f4ea_0%,#f2eadd_100%)] text-[#1f1a16] max-[1200px]:h-auto max-[1200px]:overflow-auto">
@@ -485,7 +539,7 @@ export function PlannerApp() {
         <div className="justify-self-center">
           <input
             type="text"
-            className="min-w-[10rem] max-w-[38vw] rounded-[0.38rem] border border-[rgba(126,100,66,0.28)] bg-[rgba(255,250,239,0.85)] px-[0.62rem] py-[0.2rem] text-center text-[0.82rem] font-semibold tracking-[0.01em] text-[#4b3a24] placeholder:text-[#8a7a63] focus:bg-[rgba(255,255,255,0.94)] focus:outline-none"
+            className="min-w-[12rem] max-w-[44vw] border-0 bg-transparent px-[0.25rem] py-[0.08rem] text-center text-[1.08rem] font-bold tracking-[0.02em] text-[#4b3a24] placeholder:text-[#8a7a63] focus:outline-none"
             title="Click to rename layout"
             placeholder="Untitled Layout"
             value={labelNames.layoutName}
@@ -580,8 +634,10 @@ export function PlannerApp() {
       {pendingAutosaveRestore ? (
         <div className="fixed inset-0 z-70 grid place-items-center bg-[rgba(19,15,10,0.45)] px-4">
           <div className="w-full max-w-md rounded-[0.9rem] border border-[rgba(126,101,67,0.46)] bg-[linear-gradient(180deg,rgba(255,252,244,0.98)_0%,rgba(247,236,217,0.98)_100%)] p-4 shadow-[0_16px_42px_rgba(23,19,13,0.35)]">
-            <h3 className="m-0 text-[1rem] font-bold text-[#3b3126]">Restore Autosave?</h3>
-            <p className="mt-2 text-[0.84rem] leading-[1.35] text-[#5f5446]">
+            <h3 className="m-0 text-[1rem] font-bold text-[#3b3126]">
+              Restore <span className="font-extrabold text-[#2f251b]">{autosaveLayoutName}</span>?
+            </h3>
+            <p className="mt-1 text-[0.84rem] leading-[1.35] text-[#5f5446]">
               A local autosave from{" "}
               <span className="font-semibold text-[#3b2f22]">
                 {formatAutosaveTimestamp(pendingAutosaveRestore.savedAt)}
