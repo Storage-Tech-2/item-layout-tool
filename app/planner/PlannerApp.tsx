@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ItemLibraryPanel } from "./components/ItemLibraryPanel";
 import { LayoutViewport } from "./components/LayoutViewport";
@@ -28,9 +29,10 @@ import {
 import type { FillDirection, HallId, HallType } from "./types";
 import { buildInitialHallConfigs, type StorageLayoutPreset } from "./layoutConfig";
 import { buildOrderedSlotIds } from "./utils";
+import { withBasePath } from "./base-path";
 
 const TOOLBAR_BUTTON_CLASS =
-  "rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.9)] px-[0.72rem] py-[0.32rem] text-[0.74rem] font-semibold text-[#3b2f22] shadow-[0_1px_0_rgba(255,255,255,0.55)] disabled:cursor-not-allowed disabled:opacity-45";
+  "rounded-[0.35rem] bg-transparent px-[0.46rem] py-[0.2rem] text-[0.8rem] font-semibold text-[#3b2f22] hover:text-[#241c14] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(122,99,66,0.35)] disabled:cursor-not-allowed disabled:opacity-45";
 const AUTOSAVE_DEBOUNCE_MS = 800;
 
 function shouldIgnoreHistoryHotkeys(target: EventTarget | null): boolean {
@@ -508,6 +510,22 @@ export function PlannerApp() {
     <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_15%_12%,#fff8e8_0%,rgba(255,248,232,0)_35%),radial-gradient(circle_at_88%_8%,#e2f1ee_0%,rgba(226,241,238,0)_30%),linear-gradient(180deg,#f9f4ea_0%,#f2eadd_100%)] text-[#1f1a16] max-[1200px]:h-auto max-[1200px]:overflow-auto">
       <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-b-[rgba(114,88,46,0.28)] bg-[linear-gradient(180deg,rgba(255,252,245,0.94)_0%,rgba(249,241,226,0.9)_100%)] px-4 py-[0.55rem]">
         <div className="flex items-center gap-[0.45rem]">
+          <a
+            href="https://storagecatalog.org"
+            className="mr-[0.3rem] flex items-center gap-[0.34rem] rounded-[0.35rem] px-[0.08rem] py-[0.04rem] hover:bg-[rgba(255,255,255,0.42)]"
+          >
+            <Image
+              src={withBasePath("/logo.png")}
+              alt="Storage Catalog logo"
+              width={28}
+              height={28}
+              className="h-7 w-7 rounded-[0.35rem] object-cover"
+              unoptimized
+            />
+            <span className="whitespace-nowrap text-[0.94rem] font-bold tracking-[0.015em] text-[#3e301f]">
+              Storage Catalog
+            </span>
+          </a>
           <input
             ref={openFileInputRef}
             className="hidden"
