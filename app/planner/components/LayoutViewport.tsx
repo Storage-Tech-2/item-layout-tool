@@ -986,7 +986,20 @@ export function LayoutViewport({
             const assignedIds = unitSlotIds
               .map((slotId) => slotAssignments[slotId])
               .filter((itemId): itemId is string => Boolean(itemId));
+            const previewAssignedIds = unitSlotIds
+              .map((slotId) => {
+                const preview = previewBySlot.get(slotId);
+                if (preview?.itemId) {
+                  return preview.itemId;
+                }
+                if (draggedSourceSlotIds.has(slotId)) {
+                  return undefined;
+                }
+                return slotAssignments[slotId];
+              })
+              .filter((itemId): itemId is string => Boolean(itemId));
             const hasAssigned = assignedIds.length > 0;
+            const hasPreview = unitSlotIds.some((slotId) => previewBySlot.has(slotId));
             const firstSlot = unitSlotIds[0];
             const nextEmptySlot =
               unitSlotIds.find((slotId) => !slotAssignments[slotId]) ?? firstSlot;
@@ -1003,6 +1016,9 @@ export function LayoutViewport({
                 : expandedIndex === 1
                   ? "border-[rgba(50,91,168,0.95)] bg-[linear-gradient(180deg,rgba(220,235,255,0.98)_0%,rgba(193,218,250,0.98)_100%)]"
                   : "border-[rgba(73,97,78,0.45)] bg-[linear-gradient(180deg,rgba(244,250,240,0.95)_0%,rgba(221,235,212,0.95)_100%)]";
+            const misCardPreviewClass = hasPreview
+              ? "shadow-[0_0_0_2px_rgba(85,204,178,0.38)] border-[rgba(22,132,120,0.92)]"
+              : "";
 
             if (orientation === "horizontal") {
               const unitCrossSize = 112;
@@ -1019,11 +1035,10 @@ export function LayoutViewport({
               }
               const previewLayout = misPreviewLayout(cardWidth, cardHeight);
               const previewColumns = previewLayout.columns;
-              const previewIds = assignedIds.slice(0, previewLayout.maxItems);
               slots.push(
                 <div
                   key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
-                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-hidden rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass}`}
+                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-hidden rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass} ${misCardPreviewClass}`}
                   style={{ left: x, top: y, width: cardWidth, height: cardHeight }}
                   data-no-pan
                   data-mis-card
@@ -1054,13 +1069,13 @@ export function LayoutViewport({
                     MIS {misGroupNumber}
                   </div>
                   <div className="leading-[1] text-[0.48rem] font-semibold text-[#33524f]">
-                    {assignedIds.length}/{sideConfig.misSlotsPerSlice}
+                    {previewAssignedIds.length}/{sideConfig.misSlotsPerSlice}
                   </div>
                   <div
                     className="grid content-start gap-[2px]"
                     style={{ gridTemplateColumns: `repeat(${previewColumns}, 16px)` }}
                   >
-                    {previewIds.map((itemId) => {
+                    {previewAssignedIds.slice(0, previewLayout.maxItems).map((itemId) => {
                       const item = itemById.get(itemId);
                       if (!item) {
                         return null;
@@ -1100,11 +1115,10 @@ export function LayoutViewport({
               }
               const previewLayout = misPreviewLayout(cardWidth, cardHeight);
               const previewColumns = previewLayout.columns;
-              const previewIds = assignedIds.slice(0, previewLayout.maxItems);
               slots.push(
                 <div
                   key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
-                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-hidden rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass}`}
+                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-hidden rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass} ${misCardPreviewClass}`}
                   style={{ left: x, top: y, width: cardWidth, height: cardHeight }}
                   data-no-pan
                   data-mis-card
@@ -1135,13 +1149,13 @@ export function LayoutViewport({
                     MIS {misGroupNumber}
                   </div>
                   <div className="leading-[1] text-[0.48rem] font-semibold text-[#33524f]">
-                    {assignedIds.length}/{sideConfig.misSlotsPerSlice}
+                    {previewAssignedIds.length}/{sideConfig.misSlotsPerSlice}
                   </div>
                   <div
                     className="grid content-start gap-[2px]"
                     style={{ gridTemplateColumns: `repeat(${previewColumns}, 16px)` }}
                   >
-                    {previewIds.map((itemId) => {
+                    {previewAssignedIds.slice(0, previewLayout.maxItems).map((itemId) => {
                       const item = itemById.get(itemId);
                       if (!item) {
                         return null;

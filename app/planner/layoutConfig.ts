@@ -122,7 +122,7 @@ const CROSS_LAYOUT: StorageLayoutDefinition = {
 
 const H_LAYOUT: StorageLayoutDefinition = {
     core: {
-        name: "Main Core",
+        name: "Core",
         shape: "rectangle",
         width: Math.max(Math.round(CORE_SIZE * 0.5), 92),
         height: Math.max(Math.round(CORE_SIZE * 2), 320),
