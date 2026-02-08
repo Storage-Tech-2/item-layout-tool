@@ -63,20 +63,47 @@ export function ItemLibraryPanel({
     [catalogItems, usedItemIds],
   );
 
-  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const trimmedSearch = searchQuery.trim();
 
-  const visibleItems = useMemo(() => {
-    if (!normalizedSearch) {
+  const visibleItems = (() => {
+    if (!trimmedSearch) {
       return availableItems;
     }
 
-    return availableItems.filter((item) => {
-      const label = toTitle(item.id).toLowerCase();
-      return item.id.includes(normalizedSearch) || label.includes(normalizedSearch);
-    });
-  }, [availableItems, normalizedSearch]);
+    let regex: RegExp | null = null;
+    if (trimmedSearch.startsWith("/")) {
+      const lastSlash = trimmedSearch.lastIndexOf("/");
+      if (lastSlash > 0) {
+        const pattern = trimmedSearch.slice(1, lastSlash);
+        const flags = trimmedSearch.slice(lastSlash + 1);
+        try {
+          regex = new RegExp(pattern, flags);
+        } catch {
+          regex = null;
+        }
+      }
+    }
 
-  const categories = useMemo(() => buildCategories(visibleItems), [visibleItems]);
+    if (regex) {
+      return availableItems.filter((item) => {
+        const title = toTitle(item.id);
+        regex.lastIndex = 0;
+        if (regex.test(item.id)) {
+          return true;
+        }
+        regex.lastIndex = 0;
+        return regex.test(title);
+      });
+    }
+
+    const normalized = trimmedSearch.toLowerCase();
+    return availableItems.filter((item) => {
+      const title = toTitle(item.id).toLowerCase();
+      return item.id.toLowerCase().includes(normalized) || title.includes(normalized);
+    });
+  })();
+
+  const categories = buildCategories(visibleItems);
   const categoryColumns = listWidth <= 860 ? 1 : 2;
 
   useEffect(() => {
@@ -110,7 +137,7 @@ export function ItemLibraryPanel({
 
   const categoryMeta = useMemo(() => {
     return categories.map((category) => {
-      const isCollapsed = normalizedSearch
+      const isCollapsed = trimmedSearch
         ? false
         : (collapsedOverrides[category.id] ??
           (category.items.length > defaultCollapseThreshold));
@@ -130,7 +157,7 @@ export function ItemLibraryPanel({
     categoryColumns,
     collapsedOverrides,
     defaultCollapseThreshold,
-    normalizedSearch,
+    trimmedSearch,
   ]);
 
   const virtualizedList = useMemo(() => {
@@ -352,13 +379,26 @@ export function ItemLibraryPanel({
 
         <label className="grid gap-[0.22rem]">
           <span className="text-[0.74rem] text-[#6d6256]">Search</span>
-          <input
-            className="rounded-[0.45rem] border border-[rgba(127,99,62,0.4)] bg-[#fffdf8] px-2 py-[0.42rem] text-[0.84rem] outline-none"
-            type="text"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="diamond, concrete, chest..."
-          />
+          <div className="flex items-center gap-[0.45rem]">
+            <input
+              className="min-w-0 flex-1 rounded-[0.45rem] border border-[rgba(127,99,62,0.4)] bg-[#fffdf8] px-2 py-[0.42rem] text-[0.84rem] outline-none"
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="diamond, concrete, chest, /[a-z]/i..."
+            />
+            <button
+              type="button"
+              className="shrink-0 rounded-[0.45rem] border border-[rgba(41,117,90,0.45)] bg-[rgba(234,255,245,0.96)] px-[0.58rem] py-[0.36rem] text-[0.72rem] font-semibold text-[#255344] disabled:cursor-not-allowed disabled:border-[rgba(121,96,62,0.28)] disabled:bg-[rgba(255,255,255,0.85)] disabled:text-[#847564]"
+              onClick={() => {
+                setSelectedLibraryItemIds(new Set(visibleItems.map((item) => item.id)));
+              }}
+              disabled={visibleItems.length === 0}
+              title="Select all items matching current search"
+            >
+              Select all
+            </button>
+          </div>
         </label>
       </div>
 
