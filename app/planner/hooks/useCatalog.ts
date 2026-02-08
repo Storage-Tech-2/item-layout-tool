@@ -2,10 +2,6 @@ import { useEffect, useState } from "react";
 import { withBasePath } from "../base-path";
 import type { CatalogItem, CatalogResponse } from "../types";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function parseCreativeTabs(rawCreativeTabs: unknown): string[] {
   if (!Array.isArray(rawCreativeTabs)) {
     return [];

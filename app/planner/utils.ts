@@ -123,6 +123,26 @@ function matchCustomMaterialCategory(itemId: string): CustomCategoryMatch | null
     };
   }
 
+  // check if sand or red sand and suspicious sand, but not soul sand
+  if ((/(^|_)(red_)?sand($|_)/.test(itemId) && !/(^|_)soul_sand($|_)/.test(itemId)) || /(^|_)gravel($|_)/.test(itemId)) {
+    return {
+      id: "collection:sand_gravel",
+      label: "Sand & Gravel",
+      dragLabel: "sand & gravel set",
+    };
+  }
+
+  // egg category
+  if (/(^|_)egg($|_)/.test(itemId)) {
+    return {
+      id: "collection:eggs",
+      label: "Egg",
+      dragLabel: "egg set",
+    };
+  }
+
+  
+
   return null;
 }
 
