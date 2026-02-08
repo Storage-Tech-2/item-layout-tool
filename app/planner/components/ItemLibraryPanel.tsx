@@ -488,7 +488,15 @@ export function ItemLibraryPanel({
               type="button"
               className="shrink-0 rounded-[0.45rem] border border-[rgba(41,117,90,0.45)] bg-[rgba(234,255,245,0.96)] px-[0.58rem] py-[0.36rem] text-[0.72rem] font-semibold text-[#255344] disabled:cursor-not-allowed disabled:border-[rgba(121,96,62,0.28)] disabled:bg-[rgba(255,255,255,0.85)] disabled:text-[#847564]"
               onClick={() => {
-                setSelectedLibraryItemIds(new Set(visibleItems.map((item) => item.id)));
+                const visibleItemIds = visibleItems.map((item) => item.id);
+                const allVisibleSelected = visibleItemIds.every((itemId) =>
+                  selectedLibraryItemIds.has(itemId),
+                );
+                if (allVisibleSelected) {
+                  setSelectedLibraryItemIds(new Set());
+                  return;
+                }
+                setSelectedLibraryItemIds(new Set(visibleItemIds));
               }}
               disabled={visibleItems.length === 0}
               title="Select all items matching current search"
