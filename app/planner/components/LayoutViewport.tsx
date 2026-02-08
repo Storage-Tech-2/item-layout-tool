@@ -11,7 +11,6 @@ import {
   useState,
 } from "react";
 import {
-  HALL_ORDER,
   SLOT_GAP,
   SLOT_SIZE,
   STAGE_SIZE,
@@ -207,10 +206,11 @@ function emptyHallPlacements(): Record<HallId, HallPlacement> {
 }
 
 function buildFlatLayoutMetrics(
+  hallIds: HallId[],
   hallConfigs: Record<HallId, HallConfig>,
   center: number,
 ): FlatLayoutMetrics {
-  const dimensions = HALL_ORDER.map((hallId) => {
+  const dimensions = hallIds.map((hallId) => {
     const config = hallConfigs[hallId];
     const orientation: "horizontal" | "vertical" = "horizontal";
     const { width, height } = getHallSize(config, orientation);
@@ -329,6 +329,7 @@ export function LayoutViewport({
     south: defaultHallLabel("south"),
     west: defaultHallLabel("west"),
   });
+  const hallIds = useMemo(() => Object.keys(hallConfigs) as HallId[], [hallConfigs]);
 
   const viewportBackgroundStyle = useMemo(
     () => ({
@@ -504,11 +505,11 @@ export function LayoutViewport({
   const hallLayout = useMemo<HallLayoutState>(() => {
     if (viewMode === "flat") {
       const positions = emptyHallPlacements();
-      const flatLayout = buildFlatLayoutMetrics(hallConfigs, center);
+      const flatLayout = buildFlatLayoutMetrics(hallIds, hallConfigs, center);
       let currentTop = flatLayout.top;
       const leftAlignedX = flatLayout.left;
 
-      for (const hallId of HALL_ORDER) {
+      for (const hallId of hallIds) {
         const hall = flatLayout.dimensions.find((entry) => entry.hallId === hallId);
         if (!hall) {
           continue;
@@ -540,7 +541,7 @@ export function LayoutViewport({
       directions: resolved.directions,
       core: resolved.core,
     };
-  }, [center, hallConfigs, storageLayoutPreset, viewMode]);
+  }, [center, hallConfigs, hallIds, storageLayoutPreset, viewMode]);
 
   const expandedMisPanels = useMemo<ExpandedMisPanel[]>(() => {
     return expandedMisTargets
@@ -1249,7 +1250,7 @@ export function LayoutViewport({
               if (viewMode === "flat") {
                 return;
               }
-              const flatLayout = buildFlatLayoutMetrics(hallConfigs, center);
+              const flatLayout = buildFlatLayoutMetrics(hallIds, hallConfigs, center);
               setViewMode("flat");
               const controlAnchorX = flatLayout.left + Math.min(180, flatLayout.maxWidth * 0.22);
               onRecenterViewport({
@@ -1427,7 +1428,7 @@ export function LayoutViewport({
             </div>
           ) : null}
 
-          {HALL_ORDER.map((hallId) => {
+          {hallIds.map((hallId) => {
             const hall = hallConfigs[hallId];
             const orientation =
               viewMode === "flat"

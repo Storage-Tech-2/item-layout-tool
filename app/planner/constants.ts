@@ -1,9 +1,3 @@
-import type {
-  HallId,
-} from "./types";
-
-export const HALL_ORDER: HallId[] = ["north", "east", "south", "west"];
-
 export const DRAG_DATA_KEY = "application/x-item-layout";
 
 export const STAGE_SIZE = 2200;

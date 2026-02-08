@@ -2,7 +2,6 @@ import {
   AISLE_GAP,
   COLOR_INDEX,
   COLOR_PREFIXES,
-  HALL_ORDER,
   MIS_CROSS,
   SLOT_GAP,
   SLOT_SIZE,
@@ -238,8 +237,8 @@ export function buildOrderedSlotIds(
   fillDirection: FillDirection = "column",
 ): string[] {
   const ordered: string[] = [];
-
-  for (const hallId of HALL_ORDER) {
+  const hallIds = Object.keys(configs) as HallId[];
+  for (const hallId of hallIds) {
     const hall = configs[hallId];
     const slices = resolveHallSlices(hall);
 

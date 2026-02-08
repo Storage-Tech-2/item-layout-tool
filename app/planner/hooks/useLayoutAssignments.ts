@@ -1,5 +1,5 @@
 import { type DragEvent, useMemo, useState } from "react";
-import { DRAG_DATA_KEY, HALL_ORDER } from "../constants";
+import { DRAG_DATA_KEY } from "../constants";
 import { retainValidAssignments } from "../lib/layoutAssignments";
 import { buildSlotCenters } from "../lib/layoutGeometry";
 import {
@@ -531,7 +531,8 @@ export function useLayoutAssignments({
 
       const unassignedGlobal = new Set(nextOrderedSlotIds);
       const unassignedByHall = new Map<HallId, Set<string>>();
-      for (const hallId of HALL_ORDER) {
+      const hallIds = Object.keys(nextConfigs) as HallId[];
+      for (const hallId of hallIds) {
         const hallSlots = nextOrderedSlotIds.filter((slotId) => slotId.startsWith(`${hallId}:`));
         unassignedByHall.set(hallId, new Set(hallSlots));
       }

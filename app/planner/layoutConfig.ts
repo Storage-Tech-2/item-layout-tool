@@ -1,4 +1,4 @@
-import { CORE_SIZE, HALL_GAP, HALL_ORDER } from "./constants";
+import { CORE_SIZE, HALL_GAP } from "./constants";
 import type { HallConfig, HallId, HallOrientation, HallSideConfig } from "./types";
 import { getHallSize } from "./utils";
 
@@ -202,6 +202,45 @@ const STORAGE_LAYOUTS: Record<StorageLayoutPreset, StorageLayoutDefinition> = {
     h: H_LAYOUT,
 };
 
+function hallIdFromLayoutHall(hall: Hall, fallbackIndex: number): HallId {
+    switch (hall.id) {
+        case 1:
+            return "north";
+        case 2:
+            return "east";
+        case 3:
+            return "south";
+        case 4:
+            return "west";
+        default:
+            break;
+    }
+
+    switch (fallbackIndex) {
+        case 0:
+            return "north";
+        case 1:
+            return "east";
+        case 2:
+            return "south";
+        case 3:
+            return "west";
+        default:
+            return "north";
+    }
+}
+
+function mapHallsById(definition: StorageLayoutDefinition): Partial<Record<HallId, Hall>> {
+    const mapped: Partial<Record<HallId, Hall>> = {};
+    for (const [index, hall] of definition.core.halls.entries()) {
+        const hallId = hallIdFromLayoutHall(hall, index);
+        if (!mapped[hallId]) {
+            mapped[hallId] = hall;
+        }
+    }
+    return mapped;
+}
+
 function normalizeSide(side: HallSide | HallSideConfig | undefined): HallSideConfig {
     if (!side) {
         return {
@@ -226,11 +265,11 @@ export function buildInitialHallConfigs(
     preset: StorageLayoutPreset = "cross",
 ): Record<HallId, HallConfig> {
     const definition = STORAGE_LAYOUTS[preset];
-    const result = {} as Record<HallId, HallConfig>;
-    for (const hallId of HALL_ORDER) {
-        const layoutHall = definition.core.halls[HALL_ORDER.indexOf(hallId)];
+    const hallsById = mapHallsById(definition);
+    const buildHallConfig = (hallId: HallId): HallConfig => {
+        const layoutHall = hallsById[hallId];
         const sections = layoutHall?.sections ?? [];
-        result[hallId] = {
+        return {
             name: layoutHall?.name,
             sections: sections.map((section) => ({
                 slices: Math.max(1, section.slices),
@@ -238,8 +277,14 @@ export function buildInitialHallConfigs(
                 sideRight: normalizeSide(section.sideRight),
             })),
         };
-    }
-    return result;
+    };
+
+    return {
+        north: buildHallConfig("north"),
+        east: buildHallConfig("east"),
+        south: buildHallConfig("south"),
+        west: buildHallConfig("west"),
+    };
 }
 
 function anchorCoordinate(start: number, span: number, anchor: "left" | "center" | "right"): number {
@@ -317,6 +362,7 @@ export function resolveStorageLayout(
     center: number,
 ): ResolvedStorageLayout {
     const definition = STORAGE_LAYOUTS[preset];
+    const hallsById = mapHallsById(definition);
     const coreLeft = center - definition.core.width / 2;
     const coreTop = center - definition.core.height / 2;
 
@@ -327,14 +373,15 @@ export function resolveStorageLayout(
         west: { left: 0, top: 0, transform: "", width: 0, height: 0 },
     };
     const directions: ResolvedStorageLayout["directions"] = {
-        north: definition.core.halls[0]?.direction ?? "north",
-        east: definition.core.halls[1]?.direction ?? "east",
-        south: definition.core.halls[2]?.direction ?? "south",
-        west: definition.core.halls[3]?.direction ?? "west",
+        north: hallsById.north?.direction ?? "north",
+        east: hallsById.east?.direction ?? "east",
+        south: hallsById.south?.direction ?? "south",
+        west: hallsById.west?.direction ?? "west",
     };
     const byDirection = new Map<HallDirection, HallId[]>();
-    for (const hallId of HALL_ORDER) {
-        const layoutHall = definition.core.halls[HALL_ORDER.indexOf(hallId)];
+    const hallIds = Object.keys(hallConfigs) as HallId[];
+    for (const hallId of hallIds) {
+        const layoutHall = hallsById[hallId];
         const hallDirection = layoutHall?.direction ?? hallId;
         if (!byDirection.has(hallDirection)) {
             byDirection.set(hallDirection, []);
