@@ -4,7 +4,6 @@ import {
   COLOR_PREFIXES,
   HALL_ORDER,
   MIS_CROSS,
-  MIS_SLICE_MAIN,
   SLOT_GAP,
   SLOT_SIZE,
   WOOD_INDEX,
@@ -179,10 +178,9 @@ function sideDepthPx(side: HallSideConfig): number {
   return side.rowsPerSlice * SLOT_SIZE + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
 }
 
-function sliceMainSize(left: HallSideConfig, right: HallSideConfig): number {
-  const leftMain = left.type === "mis" ? MIS_SLICE_MAIN : SLOT_SIZE;
-  const rightMain = right.type === "mis" ? MIS_SLICE_MAIN : SLOT_SIZE;
-  return Math.max(leftMain, rightMain);
+function sliceMainSize(): number {
+  // Keep per-slice main width constant; MIS spans multiple slices via misWidth.
+  return SLOT_SIZE;
 }
 
 export function resolveHallSlices(config: HallConfig): HallSliceDescriptor[] {
@@ -192,7 +190,7 @@ export function resolveHallSlices(config: HallConfig): HallSliceDescriptor[] {
 
   for (const [sectionIndex, section] of config.sections.entries()) {
     for (let sectionSlice = 0; sectionSlice < section.slices; sectionSlice += 1) {
-      const mainSize = sliceMainSize(section.sideLeft, section.sideRight);
+      const mainSize = sliceMainSize();
       slices.push({
         globalSlice,
         sectionIndex,

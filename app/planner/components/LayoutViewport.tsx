@@ -744,6 +744,7 @@ export function LayoutViewport({
           const misSlice = groupFirstSlice.globalSlice;
           const misMainStart = groupFirstSlice.mainStart;
           const misMainSize = groupLastSlice.mainStart + groupLastSlice.mainSize - groupFirstSlice.mainStart;
+          const misGroupNumber = Math.floor(groupStartSectionSlice / misWidth) + 1;
           Array.from({ length: sideConfig.misUnitsPerSlice }, (_, misUnit) => {
             const unitSlotIds = Array.from(
               { length: sideConfig.misSlotsPerSlice },
@@ -755,6 +756,7 @@ export function LayoutViewport({
             const previewIds = assignedIds.slice(0, 6);
             const hasAssigned = assignedIds.length > 0;
             const firstSlot = unitSlotIds[0];
+            const previewColumns = Math.max(1, Math.min(3, sideConfig.misWidth));
             const expandedIndex = expandedMisTargets.findIndex(
               (entry) =>
                 entry.hallId === hallId &&
@@ -774,7 +776,7 @@ export function LayoutViewport({
               const baseTop = side === 0 ? 0 : hallHeight - sideDepth;
               const x = misMainStart + 2;
               const y = baseTop + misUnit * (unitCrossSize + SLOT_GAP) + 2;
-              const cardWidth = Math.max(52, misMainSize - 4);
+              const cardWidth = Math.max(12, misMainSize - 4);
               const cardHeight = Math.max(42, unitCrossSize - 4);
               slots.push(
                 <div
@@ -807,12 +809,15 @@ export function LayoutViewport({
                   }}
                 >
                   <div className="text-[0.53rem] font-bold uppercase tracking-[0.03em] text-[#355039]">
-                    MIS {misUnit + 1}
+                    MIS {misGroupNumber}
                   </div>
                   <div className="text-[0.52rem] font-semibold text-[#33524f]">
                     {assignedIds.length}/{sideConfig.misSlotsPerSlice}
                   </div>
-                  <div className="grid content-start grid-cols-3 gap-[2px]">
+                  <div
+                    className="grid content-start gap-[2px]"
+                    style={{ gridTemplateColumns: `repeat(${previewColumns}, minmax(0, 1fr))` }}
+                  >
                     {previewIds.map((itemId) => {
                       const item = itemById.get(itemId);
                       if (!item) {
@@ -844,7 +849,7 @@ export function LayoutViewport({
               const x = baseLeft + misUnit * (unitCrossSize + SLOT_GAP) + 2;
               const y = misMainStart + 2;
               const cardWidth = Math.max(42, unitCrossSize - 4);
-              const cardHeight = Math.max(52, misMainSize - 4);
+              const cardHeight = Math.max(12, misMainSize - 4);
               slots.push(
                 <div
                   key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
@@ -876,12 +881,15 @@ export function LayoutViewport({
                   }}
                 >
                   <div className="text-[0.53rem] font-bold uppercase tracking-[0.03em] text-[#355039]">
-                    MIS {misUnit + 1}
+                    MIS {misGroupNumber}
                   </div>
                   <div className="text-[0.52rem] font-semibold text-[#33524f]">
                     {assignedIds.length}/{sideConfig.misSlotsPerSlice}
                   </div>
-                  <div className="grid content-start grid-cols-3 gap-[2px]">
+                  <div
+                    className="grid content-start gap-[2px]"
+                    style={{ gridTemplateColumns: `repeat(${previewColumns}, minmax(0, 1fr))` }}
+                  >
                     {previewIds.map((itemId) => {
                       const item = itemById.get(itemId);
                       if (!item) {
