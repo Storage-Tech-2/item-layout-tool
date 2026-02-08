@@ -25,6 +25,7 @@ export type HallConfig = {
 };
 
 export type PlannerLabelNames = {
+  layoutName: string;
   hallNames: Record<HallId, string>;
   sectionNames: Record<string, string>;
   misNames: Record<string, string>;

@@ -103,6 +103,7 @@ export function PlannerApp() {
   const {
     labelNames,
     replaceLabelNames,
+    handleLayoutNameChange,
     handleHallNameChange,
     handleSectionNameChange,
     handleMisNameChange,
@@ -451,7 +452,7 @@ export function PlannerApp() {
 
   return (
     <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_15%_12%,#fff8e8_0%,rgba(255,248,232,0)_35%),radial-gradient(circle_at_88%_8%,#e2f1ee_0%,rgba(226,241,238,0)_30%),linear-gradient(180deg,#f9f4ea_0%,#f2eadd_100%)] text-[#1f1a16] max-[1200px]:h-auto max-[1200px]:overflow-auto">
-      <header className="flex shrink-0 items-center justify-between border-b border-b-[rgba(114,88,46,0.28)] bg-[linear-gradient(180deg,rgba(255,252,245,0.94)_0%,rgba(249,241,226,0.9)_100%)] px-4 py-[0.55rem]">
+      <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-b-[rgba(114,88,46,0.28)] bg-[linear-gradient(180deg,rgba(255,252,245,0.94)_0%,rgba(249,241,226,0.9)_100%)] px-4 py-[0.55rem]">
         <div className="flex items-center gap-[0.45rem]">
           <input
             ref={openFileInputRef}
@@ -481,7 +482,17 @@ export function PlannerApp() {
             Export
           </button>
         </div>
-        <div className="flex items-center gap-[0.45rem]">
+        <div className="justify-self-center">
+          <input
+            type="text"
+            className="min-w-[10rem] max-w-[38vw] rounded-[0.38rem] border border-[rgba(126,100,66,0.28)] bg-[rgba(255,250,239,0.85)] px-[0.62rem] py-[0.2rem] text-center text-[0.82rem] font-semibold tracking-[0.01em] text-[#4b3a24] placeholder:text-[#8a7a63] focus:bg-[rgba(255,255,255,0.94)] focus:outline-none"
+            title="Click to rename layout"
+            placeholder="Untitled Layout"
+            value={labelNames.layoutName}
+            onChange={(event) => handleLayoutNameChange(event.target.value)}
+          />
+        </div>
+        <div className="flex items-center justify-self-end gap-[0.45rem]">
           <button
             type="button"
             className={TOOLBAR_BUTTON_CLASS}

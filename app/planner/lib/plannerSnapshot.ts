@@ -34,6 +34,7 @@ type RecordDelta<T> = {
 };
 
 export type PlannerLabelNamesDelta = {
+  layoutName?: string;
   hallNames?: RecordDelta<string>;
   sectionNames?: RecordDelta<string>;
   misNames?: RecordDelta<string>;
@@ -74,6 +75,7 @@ export function misNameKey(
 
 export function createEmptyPlannerLabelNames(): PlannerLabelNames {
   return {
+    layoutName: "",
     hallNames: {},
     sectionNames: {},
     misNames: {},
@@ -185,6 +187,7 @@ function cloneNameMap(nameMap: Record<string, string>): Record<string, string> {
 
 export function clonePlannerLabelNames(labelNames: PlannerLabelNames): PlannerLabelNames {
   return {
+    layoutName: labelNames.layoutName.trim(),
     hallNames: cloneHallNames(labelNames.hallNames),
     sectionNames: cloneNameMap(labelNames.sectionNames),
     misNames: cloneNameMap(labelNames.misNames),
@@ -369,15 +372,17 @@ function diffPlannerLabelNames(
   previous: PlannerLabelNames,
   next: PlannerLabelNames,
 ): PlannerLabelNamesDelta | null {
+  const layoutName = previous.layoutName !== next.layoutName ? next.layoutName : undefined;
   const hallNames = diffHallNameRecord(previous.hallNames, next.hallNames);
   const sectionNames = diffStringRecord(previous.sectionNames, next.sectionNames);
   const misNames = diffStringRecord(previous.misNames, next.misNames);
 
-  if (!hallNames && !sectionNames && !misNames) {
+  if (!layoutName && !hallNames && !sectionNames && !misNames) {
     return null;
   }
 
   return {
+    layoutName,
     hallNames: hallNames ?? undefined,
     sectionNames: sectionNames ?? undefined,
     misNames: misNames ?? undefined,
@@ -389,6 +394,7 @@ function applyPlannerLabelNamesDelta(
   delta: PlannerLabelNamesDelta,
 ): PlannerLabelNames {
   return {
+    layoutName: delta.layoutName ?? base.layoutName,
     hallNames: delta.hallNames ? applyHallNameDelta(base.hallNames, delta.hallNames) : base.hallNames,
     sectionNames: delta.sectionNames
       ? applyStringRecordDelta(base.sectionNames, delta.sectionNames)
@@ -633,7 +639,13 @@ function parsePlannerLabelNames(value: unknown): PlannerLabelNames {
     return createEmptyPlannerLabelNames();
   }
 
+  const layoutName =
+    typeof value.layoutName === "string" && value.layoutName.trim().length > 0
+      ? value.layoutName.trim()
+      : "";
+
   return {
+    layoutName,
     hallNames: parseHallNames(value.hallNames),
     sectionNames: parseNameMap(value.sectionNames),
     misNames: parseNameMap(value.misNames),
@@ -661,6 +673,7 @@ export function parsePlannerSnapshot(value: unknown): PlannerSnapshot | null {
     "labelNames" in value
       ? parsePlannerLabelNames(value.labelNames)
       : parsePlannerLabelNames({
+          layoutName: value.layoutName,
           hallNames: value.hallNames,
           sectionNames: value.sectionNames,
           misNames: value.misNames,

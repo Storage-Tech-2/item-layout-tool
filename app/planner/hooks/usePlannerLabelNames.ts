@@ -10,6 +10,7 @@ import {
 type UsePlannerLabelNamesResult = {
   labelNames: PlannerLabelNames;
   replaceLabelNames: (next: PlannerLabelNames) => void;
+  handleLayoutNameChange: (rawName: string) => void;
   handleHallNameChange: (hallId: HallId, rawName: string) => void;
   handleSectionNameChange: (hallId: HallId, sectionIndex: number, rawName: string) => void;
   handleMisNameChange: (
@@ -28,6 +29,19 @@ export function usePlannerLabelNames(): UsePlannerLabelNamesResult {
 
   const replaceLabelNames = useCallback((next: PlannerLabelNames) => {
     setLabelNames(clonePlannerLabelNames(next));
+  }, []);
+
+  const handleLayoutNameChange = useCallback((rawName: string) => {
+    const trimmed = rawName.trim();
+    setLabelNames((current) => {
+      if (current.layoutName === trimmed) {
+        return current;
+      }
+      return {
+        ...current,
+        layoutName: trimmed,
+      };
+    });
   }, []);
 
   const handleHallNameChange = useCallback((hallId: HallId, rawName: string) => {
@@ -132,6 +146,7 @@ export function usePlannerLabelNames(): UsePlannerLabelNamesResult {
   return {
     labelNames,
     replaceLabelNames,
+    handleLayoutNameChange,
     handleHallNameChange,
     handleSectionNameChange,
     handleMisNameChange,
