@@ -199,6 +199,17 @@ export function useLayoutAssignments({
       return null;
     }
 
+    // Only run MIS-unit swap for explicit full-unit drags (from MIS card/panel),
+    // not individual slot drags from popup content.
+    const payloadSourceSlotIds = payload.sourceSlotIds ?? [];
+    if (payloadSourceSlotIds.length !== sourceSlotIds.length) {
+      return null;
+    }
+    const payloadSourceSlotSet = new Set(payloadSourceSlotIds);
+    if (sourceSlotIds.some((slotId) => !payloadSourceSlotSet.has(slotId))) {
+      return null;
+    }
+
     const swapCount = Math.min(sourceSlotIds.length, targetSlotIds.length);
     const previews: PreviewPlacement[] = [];
     for (let index = 0; index < swapCount; index += 1) {
@@ -240,6 +251,17 @@ export function useLayoutAssignments({
     const sourceSlotIds = getMisUnitSlotIds(sourceUnit, orderedSlotIds);
     const targetSlotIds = getMisUnitSlotIds(targetUnit, orderedSlotIds);
     if (sourceSlotIds.length === 0 || targetSlotIds.length === 0) {
+      return false;
+    }
+
+    // Only run MIS-unit swap for explicit full-unit drags (from MIS card/panel),
+    // not individual slot drags from popup content.
+    const payloadSourceSlotIds = payload.sourceSlotIds ?? [];
+    if (payloadSourceSlotIds.length !== sourceSlotIds.length) {
+      return false;
+    }
+    const payloadSourceSlotSet = new Set(payloadSourceSlotIds);
+    if (sourceSlotIds.some((slotId) => !payloadSourceSlotSet.has(slotId))) {
       return false;
     }
 

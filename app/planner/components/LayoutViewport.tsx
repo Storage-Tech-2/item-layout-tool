@@ -860,6 +860,19 @@ export function LayoutViewport({
             unoptimized
           />
         ) : null}
+        {showPreviewItem ? (
+          <div
+            className={`pointer-events-none absolute inset-0 z-[1] ${
+              isSwapPreview
+                ? showAssignedItem
+                  ? "bg-[rgba(251,146,60,0.2)]"
+                  : "bg-[rgba(251,146,60,0.32)]"
+                : showAssignedItem
+                  ? "bg-[rgba(45,212,191,0.2)]"
+                  : "bg-[rgba(45,212,191,0.3)]"
+            }`}
+          />
+        ) : null}
         {showPreviewItem && previewItem ? (
           <Image
             src={previewItem.texturePath}
