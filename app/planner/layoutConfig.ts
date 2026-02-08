@@ -238,33 +238,6 @@ export function buildInitialHallConfigs(
     return result;
 }
 
-function toHallConfig(
-    layoutHall: Hall | undefined,
-    fallback: HallConfig,
-): HallConfig {
-    if (!layoutHall || layoutHall.sections.length === 0) {
-        return fallback;
-    }
-    const fallbackSection = fallback.sections[0];
-    if (!fallbackSection) {
-        return fallback;
-    }
-    return {
-        name: layoutHall.name,
-        sections: layoutHall.sections.map((section) => ({
-            slices: Math.max(1, section.slices),
-            sideLeft: {
-                ...fallbackSection.sideLeft,
-                ...(section.sideLeft ?? {}),
-            },
-            sideRight: {
-                ...fallbackSection.sideRight,
-                ...(section.sideRight ?? {}),
-            },
-        })),
-    };
-}
-
 function anchorCoordinate(start: number, span: number, anchor: "left" | "center" | "right"): number {
     if (anchor === "left") {
         return start;
@@ -356,15 +329,8 @@ export function resolveStorageLayout(
         west: definition.core.halls[3]?.direction ?? "west",
     };
     const byDirection = new Map<HallDirection, HallId[]>();
-    const effectiveHallConfigs: Record<HallId, HallConfig> = {
-        north: hallConfigs.north,
-        east: hallConfigs.east,
-        south: hallConfigs.south,
-        west: hallConfigs.west,
-    };
     for (const hallId of HALL_ORDER) {
         const layoutHall = definition.core.halls[HALL_ORDER.indexOf(hallId)];
-        effectiveHallConfigs[hallId] = toHallConfig(layoutHall, hallConfigs[hallId]);
         const hallDirection = layoutHall?.direction ?? hallId;
         if (!byDirection.has(hallDirection)) {
             byDirection.set(hallDirection, []);
@@ -376,14 +342,14 @@ export function resolveStorageLayout(
         const anchor = directionAnchor(direction);
         const orientation = directionOrientation(direction);
         const maxPerpSpan = hallIds.reduce((max, hallId) => {
-            const size = getHallSize(effectiveHallConfigs[hallId], orientation);
+            const size = getHallSize(hallConfigs[hallId], orientation);
             const perpendicular = orientation === "vertical" ? size.width : size.height;
             return Math.max(max, perpendicular);
         }, 0);
         const spacing = maxPerpSpan + HALL_GAP;
 
         for (const [index, hallId] of hallIds.entries()) {
-            const size = getHallSize(effectiveHallConfigs[hallId], orientation);
+            const size = getHallSize(hallConfigs[hallId], orientation);
             const baseX =
                 anchorCoordinate(coreLeft, definition.core.width, anchor.x) + anchor.offsetX;
             const baseY =

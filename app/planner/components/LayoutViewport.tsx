@@ -685,6 +685,26 @@ export function LayoutViewport({
       maxLeftDepth = Math.max(maxLeftDepth, sideDepthPx(slice.sideLeft));
       maxRightDepth = Math.max(maxRightDepth, sideDepthPx(slice.sideRight));
     }
+    const aisleSpan = Math.max(8, hallWidth - maxLeftDepth - maxRightDepth);
+    const aisleCenterX = maxLeftDepth + aisleSpan / 2;
+    const sectionRanges = config.sections
+      .map((section, sectionIndex) => {
+        const sectionSlices = slices.filter((slice) => slice.sectionIndex === sectionIndex);
+        if (sectionSlices.length === 0) {
+          return null;
+        }
+        const first = sectionSlices[0];
+        const last = sectionSlices[sectionSlices.length - 1];
+        return {
+          name: `Section ${sectionIndex + 1}`,
+          start: first.mainStart,
+          end: last.mainStart + last.mainSize,
+        };
+      })
+      .filter(
+        (entry): entry is { name: string; start: number; end: number } =>
+          entry !== null,
+      );
 
     const slots: ReactNode[] = [];
     for (const slice of visualSlices) {
@@ -899,6 +919,44 @@ export function LayoutViewport({
             style={{ left: maxLeftDepth, width: Math.max(8, hallWidth - maxLeftDepth - maxRightDepth) }}
           />
         )}
+        {sectionRanges.length > 1 ? sectionRanges.map((section, index) => {
+          const center = section.start + (section.end - section.start) / 2;
+          const boundary = index > 0 ? section.start - SLOT_GAP / 2 : null;
+          if (orientation === "horizontal") {
+            return (
+              <div key={`${hallId}:section:${index}`} className="pointer-events-none absolute inset-0">
+                {boundary !== null ? (
+                  <div
+                    className="absolute w-px bg-[rgba(64,50,27,0.35)]"
+                    style={{ left: boundary, top: 0, height: hallHeight }}
+                  />
+                ) : null}
+                <div
+                  className="absolute -translate-x-1/2 rounded-[0.3rem] border border-[rgba(64,50,27,0.26)] bg-[rgba(255,246,227,0.9)] px-[0.2rem] py-[0.04rem] text-[0.5rem] font-bold uppercase tracking-[0.03em] text-[rgba(72,56,33,0.8)]"
+                  style={{ left: center, top: maxLeftDepth + 2 }}
+                >
+                  {section.name}
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div key={`${hallId}:section:${index}`} className="pointer-events-none absolute inset-0">
+              {boundary !== null ? (
+                <div
+                  className="absolute h-px bg-[rgba(64,50,27,0.35)]"
+                  style={{ left: 0, top: boundary, width: hallWidth }}
+                />
+              ) : null}
+              <div
+                className="absolute -translate-x-1/2 -translate-y-1/2 -rotate-90 rounded-[0.3rem] border border-[rgba(64,50,27,0.26)] bg-[rgba(255,246,227,0.9)] px-[0.2rem] py-[0.04rem] text-[0.5rem] font-bold uppercase tracking-[0.03em] text-[rgba(72,56,33,0.8)]"
+                style={{ left: aisleCenterX, top: center }}
+              >
+                {section.name}
+              </div>
+            </div>
+          );
+        }) : null}
         {slots}
       </>
     );
@@ -1271,7 +1329,7 @@ export function LayoutViewport({
             const layoutDirection = hallLayout.directions[hallId];
             const controlAnchorStyle = (() => {
               if (viewMode === "flat") {
-                return { left: "0", top: "-0.36rem", transform: "translate(0, -100%)" };
+                return { left: "-0.36rem", top: "50%", transform: "translate(-100%, -50%)" };
               }
               switch (layoutDirection) {
                 case "south":
