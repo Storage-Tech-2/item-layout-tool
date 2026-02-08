@@ -32,7 +32,7 @@ import { buildOrderedSlotIds } from "./utils";
 import { withBasePath } from "./base-path";
 
 const TOOLBAR_BUTTON_CLASS =
-  "rounded-[0.35rem] bg-transparent px-[0.46rem] py-[0.2rem] text-[0.8rem] font-semibold text-[#3b2f22] hover:text-[#241c14] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(122,99,66,0.35)] disabled:cursor-not-allowed disabled:opacity-45";
+  "cursor-pointer rounded-[0.35rem] bg-transparent px-[0.46rem] py-[0.2rem] text-[0.8rem] font-semibold text-[#3b2f22] hover:text-[#241c14] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(122,99,66,0.35)] disabled:cursor-not-allowed disabled:opacity-45";
 const AUTOSAVE_DEBOUNCE_MS = 800;
 
 function shouldIgnoreHistoryHotkeys(target: EventTarget | null): boolean {
