@@ -173,6 +173,7 @@ type CursorMovementHint = {
   toSlotId: string;
   style: "straight" | "turn" | "hall-jump";
   direction: "right" | "left" | "up" | "down";
+  turnToDirection?: "right" | "left" | "up" | "down";
 };
 
 type WorldBounds = {
@@ -215,17 +216,91 @@ function sideDepthPx(side: HallSideConfig): number {
   return side.rowsPerSlice * SLOT_SIZE + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
 }
 
-function movementRotationDegrees(direction: CursorMovementHint["direction"]): number {
+type CardinalDirection = CursorMovementHint["direction"];
+
+function parseHallIdFromSlotId(slotId: string): HallId | null {
+  const [hallPart] = slotId.split(":");
+  const hallId = Number(hallPart);
+  if (!Number.isFinite(hallId)) {
+    return null;
+  }
+  return hallId;
+}
+
+function directionVector(direction: CardinalDirection): { x: number; y: number } {
   switch (direction) {
-    case "up":
-      return -90;
-    case "down":
-      return 90;
     case "left":
-      return 180;
+      return { x: -1, y: 0 };
+    case "up":
+      return { x: 0, y: -1 };
+    case "down":
+      return { x: 0, y: 1 };
     case "right":
     default:
-      return 0;
+      return { x: 1, y: 0 };
+  }
+}
+
+function vectorDirection(x: number, y: number): CardinalDirection {
+  if (Math.abs(x) >= Math.abs(y)) {
+    return x >= 0 ? "right" : "left";
+  }
+  return y >= 0 ? "down" : "up";
+}
+
+function mapLogicalDirectionToHall(
+  direction: CardinalDirection,
+  hallDirection: HallDirection,
+): CardinalDirection {
+  const vector = directionVector(direction);
+  switch (hallDirection) {
+    case "west":
+      return vectorDirection(-vector.x, -vector.y);
+    case "north":
+      return vectorDirection(vector.y, -vector.x);
+    case "south":
+      return vectorDirection(-vector.y, vector.x);
+    case "east":
+    default:
+      return direction;
+  }
+}
+
+function arrowHeadPoints(
+  endX: number,
+  endY: number,
+  direction: CardinalDirection,
+): string {
+  switch (direction) {
+    case "left":
+      return `${endX + 2.8},${endY - 2.2} ${endX},${endY} ${endX + 2.8},${endY + 2.2}`;
+    case "up":
+      return `${endX - 2.2},${endY + 2.8} ${endX},${endY} ${endX + 2.2},${endY + 2.8}`;
+    case "down":
+      return `${endX - 2.2},${endY - 2.8} ${endX},${endY} ${endX + 2.2},${endY - 2.8}`;
+    case "right":
+    default:
+      return `${endX - 2.8},${endY - 2.2} ${endX},${endY} ${endX - 2.8},${endY + 2.2}`;
+  }
+}
+
+function indicatorAnchorStyle(direction: CardinalDirection): {
+  left?: string;
+  right?: string;
+  top?: string;
+  bottom?: string;
+  transform?: string;
+} {
+  switch (direction) {
+    case "left":
+      return { left: "-1.12rem", top: "50%", transform: "translateY(-50%)" };
+    case "up":
+      return { top: "-1.12rem", left: "50%", transform: "translateX(-50%)" };
+    case "down":
+      return { bottom: "-1.12rem", left: "50%", transform: "translateX(-50%)" };
+    case "right":
+    default:
+      return { right: "-1.12rem", top: "50%", transform: "translateY(-50%)" };
   }
 }
 
@@ -825,26 +900,48 @@ export function LayoutViewport({
   }, []);
 
   function renderCursorMovementIndicator(hint: CursorMovementHint): ReactNode {
-    const rotation = movementRotationDegrees(hint.direction);
+    const hallId = parseHallIdFromSlotId(hint.fromSlotId);
+    const hallDirection = hallId === null ? "east" : (hallLayout.directions[hallId] ?? "east");
+    const primaryDirection = mapLogicalDirectionToHall(hint.direction, hallDirection);
+    const secondaryDirection = hint.turnToDirection
+      ? mapLogicalDirectionToHall(hint.turnToDirection, hallDirection)
+      : null;
+    const anchorStyle = indicatorAnchorStyle(primaryDirection);
+
+    const start = { x: 10, y: 10 };
+    const primaryVector = directionVector(primaryDirection);
+    const first = {
+      x: start.x + primaryVector.x * 5.6,
+      y: start.y + primaryVector.y * 5.6,
+    };
 
     if (hint.style === "hall-jump") {
+      const end = {
+        x: first.x + primaryVector.x * 4.8,
+        y: first.y + primaryVector.y * 4.8,
+      };
       return (
-        <span
-          className="pointer-events-none absolute -left-[0.2rem] -top-[0.24rem] z-4"
-          style={{ transform: `rotate(${rotation}deg)` }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <span className="pointer-events-none absolute z-6" style={anchorStyle}>
+          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
             <path
-              d="M1.2 7 H8.2"
+              d={`M${start.x} ${start.y} L${end.x} ${end.y}`}
               fill="none"
               stroke="rgba(146,64,14,0.95)"
-              strokeWidth="1.6"
+              strokeWidth="1.8"
               strokeLinecap="round"
+            />
+            <polyline
+              points={arrowHeadPoints(end.x, end.y, primaryDirection)}
+              fill="none"
+              stroke="rgba(146,64,14,0.95)"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
             <circle
-              cx="10.9"
-              cy="7"
-              r="2.1"
+              cx={end.x}
+              cy={end.y}
+              r="2.6"
               fill="none"
               stroke="rgba(146,64,14,0.95)"
               strokeWidth="1.4"
@@ -854,26 +951,28 @@ export function LayoutViewport({
       );
     }
 
-    if (hint.style === "turn") {
+    if (hint.style === "turn" && secondaryDirection) {
+      const secondaryVector = directionVector(secondaryDirection);
+      const end = {
+        x: first.x + secondaryVector.x * 5.2,
+        y: first.y + secondaryVector.y * 5.2,
+      };
       return (
-        <span
-          className="pointer-events-none absolute -left-[0.22rem] -top-[0.24rem] z-4"
-          style={{ transform: `rotate(${rotation}deg)` }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <span className="pointer-events-none absolute z-6" style={anchorStyle}>
+          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
             <path
-              d="M2 2 V9 H10"
+              d={`M${start.x} ${start.y} L${first.x} ${first.y} L${end.x} ${end.y}`}
               fill="none"
               stroke="rgba(146,64,14,0.95)"
-              strokeWidth="1.6"
+              strokeWidth="1.8"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            <path
-              d="M8.2 7.5 L10.8 9 L8.2 10.5"
+            <polyline
+              points={arrowHeadPoints(end.x, end.y, secondaryDirection)}
               fill="none"
               stroke="rgba(146,64,14,0.95)"
-              strokeWidth="1.4"
+              strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"
             />
@@ -882,24 +981,25 @@ export function LayoutViewport({
       );
     }
 
+    const end = {
+      x: first.x + primaryVector.x * 4.8,
+      y: first.y + primaryVector.y * 4.8,
+    };
     return (
-      <span
-        className="pointer-events-none absolute -left-[0.2rem] -top-[0.24rem] z-4"
-        style={{ transform: `rotate(${rotation}deg)` }}
-      >
-        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+      <span className="pointer-events-none absolute z-6" style={anchorStyle}>
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
           <path
-            d="M1.5 7 H10.5"
+            d={`M${start.x} ${start.y} L${end.x} ${end.y}`}
             fill="none"
             stroke="rgba(146,64,14,0.95)"
-            strokeWidth="1.6"
+            strokeWidth="1.8"
             strokeLinecap="round"
           />
-          <path
-            d="M8.5 4.8 L11.2 7 L8.5 9.2"
+          <polyline
+            points={arrowHeadPoints(end.x, end.y, primaryDirection)}
             fill="none"
             stroke="rgba(146,64,14,0.95)"
-            strokeWidth="1.4"
+            strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -930,7 +1030,7 @@ export function LayoutViewport({
       <button
         key={slotId}
         type="button"
-        className={`relative grid h-8.5 w-8.5 cursor-pointer place-items-center overflow-hidden rounded-[0.45rem] border p-0 transition hover:-translate-y-px ${isSelected
+        className={`relative grid h-8.5 w-8.5 cursor-pointer place-items-center overflow-visible rounded-[0.45rem] border p-0 transition hover:-translate-y-px ${isSelected
           ? "hover:shadow-[0_0_0_2px_rgba(37,99,235,0.55)]"
           : "hover:shadow-[0_3px_8px_rgba(57,47,30,0.22)]"
           } ${assignedItem
@@ -1263,7 +1363,7 @@ export function LayoutViewport({
               slots.push(
                 <div
                   key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
-                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-hidden rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass} ${misCardPreviewClass} ${misCardCursorClass}`}
+                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-visible rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass} ${misCardPreviewClass} ${misCardCursorClass}`}
                   style={{ left: x, top: y, width: cardWidth, height: cardHeight }}
                   data-no-pan
                   data-mis-card
@@ -1366,7 +1466,7 @@ export function LayoutViewport({
               slots.push(
                 <div
                   key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
-                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-hidden rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass} ${misCardPreviewClass} ${misCardCursorClass}`}
+                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-visible rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass} ${misCardPreviewClass} ${misCardCursorClass}`}
                   style={{ left: x, top: y, width: cardWidth, height: cardHeight }}
                   data-no-pan
                   data-mis-card

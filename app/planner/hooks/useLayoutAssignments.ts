@@ -34,6 +34,7 @@ type UseLayoutAssignmentsResult = {
     toSlotId: string;
     style: "straight" | "turn" | "hall-jump";
     direction: "right" | "left" | "up" | "down";
+    turnToDirection?: "right" | "left" | "up" | "down";
   } | null;
   selectedSlotIdSet: Set<string>;
   draggedSourceSlotIdSet: Set<string>;
@@ -336,6 +337,7 @@ export function useLayoutAssignments({
     toSlotId: string;
     style: "straight" | "turn" | "hall-jump";
     direction: "right" | "left" | "up" | "down";
+    turnToDirection?: "right" | "left" | "up" | "down";
   } | null {
     const anchorSlotId = findFirstEmptySlotFrom(cursorSlotId, activeSlotAssignments);
     if (!anchorSlotId) {
@@ -379,6 +381,7 @@ export function useLayoutAssignments({
             toSlotId: nextSlotId,
             style: "turn",
             direction: (toMeta.row ?? 0) >= (fromMeta.row ?? 0) ? "down" : "up",
+            turnToDirection: toMeta.slice >= fromMeta.slice ? "right" : "left",
           };
         }
         return {
@@ -395,6 +398,7 @@ export function useLayoutAssignments({
           toSlotId: nextSlotId,
           style: "turn",
           direction: toMeta.slice >= fromMeta.slice ? "right" : "left",
+          turnToDirection: (toMeta.row ?? 0) >= (fromMeta.row ?? 0) ? "down" : "up",
         };
       }
       return {
@@ -414,6 +418,7 @@ export function useLayoutAssignments({
         toSlotId: nextSlotId,
         style: wrappedWithinMis ? "turn" : "straight",
         direction: wrappedWithinMis ? "down" : "right",
+        turnToDirection: wrappedWithinMis ? "right" : undefined,
       };
     }
 
