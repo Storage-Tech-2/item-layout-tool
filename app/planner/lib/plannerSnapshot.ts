@@ -47,6 +47,18 @@ export type PlannerSnapshotDelta = {
   labelNames?: PlannerLabelNamesDelta;
 };
 
+export type PlannerHistoryEntry = {
+  forward: PlannerSnapshotDelta;
+  backward: PlannerSnapshotDelta;
+  key: string;
+};
+
+export type PlannerHistoryState = {
+  entries: PlannerHistoryEntry[];
+  index: number;
+  currentSnapshot: PlannerSnapshot;
+};
+
 export function sectionNameKey(hallId: HallId, sectionIndex: number): string {
   return `${hallId}:${sectionIndex}`;
 }

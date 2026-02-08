@@ -1,17 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  type PlannerHistoryEntry,
+  type PlannerHistoryState,
   type PlannerSnapshot,
   type PlannerSnapshotDelta,
   applyPlannerSnapshotDelta,
+  buildPlannerSnapshot,
   diffPlannerSnapshot,
   snapshotToKey,
 } from "../lib/plannerSnapshot";
-
-type PlannerHistoryEntry = {
-  forward: PlannerSnapshotDelta;
-  backward: PlannerSnapshotDelta;
-  key: string;
-};
 
 type UsePlannerHistoryInput = {
   snapshot: PlannerSnapshot;
@@ -24,7 +21,35 @@ type UsePlannerHistoryResult = {
   canRedo: boolean;
   undo: () => void;
   redo: () => void;
+  getHistoryState: () => PlannerHistoryState | null;
+  restoreHistoryState: (state: PlannerHistoryState) => void;
 };
+
+function cloneSnapshotDelta(delta: PlannerSnapshotDelta): PlannerSnapshotDelta {
+  if (typeof structuredClone === "function") {
+    return structuredClone(delta);
+  }
+  return JSON.parse(JSON.stringify(delta)) as PlannerSnapshotDelta;
+}
+
+function cloneHistoryEntry(entry: PlannerHistoryEntry): PlannerHistoryEntry {
+  return {
+    forward: cloneSnapshotDelta(entry.forward),
+    backward: cloneSnapshotDelta(entry.backward),
+    key: entry.key,
+  };
+}
+
+function cloneHistoryEntries(entries: PlannerHistoryEntry[]): PlannerHistoryEntry[] {
+  return entries.map(cloneHistoryEntry);
+}
+
+function clampHistoryIndex(index: number, historyLength: number): number {
+  if (!Number.isInteger(index) || index <= 0) {
+    return 0;
+  }
+  return Math.min(index, historyLength);
+}
 
 export function usePlannerHistory({
   snapshot,
@@ -35,6 +60,7 @@ export function usePlannerHistory({
   const historyIndexRef = useRef(0);
   const currentSnapshotRef = useRef<PlannerSnapshot | null>(null);
   const currentSnapshotKeyRef = useRef<string | null>(null);
+  const skipSnapshotKeyRef = useRef<string | null>(null);
   const pendingFlagTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -72,6 +98,14 @@ export function usePlannerHistory({
     const index = historyIndexRef.current;
     const currentSnapshot = currentSnapshotRef.current;
     const currentSnapshotKey = currentSnapshotKeyRef.current;
+
+    if (skipSnapshotKeyRef.current === snapshotKey) {
+      skipSnapshotKeyRef.current = null;
+      currentSnapshotRef.current = snapshot;
+      currentSnapshotKeyRef.current = snapshotKey;
+      scheduleFlags(historyIndexRef.current, history.length);
+      return;
+    }
 
     if (!currentSnapshot || currentSnapshotKey === null) {
       currentSnapshotRef.current = snapshot;
@@ -148,10 +182,44 @@ export function usePlannerHistory({
     onApplySnapshot(nextSnapshot);
   }, [onApplySnapshot, scheduleFlags]);
 
+  const getHistoryState = useCallback((): PlannerHistoryState | null => {
+    const currentSnapshot = currentSnapshotRef.current;
+    if (!currentSnapshot) {
+      return null;
+    }
+
+    const entries = cloneHistoryEntries(historyRef.current);
+    const index = clampHistoryIndex(historyIndexRef.current, entries.length);
+    return {
+      entries,
+      index,
+      currentSnapshot: buildPlannerSnapshot(currentSnapshot),
+    };
+  }, []);
+
+  const restoreHistoryState = useCallback(
+    (state: PlannerHistoryState): void => {
+      const entries = cloneHistoryEntries(state.entries);
+      const index = clampHistoryIndex(state.index, entries.length);
+      const currentSnapshot = buildPlannerSnapshot(state.currentSnapshot);
+      const currentSnapshotKey = snapshotToKey(currentSnapshot);
+
+      historyRef.current = entries;
+      historyIndexRef.current = index;
+      currentSnapshotRef.current = currentSnapshot;
+      currentSnapshotKeyRef.current = currentSnapshotKey;
+      skipSnapshotKeyRef.current = currentSnapshotKey;
+      scheduleFlags(index, entries.length);
+    },
+    [scheduleFlags],
+  );
+
   return {
     canUndo,
     canRedo,
     undo,
     redo,
+    getHistoryState,
+    restoreHistoryState,
   };
 }

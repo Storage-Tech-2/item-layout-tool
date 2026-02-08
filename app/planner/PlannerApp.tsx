@@ -1,6 +1,6 @@
 "use client";
 
-import { type ChangeEvent, useCallback, useMemo, useRef, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ItemLibraryPanel } from "./components/ItemLibraryPanel";
 import { LayoutViewport } from "./components/LayoutViewport";
 import {
@@ -19,12 +19,27 @@ import { useLayoutAssignments } from "./hooks/useLayoutAssignments";
 import { usePlannerHistory } from "./hooks/usePlannerHistory";
 import { usePlannerLabelNames } from "./hooks/usePlannerLabelNames";
 import { useViewportNavigation } from "./hooks/useViewportNavigation";
+import {
+  type PlannerAutosaveDraft,
+  clearPlannerAutosaveDraft,
+  loadPlannerAutosaveDraft,
+  savePlannerAutosaveDraft,
+} from "./lib/plannerDraftStore";
 import type { FillDirection, HallId, HallType } from "./types";
 import { buildInitialHallConfigs, type StorageLayoutPreset } from "./layoutConfig";
 import { buildOrderedSlotIds } from "./utils";
 
 const TOOLBAR_BUTTON_CLASS =
   "rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.9)] px-[0.72rem] py-[0.32rem] text-[0.74rem] font-semibold text-[#3b2f22] shadow-[0_1px_0_rgba(255,255,255,0.55)] disabled:cursor-not-allowed disabled:opacity-45";
+const AUTOSAVE_DEBOUNCE_MS = 800;
+
+function formatAutosaveTimestamp(savedAt: string): string {
+  const date = new Date(savedAt);
+  if (Number.isFinite(date.getTime())) {
+    return date.toLocaleString();
+  }
+  return savedAt;
+}
 
 export function PlannerApp() {
   const { catalogItems, isLoadingCatalog, catalogError } = useCatalog();
@@ -91,7 +106,12 @@ export function PlannerApp() {
     preset: StorageLayoutPreset;
     removedCount: number;
   } | null>(null);
+  const [pendingAutosaveRestore, setPendingAutosaveRestore] = useState<PlannerAutosaveDraft | null>(
+    null,
+  );
+  const [isAutosaveRestoreResolved, setIsAutosaveRestoreResolved] = useState(false);
   const openFileInputRef = useRef<HTMLInputElement | null>(null);
+  const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const plannerSnapshot = useMemo<PlannerSnapshot>(
     () =>
@@ -143,11 +163,82 @@ export function PlannerApp() {
     [applySnapshot],
   );
 
-  const { canUndo, canRedo, undo, redo } = usePlannerHistory({
+  const { canUndo, canRedo, undo, redo, getHistoryState, restoreHistoryState } = usePlannerHistory({
     snapshot: plannerSnapshot,
     snapshotKey: plannerSnapshotKey,
     onApplySnapshot: applyHistorySnapshot,
   });
+
+  useEffect(() => {
+    let isCancelled = false;
+    void (async () => {
+      try {
+        const draft = await loadPlannerAutosaveDraft();
+        if (isCancelled) {
+          return;
+        }
+        if (draft) {
+          setPendingAutosaveRestore(draft);
+        } else {
+          setIsAutosaveRestoreResolved(true);
+        }
+      } catch {
+        if (!isCancelled) {
+          setIsAutosaveRestoreResolved(true);
+        }
+      }
+    })();
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (autosaveTimeoutRef.current !== null) {
+        clearTimeout(autosaveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isAutosaveRestoreResolved || pendingAutosaveRestore) {
+      return;
+    }
+
+    const historyState = getHistoryState();
+    if (!historyState) {
+      return;
+    }
+
+    if (autosaveTimeoutRef.current !== null) {
+      clearTimeout(autosaveTimeoutRef.current);
+    }
+
+    autosaveTimeoutRef.current = setTimeout(() => {
+      autosaveTimeoutRef.current = null;
+      void savePlannerAutosaveDraft({
+        savedAt: new Date().toISOString(),
+        snapshot: plannerSnapshot,
+        history: getHistoryState() ?? historyState,
+      }).catch(() => {
+        // Ignore autosave failures (storage can be unavailable in some browser modes).
+      });
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (autosaveTimeoutRef.current !== null) {
+        clearTimeout(autosaveTimeoutRef.current);
+        autosaveTimeoutRef.current = null;
+      }
+    };
+  }, [
+    getHistoryState,
+    isAutosaveRestoreResolved,
+    pendingAutosaveRestore,
+    plannerSnapshot,
+    plannerSnapshotKey,
+  ]);
 
   function handleSectionSlicesChange(hallId: HallId, sectionIndex: number, value: string): void {
     setSectionSlices(hallId, sectionIndex, value);
@@ -282,6 +373,27 @@ export function PlannerApp() {
     URL.revokeObjectURL(downloadUrl);
   }
 
+  function handleRestoreAutosaveClick(): void {
+    if (!pendingAutosaveRestore) {
+      return;
+    }
+
+    restoreHistoryState(pendingAutosaveRestore.history);
+    applySnapshot(pendingAutosaveRestore.history.currentSnapshot);
+    setPendingAutosaveRestore(null);
+    setIsAutosaveRestoreResolved(true);
+  }
+
+  async function handleDiscardAutosaveClick(): Promise<void> {
+    setPendingAutosaveRestore(null);
+    setIsAutosaveRestoreResolved(true);
+    try {
+      await clearPlannerAutosaveDraft();
+    } catch {
+      // Ignore draft-clear failures and continue with a fresh session.
+    }
+  }
+
   return (
     <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_15%_12%,#fff8e8_0%,rgba(255,248,232,0)_35%),radial-gradient(circle_at_88%_8%,#e2f1ee_0%,rgba(226,241,238,0)_30%),linear-gradient(180deg,#f9f4ea_0%,#f2eadd_100%)] text-[#1f1a16] max-[1200px]:h-auto max-[1200px]:overflow-auto">
       <header className="flex shrink-0 items-center justify-between border-b border-b-[rgba(114,88,46,0.28)] bg-[linear-gradient(180deg,rgba(255,252,245,0.94)_0%,rgba(249,241,226,0.9)_100%)] px-4 py-[0.55rem]">
@@ -393,6 +505,42 @@ export function PlannerApp() {
           onAnyDragEnd={clearDragState}
         />
       </div>
+
+      {pendingAutosaveRestore ? (
+        <div className="fixed inset-0 z-[70] grid place-items-center bg-[rgba(19,15,10,0.45)] px-4">
+          <div className="w-full max-w-md rounded-[0.9rem] border border-[rgba(126,101,67,0.46)] bg-[linear-gradient(180deg,rgba(255,252,244,0.98)_0%,rgba(247,236,217,0.98)_100%)] p-4 shadow-[0_16px_42px_rgba(23,19,13,0.35)]">
+            <h3 className="m-0 text-[1rem] font-bold text-[#3b3126]">Restore Autosave?</h3>
+            <p className="mt-2 text-[0.84rem] leading-[1.35] text-[#5f5446]">
+              A local autosave from{" "}
+              <span className="font-semibold text-[#3b2f22]">
+                {formatAutosaveTimestamp(pendingAutosaveRestore.savedAt)}
+              </span>{" "}
+              was found.
+            </p>
+            <p className="mt-1 text-[0.78rem] text-[#6c5f4e]">
+              Restore the autosaved layout and history?
+            </p>
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.88)] px-3 py-[0.34rem] text-[0.78rem] font-semibold text-[#3b2f22]"
+                onClick={() => {
+                  void handleDiscardAutosaveClick();
+                }}
+              >
+                Start Fresh
+              </button>
+              <button
+                type="button"
+                className="rounded-[0.45rem] border border-[rgba(61,116,87,0.52)] bg-[rgba(231,250,238,0.95)] px-3 py-[0.34rem] text-[0.78rem] font-semibold text-[#204b35]"
+                onClick={handleRestoreAutosaveClick}
+              >
+                Restore
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {pendingLayoutChange ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[rgba(27,22,16,0.42)] px-4">
