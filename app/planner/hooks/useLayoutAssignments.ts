@@ -468,8 +468,8 @@ export function useLayoutAssignments({
     const nextCenterBySlotId = buildSlotCenters(nextConfigs);
 
     const parseHallId = (slotId: string): HallId | null => {
-      const hallId = slotId.split(":")[0];
-      if (hallId === "north" || hallId === "east" || hallId === "south" || hallId === "west") {
+      const hallId = Number(slotId.split(":")[0]);
+      if (Number.isFinite(hallId)) {
         return hallId;
       }
       return null;
@@ -531,7 +531,7 @@ export function useLayoutAssignments({
 
       const unassignedGlobal = new Set(nextOrderedSlotIds);
       const unassignedByHall = new Map<HallId, Set<string>>();
-      const hallIds = Object.keys(nextConfigs) as HallId[];
+      const hallIds = Object.keys(nextConfigs).map((key) => Number(key));
       for (const hallId of hallIds) {
         const hallSlots = nextOrderedSlotIds.filter((slotId) => slotId.startsWith(`${hallId}:`));
         unassignedByHall.set(hallId, new Set(hallSlots));

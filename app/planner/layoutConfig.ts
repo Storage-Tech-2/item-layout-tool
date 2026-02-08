@@ -59,16 +59,7 @@ export type ResolvedStorageLayout = {
 };
 
 function defaultHallName(hallId: HallId): string {
-    switch (hallId) {
-        case "north":
-            return "North Hall";
-        case "east":
-            return "East Hall";
-        case "south":
-            return "South Hall";
-        case "west":
-            return "West Hall";
-    }
+    return `Hall ${hallId}`;
 }
 
 const CROSS_LAYOUT: StorageLayoutDefinition = {
@@ -80,7 +71,7 @@ const CROSS_LAYOUT: StorageLayoutDefinition = {
         halls: [
             {
                 id: 1,
-                name: defaultHallName("north"),
+                name: "North Hall",
                 direction: "north",
                 sections: [
                     {
@@ -93,7 +84,7 @@ const CROSS_LAYOUT: StorageLayoutDefinition = {
             },
             {
                 id: 2,
-                name: defaultHallName("east"),
+                name: "East Hall",
                 direction: "east",
                 sections: [
                     {
@@ -106,7 +97,7 @@ const CROSS_LAYOUT: StorageLayoutDefinition = {
             },
             {
                 id: 3,
-                name: defaultHallName("south"),
+                name: "South Hall",
                 direction: "south",
                 sections: [
                     {
@@ -119,7 +110,7 @@ const CROSS_LAYOUT: StorageLayoutDefinition = {
             },
             {
                 id: 4,
-                name: defaultHallName("west"),
+                name: "West Hall",
                 direction: "west",
                 sections: [
                     {
@@ -143,7 +134,7 @@ const H_LAYOUT: StorageLayoutDefinition = {
         halls: [
             {
                 id: 1,
-                name: defaultHallName("north"),
+                name: "North Hall",
                 direction: "north",
                 sections: [
                     {
@@ -156,7 +147,7 @@ const H_LAYOUT: StorageLayoutDefinition = {
             },
             {
                 id: 2,
-                name: defaultHallName("east"),
+                name: "East Hall",
                 direction: "north",
                 sections: [
                     {
@@ -169,7 +160,7 @@ const H_LAYOUT: StorageLayoutDefinition = {
             },
             {
                 id: 3,
-                name: defaultHallName("south"),
+                name: "South Hall",
                 direction: "south",
                 sections: [
                     {
@@ -182,7 +173,7 @@ const H_LAYOUT: StorageLayoutDefinition = {
             },
             {
                 id: 4,
-                name: defaultHallName("west"),
+                name: "West Hall",
                 direction: "south",
                 sections: [
                     {
@@ -203,31 +194,10 @@ const STORAGE_LAYOUTS: Record<StorageLayoutPreset, StorageLayoutDefinition> = {
 };
 
 function hallIdFromLayoutHall(hall: Hall, fallbackIndex: number): HallId {
-    switch (hall.id) {
-        case 1:
-            return "north";
-        case 2:
-            return "east";
-        case 3:
-            return "south";
-        case 4:
-            return "west";
-        default:
-            break;
+    if (Number.isFinite(hall.id) && hall.id > 0) {
+        return hall.id;
     }
-
-    switch (fallbackIndex) {
-        case 0:
-            return "north";
-        case 1:
-            return "east";
-        case 2:
-            return "south";
-        case 3:
-            return "west";
-        default:
-            return "north";
-    }
+    return fallbackIndex + 1;
 }
 
 function mapHallsById(definition: StorageLayoutDefinition): Partial<Record<HallId, Hall>> {
@@ -266,25 +236,21 @@ export function buildInitialHallConfigs(
 ): Record<HallId, HallConfig> {
     const definition = STORAGE_LAYOUTS[preset];
     const hallsById = mapHallsById(definition);
-    const buildHallConfig = (hallId: HallId): HallConfig => {
+    const result: Record<HallId, HallConfig> = {};
+    for (const hall of definition.core.halls) {
+        const hallId = hallIdFromLayoutHall(hall, hall.id - 1);
         const layoutHall = hallsById[hallId];
         const sections = layoutHall?.sections ?? [];
-        return {
-            name: layoutHall?.name,
+        result[hallId] = {
+            name: layoutHall?.name ?? defaultHallName(hallId),
             sections: sections.map((section) => ({
                 slices: Math.max(1, section.slices),
                 sideLeft: normalizeSide(section.sideLeft),
                 sideRight: normalizeSide(section.sideRight),
             })),
         };
-    };
-
-    return {
-        north: buildHallConfig("north"),
-        east: buildHallConfig("east"),
-        south: buildHallConfig("south"),
-        west: buildHallConfig("west"),
-    };
+    }
+    return result;
 }
 
 function anchorCoordinate(start: number, span: number, anchor: "left" | "center" | "right"): number {
@@ -366,23 +332,13 @@ export function resolveStorageLayout(
     const coreLeft = center - definition.core.width / 2;
     const coreTop = center - definition.core.height / 2;
 
-    const positions: ResolvedStorageLayout["positions"] = {
-        north: { left: 0, top: 0, transform: "", width: 0, height: 0 },
-        east: { left: 0, top: 0, transform: "", width: 0, height: 0 },
-        south: { left: 0, top: 0, transform: "", width: 0, height: 0 },
-        west: { left: 0, top: 0, transform: "", width: 0, height: 0 },
-    };
-    const directions: ResolvedStorageLayout["directions"] = {
-        north: hallsById.north?.direction ?? "north",
-        east: hallsById.east?.direction ?? "east",
-        south: hallsById.south?.direction ?? "south",
-        west: hallsById.west?.direction ?? "west",
-    };
+    const positions: ResolvedStorageLayout["positions"] = {};
+    const directions: ResolvedStorageLayout["directions"] = {};
     const byDirection = new Map<HallDirection, HallId[]>();
-    const hallIds = Object.keys(hallConfigs) as HallId[];
+    const hallIds = Object.keys(hallConfigs).map((key) => Number(key));
     for (const hallId of hallIds) {
         const layoutHall = hallsById[hallId];
-        const hallDirection = layoutHall?.direction ?? hallId;
+        const hallDirection = layoutHall?.direction ?? "east";
         if (!byDirection.has(hallDirection)) {
             byDirection.set(hallDirection, []);
         }

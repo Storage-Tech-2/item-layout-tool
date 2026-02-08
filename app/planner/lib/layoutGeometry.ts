@@ -31,7 +31,7 @@ export function buildSlotCenters(
   const slotCenters = new Map<string, SlotPoint>();
   const center = STAGE_SIZE / 2;
   const resolvedLayout = resolveStorageLayout("cross", hallConfigs, center);
-  const hallIds = Object.keys(hallConfigs) as HallId[];
+  const hallIds = Object.keys(hallConfigs).map((key) => Number(key));
 
   for (const hallId of hallIds) {
     const config = hallConfigs[hallId];

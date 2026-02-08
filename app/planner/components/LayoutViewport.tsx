@@ -150,16 +150,7 @@ type ExpandedMisPanel = ExpandedMisTarget & {
 };
 
 function defaultHallLabel(hallId: HallId): string {
-  switch (hallId) {
-    case "north":
-      return "North Hall";
-    case "east":
-      return "East Hall";
-    case "south":
-      return "South Hall";
-    case "west":
-      return "West Hall";
-  }
+  return `Hall ${hallId}`;
 }
 
 function expandedMisKey(target: ExpandedMisTarget): string {
@@ -196,13 +187,12 @@ function sideDepthPx(side: HallSideConfig): number {
   return side.rowsPerSlice * SLOT_SIZE + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
 }
 
-function emptyHallPlacements(): Record<HallId, HallPlacement> {
-  return {
-    north: { left: 0, top: 0, transform: "", width: 0, height: 0 },
-    east: { left: 0, top: 0, transform: "", width: 0, height: 0 },
-    south: { left: 0, top: 0, transform: "", width: 0, height: 0 },
-    west: { left: 0, top: 0, transform: "", width: 0, height: 0 },
-  };
+function emptyHallPlacements(hallIds: HallId[]): Record<HallId, HallPlacement> {
+  const positions: Record<HallId, HallPlacement> = {};
+  for (const hallId of hallIds) {
+    positions[hallId] = { left: 0, top: 0, transform: "", width: 0, height: 0 };
+  }
+  return positions;
 }
 
 function buildFlatLayoutMetrics(
@@ -323,13 +313,8 @@ export function LayoutViewport({
   const [viewMode, setViewMode] = useState<LayoutViewMode>("storage");
   const [storageLayoutPreset, setStorageLayoutPreset] = useState<StorageLayoutPreset>("cross");
   const [expandedMisTargets, setExpandedMisTargets] = useState<ExpandedMisTarget[]>([]);
-  const [hallNames, setHallNames] = useState<Record<HallId, string>>({
-    north: defaultHallLabel("north"),
-    east: defaultHallLabel("east"),
-    south: defaultHallLabel("south"),
-    west: defaultHallLabel("west"),
-  });
-  const hallIds = useMemo(() => Object.keys(hallConfigs) as HallId[], [hallConfigs]);
+  const [hallNames, setHallNames] = useState<Record<HallId, string>>({});
+  const hallIds = useMemo(() => Object.keys(hallConfigs).map((key) => Number(key)), [hallConfigs]);
 
   const viewportBackgroundStyle = useMemo(
     () => ({
@@ -504,7 +489,7 @@ export function LayoutViewport({
 
   const hallLayout = useMemo<HallLayoutState>(() => {
     if (viewMode === "flat") {
-      const positions = emptyHallPlacements();
+      const positions = emptyHallPlacements(hallIds);
       const flatLayout = buildFlatLayoutMetrics(hallIds, hallConfigs, center);
       let currentTop = flatLayout.top;
       const leftAlignedX = flatLayout.left;
@@ -526,12 +511,9 @@ export function LayoutViewport({
 
       return {
         positions,
-        directions: {
-          north: "north",
-          east: "east",
-          south: "south",
-          west: "west",
-        },
+        directions: Object.fromEntries(
+          hallIds.map((hallId) => [hallId, "east"]),
+        ) as Record<HallId, HallDirection>,
         core: null,
       };
     }
@@ -1360,7 +1342,7 @@ export function LayoutViewport({
                 >
                   <div className="grid gap-[0.08rem]">
                     <div className="text-[0.78rem] font-bold uppercase tracking-[0.05em]">
-                      {hallNames[panel.hallId]} Slice {panel.slice + 1} •{" "}
+                      {(hallNames[panel.hallId] ?? hallConfigs[panel.hallId]?.name ?? defaultHallLabel(panel.hallId))} Slice {panel.slice + 1} •{" "}
                       {panel.side === 0 ? "Left" : "Right"} MIS {panel.misUnit + 1}
                     </div>
                     <div className={`text-[0.68rem] ${subTextClass}`}>
@@ -1508,7 +1490,7 @@ export function LayoutViewport({
                       }}
                       title="Click to rename hall"
                     >
-                      {hallNames[hallId]}
+                      {hallNames[hallId] ?? hall.name ?? defaultHallLabel(hallId)}
                     </span>
                       <button
                         type="button"

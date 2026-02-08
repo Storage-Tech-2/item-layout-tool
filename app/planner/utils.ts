@@ -237,7 +237,7 @@ export function buildOrderedSlotIds(
   fillDirection: FillDirection = "column",
 ): string[] {
   const ordered: string[] = [];
-  const hallIds = Object.keys(configs) as HallId[];
+  const hallIds = Object.keys(configs).map((key) => Number(key));
   for (const hallId of hallIds) {
     const hall = configs[hallId];
     const slices = resolveHallSlices(hall);

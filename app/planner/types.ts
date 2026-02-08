@@ -1,4 +1,4 @@
-export type HallId = "north" | "east" | "south" | "west";
+export type HallId = number;
 export type FillDirection = "row" | "column";
 
 export type HallType = "bulk" | "chest" | "mis";

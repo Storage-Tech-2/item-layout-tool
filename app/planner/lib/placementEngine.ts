@@ -48,8 +48,9 @@ type ParsedMisSlot = {
 type ParsedSlot = ParsedGridSlot | ParsedMisSlot;
 
 function parseHallId(raw: string): HallId | null {
-  if (raw === "north" || raw === "east" || raw === "south" || raw === "west") {
-    return raw;
+  const hallId = Number(raw);
+  if (Number.isFinite(hallId)) {
+    return hallId;
   }
   return null;
 }
