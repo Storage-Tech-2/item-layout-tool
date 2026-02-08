@@ -657,18 +657,19 @@ export function ItemLibraryPanel({
                             return;
                           }
 
-                          if (!selectedLibraryItemIds.has(item.id)) {
+                          if (selectedLibraryItemIds.size === 0) {
                             return;
                           }
 
                           event.preventDefault();
                           event.stopPropagation();
                           setSelectedLibraryItemIds((current) => {
-                            if (!current.has(item.id)) {
-                              return current;
-                            }
                             const next = new Set(current);
-                            next.delete(item.id);
+                            if (next.has(item.id)) {
+                              next.delete(item.id);
+                            } else {
+                              next.add(item.id);
+                            }
                             return next;
                           });
                         }}

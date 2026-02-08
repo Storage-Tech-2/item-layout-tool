@@ -987,14 +987,13 @@ export function LayoutViewport({
             return;
           }
 
-          if (isSelected) {
-            const nextSelection = Array.from(selectedSlotIds).filter(
-              (selectedSlotId) => selectedSlotId !== slotId,
-            );
-            onSelectionChange(nextSelection);
+          const nextSelection = new Set(selectedSlotIds);
+          if (nextSelection.has(slotId)) {
+            nextSelection.delete(slotId);
           } else {
-            onSelectionChange([]);
+            nextSelection.add(slotId);
           }
+          onSelectionChange(Array.from(nextSelection));
 
           event.stopPropagation();
         }}
