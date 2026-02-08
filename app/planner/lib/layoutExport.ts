@@ -51,6 +51,8 @@ type ExportSlotEntry = {
   isBlock: boolean;
   x: number;
   z: number;
+  misGroupKey: string | null;
+  misSlotIndex: number | null;
 };
 
 type NucleationSchematicWrapper = {
@@ -80,6 +82,7 @@ type NucleationSchematicWrapper = {
     fixed: boolean,
   ) => void;
   addEntity?: (id: string, x: number, y: number, z: number, nbt: unknown) => void;
+  addBlockEntity?: (id: string, x: number, y: number, z: number, nbt: unknown) => void;
   to_litematic?: () => Uint8Array | number[];
 };
 
@@ -197,7 +200,8 @@ function writeContainerLayout(
   schematic: NucleationSchematicWrapper,
   entries: ExportSlotEntry[],
 ): void {
-  for (const entry of entries) {
+  const nonMisEntries = writeMisAsDoubleChests(schematic, entries);
+  for (const entry of nonMisEntries) {
     setBlockState(schematic, entry.x, 0, entry.z, "minecraft:barrel[facing=up]");
 
     if (typeof schematic.addContainerItem !== "function") {
@@ -211,7 +215,8 @@ function writeItemFrameLayout(
   schematic: NucleationSchematicWrapper,
   entries: ExportSlotEntry[],
 ): void {
-  for (const entry of entries) {
+  const nonMisEntries = writeMisAsDoubleChests(schematic, entries);
+  for (const entry of nonMisEntries) {
     placeItemFrameSlot(schematic, entry.x, 0, entry.z, entry.itemId);
   }
 }
@@ -220,7 +225,8 @@ function writeBlocksAndFramesLayout(
   schematic: NucleationSchematicWrapper,
   entries: ExportSlotEntry[],
 ): void {
-  for (const entry of entries) {
+  const nonMisEntries = writeMisAsDoubleChests(schematic, entries);
+  for (const entry of nonMisEntries) {
     if (entry.isBlock) {
       try {
         setBlockState(schematic, entry.x, 0, entry.z, toMinecraftId(entry.itemId));
@@ -265,8 +271,130 @@ function setBlockState(
   throw new Error("Nucleation SchematicWrapper is missing block placement APIs.");
 }
 
+function writeMisAsDoubleChests(
+  schematic: NucleationSchematicWrapper,
+  entries: ExportSlotEntry[],
+): ExportSlotEntry[] {
+  const misGroups = new Map<string, ExportSlotEntry[]>();
+  const nonMisEntries: ExportSlotEntry[] = [];
+
+  for (const entry of entries) {
+    if (!entry.misGroupKey || entry.misSlotIndex === null) {
+      nonMisEntries.push(entry);
+      continue;
+    }
+    const current = misGroups.get(entry.misGroupKey);
+    if (current) {
+      current.push(entry);
+    } else {
+      misGroups.set(entry.misGroupKey, [entry]);
+    }
+  }
+
+  for (const groupEntries of misGroups.values()) {
+    placeMisGroupAsDoubleChests(schematic, groupEntries);
+  }
+
+  return nonMisEntries;
+}
+
+function placeMisGroupAsDoubleChests(
+  schematic: NucleationSchematicWrapper,
+  entries: ExportSlotEntry[],
+): void {
+  if (entries.length === 0) {
+    return;
+  }
+
+  const anchorX = Math.min(...entries.map((entry) => entry.x));
+  const anchorZ = Math.min(...entries.map((entry) => entry.z));
+  const sorted = [...entries].sort((a, b) => {
+    const aSlot = a.misSlotIndex ?? 0;
+    const bSlot = b.misSlotIndex ?? 0;
+    return aSlot - bSlot;
+  });
+
+  type ChestItems = Array<{ id: string; slot: number }>;
+  const chestItems = new Map<string, ChestItems>();
+
+  for (const entry of sorted) {
+    const logicalSlot = entry.misSlotIndex ?? 0;
+    const pairIndex = Math.floor(logicalSlot / 54);
+    const pairSlot = logicalSlot % 54;
+    const chestX = anchorX;
+    const chestZ = anchorZ + pairIndex * 2;
+
+    // Double chest (east-west): left at chestX, right at chestX+1
+    setBlockState(
+      schematic,
+      chestX,
+      0,
+      chestZ,
+      "minecraft:chest[facing=north,type=left,waterlogged=false]",
+    );
+    setBlockState(
+      schematic,
+      chestX + 1,
+      0,
+      chestZ,
+      "minecraft:chest[facing=north,type=right,waterlogged=false]",
+    );
+
+    if (pairSlot < 27) {
+      const key = `${chestX},${chestZ}`;
+      const current = chestItems.get(key) ?? [];
+      current.push({ id: toMinecraftId(entry.itemId), slot: pairSlot });
+      chestItems.set(key, current);
+    } else {
+      const key = `${chestX + 1},${chestZ}`;
+      const current = chestItems.get(key) ?? [];
+      current.push({ id: toMinecraftId(entry.itemId), slot: pairSlot - 27 });
+      chestItems.set(key, current);
+    }
+  }
+
+  if (typeof schematic.addBlockEntity === "function") {
+    for (const [key, items] of chestItems.entries()) {
+      const [rawX, rawZ] = key.split(",");
+      const x = Number(rawX);
+      const z = Number(rawZ);
+      schematic.addBlockEntity("minecraft:chest", x, 0, z, {
+        Items: items.map((item) => ({
+          id: item.id,
+          count: 1,
+          Slot: item.slot,
+        })),
+      });
+      console.log(`Placed chest at (${x}, 0, ${z}) with items:`, items);
+    }
+    return;
+  }
+
+  throw new Error(
+    "Nucleation module is missing addBlockEntity()/addContainerItem(). Rebuild your WASM package.",
+  );
+}
+
 function toMinecraftId(itemId: string): string {
   return itemId.includes(":") ? itemId : `minecraft:${itemId}`;
+}
+
+function parseMisSlotMetadata(slotId: string): { groupKey: string; slotIndex: number } | null {
+  const parts = slotId.split(":");
+  // MIS format: hallId:m:slice:side:misUnit:index
+  if (parts.length !== 6 || parts[1] !== "m") {
+    return null;
+  }
+
+  const slotIndex = Number(parts[5]);
+  if (!Number.isInteger(slotIndex) || slotIndex < 0) {
+    return null;
+  }
+
+  return {
+    groupKey: `${parts[0]}:m:${parts[2]}:${parts[3]}:${parts[4]}`,
+    slotIndex,
+  };
 }
 
 function buildExportSlotEntries(
@@ -295,12 +423,15 @@ function buildExportSlotEntries(
     const xKey = Math.round(center.x * 1000);
     const yKey = Math.round(center.y * 1000);
     const catalogItem = itemById.get(itemId);
+    const misMetadata = parseMisSlotMetadata(slotId);
     raw.push({
       slotId,
       itemId,
       xKey,
       yKey,
       isBlock: catalogItem?.registration === "block",
+      misGroupKey: misMetadata?.groupKey ?? null,
+      misSlotIndex: misMetadata?.slotIndex ?? null,
     });
   }
 
@@ -308,8 +439,15 @@ function buildExportSlotEntries(
     return [];
   }
 
-  const xKeys = Array.from(new Set(raw.map((entry) => entry.xKey))).sort((a, b) => a - b);
-  const yKeys = Array.from(new Set(raw.map((entry) => entry.yKey))).sort((a, b) => a - b);
+  // Build the coordinate grid from all planner slots (not only assigned ones)
+  // so empty user gaps remain empty in the exported schematic.
+  const allSlotCenters = Array.from(slotCenters.values());
+  const xKeys = Array.from(new Set(allSlotCenters.map((center) => Math.round(center.x * 1000)))).sort(
+    (a, b) => a - b,
+  );
+  const yKeys = Array.from(new Set(allSlotCenters.map((center) => Math.round(center.y * 1000)))).sort(
+    (a, b) => a - b,
+  );
   const xIndex = new Map(xKeys.map((value, index) => [value, index]));
   const yIndex = new Map(yKeys.map((value, index) => [value, index]));
 
@@ -322,6 +460,8 @@ function buildExportSlotEntries(
       isBlock: entry.isBlock,
       x: (xIndex.get(entry.xKey) ?? 0) * spacing,
       z: (yIndex.get(entry.yKey) ?? 0) * spacing,
+      misGroupKey: entry.misGroupKey,
+      misSlotIndex: entry.misSlotIndex,
     }))
     .sort((a, b) => (a.z === b.z ? a.x - b.x : a.z - b.z));
 }
