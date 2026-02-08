@@ -702,7 +702,14 @@ export function LayoutViewport({
     hallHeight: number,
   ): ReactNode {
     const slices = resolveHallSlices(config);
-    const visualSlices = slices;
+    const flipMainAxis = layoutDirection === "north" || layoutDirection === "west";
+    const visualSlices = flipMainAxis ? [...slices].reverse() : slices;
+    const mainSpan =
+      slices.length === 0
+        ? SLOT_SIZE
+        : slices[slices.length - 1].mainStart + slices[slices.length - 1].mainSize;
+    const mapMainStart = (start: number, size: number): number =>
+      flipMainAxis ? mainSpan - (start + size) : start;
 
     let maxLeftDepth = 0;
     let maxRightDepth = 0;
@@ -722,12 +729,15 @@ export function LayoutViewport({
         const last = sectionSlices[sectionSlices.length - 1];
         return {
           name: `Section ${sectionIndex + 1}`,
-          start: first.mainStart,
-          end: last.mainStart + last.mainSize,
+          start: mapMainStart(first.mainStart, last.mainStart + last.mainSize - first.mainStart),
+          end:
+            mapMainStart(first.mainStart, last.mainStart + last.mainSize - first.mainStart) +
+            (last.mainStart + last.mainSize - first.mainStart),
+          rawStart: first.mainStart,
         };
       })
       .filter(
-        (entry): entry is { name: string; start: number; end: number } =>
+        (entry): entry is { name: string; start: number; end: number; rawStart: number } =>
           entry !== null,
       );
 
@@ -755,7 +765,10 @@ export function LayoutViewport({
           const groupFirstSlice = groupSlices[0] ?? slice;
           const groupLastSlice = groupSlices[groupSlices.length - 1] ?? slice;
           const misSlice = groupFirstSlice.globalSlice;
-          const misMainStart = groupFirstSlice.mainStart;
+          const misMainStart = mapMainStart(
+            groupFirstSlice.mainStart,
+            groupLastSlice.mainStart + groupLastSlice.mainSize - groupFirstSlice.mainStart,
+          );
           const misMainSize = groupLastSlice.mainStart + groupLastSlice.mainSize - groupFirstSlice.mainStart;
           const misGroupNumber = Math.floor(groupStartSectionSlice / misWidth) + 1;
           Array.from({ length: sideConfig.misUnitsPerSlice }, (_, misUnit) => {
@@ -950,9 +963,10 @@ export function LayoutViewport({
           const visualRow = reverseCrossAxisForDirection
             ? sideConfig.rowsPerSlice - 1 - row
             : row;
+          const mainStart = mapMainStart(slice.mainStart, slice.mainSize);
           if (orientation === "horizontal") {
             const baseTop = visualSide === 0 ? 0 : hallHeight - sideDepth;
-            const x = slice.mainStart + (slice.mainSize - SLOT_SIZE) / 2;
+            const x = mainStart + (slice.mainSize - SLOT_SIZE) / 2;
             const y = baseTop + visualRow * (SLOT_SIZE + SLOT_GAP);
             slots.push(
               <div key={slotKey} className="absolute" style={{ left: x, top: y }}>
@@ -962,7 +976,7 @@ export function LayoutViewport({
           } else {
             const baseLeft = visualSide === 0 ? 0 : hallWidth - sideDepth;
             const x = baseLeft + visualRow * (SLOT_SIZE + SLOT_GAP);
-            const y = slice.mainStart + (slice.mainSize - SLOT_SIZE) / 2;
+            const y = mainStart + (slice.mainSize - SLOT_SIZE) / 2;
             slots.push(
               <div key={slotKey} className="absolute" style={{ left: x, top: y }}>
                 {renderSlot(slotKey)}
@@ -988,7 +1002,12 @@ export function LayoutViewport({
         )}
         {sectionRanges.length > 1 ? sectionRanges.map((section, index) => {
           const center = section.start + (section.end - section.start) / 2;
-          const boundary = index > 0 ? section.start - SLOT_GAP / 2 : null;
+          const boundary =
+            index > 0
+              ? flipMainAxis
+                ? mainSpan - (section.rawStart - SLOT_GAP / 2)
+                : section.rawStart - SLOT_GAP / 2
+              : null;
           if (orientation === "horizontal") {
             return (
               <div key={`${hallId}:section:${index}`} className="pointer-events-none absolute inset-0">
