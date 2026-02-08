@@ -20,7 +20,7 @@ type ViewportState = {
   pan: { x: number; y: number };
 };
 
-const PAN_ZOOM_COMMIT_INTERVAL_MS = 33;
+const PAN_ZOOM_COMMIT_INTERVAL_MS = 48;
 
 export function useViewportNavigation(): {
   viewportRef: RefObject<HTMLDivElement | null>;
@@ -111,7 +111,12 @@ export function useViewportNavigation(): {
       liveStateRef.current = next;
       notifyTransformListeners(next);
       if (commitMode === "immediate") {
-        lastCommitTimestampRef.current = typeof performance !== "undefined" ? performance.now() : 0;
+        if (commitRafRef.current !== null) {
+          window.cancelAnimationFrame(commitRafRef.current);
+          commitRafRef.current = null;
+        }
+        lastCommitTimestampRef.current =
+          typeof performance !== "undefined" ? performance.now() : 0;
         commitLiveStateToReact();
         return;
       }
@@ -355,6 +360,7 @@ export function useViewportNavigation(): {
 
     document.body.style.userSelect = previousBodyUserSelect.current;
     panSessionRef.current = null;
+    commitLiveStateToReact();
   }
 
   return {

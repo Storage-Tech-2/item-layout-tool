@@ -451,6 +451,8 @@ export function LayoutViewport({
   const didInitialFit = useRef(false);
   const panLayerRef = useRef<HTMLDivElement | null>(null);
   const zoomLayerRef = useRef<HTMLDivElement | null>(null);
+  const pendingTransformRef = useRef<{ pan: { x: number; y: number }; zoom: number } | null>(null);
+  const transformRafRef = useRef<number | null>(null);
   const [viewportSize, setViewportSize] = useState<{ width: number; height: number }>({
     width: 0,
     height: 0,
@@ -467,15 +469,41 @@ export function LayoutViewport({
     }
   }, []);
 
+  const scheduleViewportTransform = useCallback((nextPan: { x: number; y: number }, nextZoom: number): void => {
+    pendingTransformRef.current = { pan: nextPan, zoom: nextZoom };
+    if (transformRafRef.current !== null) {
+      return;
+    }
+    transformRafRef.current = window.requestAnimationFrame(() => {
+      transformRafRef.current = null;
+      const pending = pendingTransformRef.current;
+      if (!pending) {
+        return;
+      }
+      pendingTransformRef.current = null;
+      applyViewportTransform(pending.pan, pending.zoom);
+    });
+  }, [applyViewportTransform]);
+
   useEffect(() => {
     return subscribeViewportTransform((nextState) => {
-      applyViewportTransform(nextState.pan, nextState.zoom);
+      scheduleViewportTransform(nextState.pan, nextState.zoom);
     });
-  }, [applyViewportTransform, subscribeViewportTransform]);
+  }, [scheduleViewportTransform, subscribeViewportTransform]);
 
   useEffect(() => {
     applyViewportTransform(pan, zoom);
   }, [applyViewportTransform, pan, zoom]);
+
+  useEffect(() => {
+    return () => {
+      if (transformRafRef.current !== null) {
+        window.cancelAnimationFrame(transformRafRef.current);
+        transformRafRef.current = null;
+      }
+      pendingTransformRef.current = null;
+    };
+  }, []);
 
   function resolvePlacementTopLeft(placement: HallPlacement): { left: number; top: number } {
     const match = /translate\(\s*([^)]+?)\s*,\s*([^)]+?)\s*\)/.exec(placement.transform);
