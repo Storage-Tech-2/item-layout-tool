@@ -42,6 +42,7 @@ type LayoutViewportProps = {
   hallNames: Record<HallId, string>;
   sectionNames: Record<string, string>;
   misNames: Record<string, string>;
+  cursorSlotId: string | null;
   viewportRef: RefObject<HTMLDivElement | null>;
   zoom: number;
   pan: { x: number; y: number };
@@ -57,6 +58,8 @@ type LayoutViewportProps = {
   onSlotDragOver: (event: DragEvent<HTMLElement>, slotId: string) => void;
   onSlotDrop: (event: DragEvent<HTMLElement>, slotId: string) => void;
   onViewportDropFallback: (event: DragEvent<HTMLElement>) => void;
+  onCursorSlotChange: (slotId: string) => void;
+  onCursorMisChange: (hallId: HallId, slice: number, side: 0 | 1, misUnit: number) => void;
   onSectionSlicesChange: (hallId: HallId, sectionIndex: number, value: string) => void;
   onSectionSideTypeChange: (
     hallId: HallId,
@@ -276,6 +279,7 @@ export function LayoutViewport({
   hallNames,
   sectionNames,
   misNames,
+  cursorSlotId,
   viewportRef,
   zoom,
   pan,
@@ -288,6 +292,8 @@ export function LayoutViewport({
   onSlotDragOver,
   onSlotDrop,
   onViewportDropFallback,
+  onCursorSlotChange,
+  onCursorMisChange,
   onSectionSlicesChange,
   onSectionSideTypeChange,
   onSectionSideRowsChange,
@@ -807,6 +813,7 @@ export function LayoutViewport({
     const isSwapPreview = preview?.kind === "swap";
     const showAssignedItem = Boolean(assignedItem) && !showPreviewItem && !isDraggedSource;
     const isSelected = selectedSlotIds.has(slotId) && Boolean(assignedItem);
+    const isCursorSlot = cursorSlotId === slotId;
 
     return (
       <button
@@ -823,7 +830,7 @@ export function LayoutViewport({
               ? "border-[rgba(194,65,12,0.92)] shadow-[0_0_0_2px_rgba(251,146,60,0.45)]"
               : "border-[rgba(22,132,120,0.92)] shadow-[0_0_0_2px_rgba(85,204,178,0.38)]"
             : ""
-          } ${isSelected ? "shadow-[0_0_0_2px_rgba(37,99,235,0.55)]" : ""}`}
+          } ${isSelected ? "shadow-[0_0_0_2px_rgba(37,99,235,0.55)]" : ""} ${isCursorSlot ? "shadow-[0_0_0_2px_rgba(217,119,6,0.9)] border-[rgba(180,83,9,0.86)]" : ""}`}
         draggable={Boolean(assignedItem)}
         onPointerDown={(event) => {
           if (event.shiftKey) {
@@ -853,6 +860,15 @@ export function LayoutViewport({
         onClick={(event) => {
           if (event.shiftKey) {
             event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+
+          if (!assignedItem) {
+            onCursorSlotChange(slotId);
+            if (selectedSlotIds.size > 0) {
+              onSelectionChange([]);
+            }
             event.stopPropagation();
             return;
           }
@@ -929,6 +945,9 @@ export function LayoutViewport({
             draggable={false}
             unoptimized
           />
+        ) : null}
+        {isCursorSlot ? (
+          <span className="pointer-events-none absolute -right-[0.12rem] -top-[0.12rem] z-3 h-[0.45rem] w-[0.45rem] rounded-full border border-[rgba(120,53,15,0.9)] bg-[rgba(245,158,11,0.96)]" />
         ) : null}
       </button>
     );
@@ -1106,6 +1125,9 @@ export function LayoutViewport({
                 ? "shadow-[0_0_0_2px_rgba(251,146,60,0.45)] border-[rgba(194,65,12,0.92)]"
                 : "shadow-[0_0_0_2px_rgba(85,204,178,0.38)] border-[rgba(22,132,120,0.92)]"
               : "";
+            const misCardCursorClass = cursorSlotId && unitSlotIds.includes(cursorSlotId)
+              ? "shadow-[0_0_0_2px_rgba(217,119,6,0.85)] border-[rgba(180,83,9,0.9)]"
+              : "";
 
             if (orientation === "horizontal") {
               const unitCrossSize = 112;
@@ -1125,7 +1147,7 @@ export function LayoutViewport({
               slots.push(
                 <div
                   key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
-                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-hidden rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass} ${misCardPreviewClass}`}
+                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-hidden rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass} ${misCardPreviewClass} ${misCardCursorClass}`}
                   style={{ left: x, top: y, width: cardWidth, height: cardHeight }}
                   data-no-pan
                   data-mis-card
@@ -1144,6 +1166,7 @@ export function LayoutViewport({
                   onDrop={(event) => onSlotDrop(event, nextEmptySlot)}
                   onClick={(event) => {
                     event.stopPropagation();
+                    onCursorMisChange(misTarget.hallId, misTarget.slice, misTarget.side, misTarget.misUnit);
                     toggleExpandedMis(misTarget);
                   }}
                 >
@@ -1226,7 +1249,7 @@ export function LayoutViewport({
               slots.push(
                 <div
                   key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
-                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-hidden rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass} ${misCardPreviewClass}`}
+                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-hidden rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass} ${misCardPreviewClass} ${misCardCursorClass}`}
                   style={{ left: x, top: y, width: cardWidth, height: cardHeight }}
                   data-no-pan
                   data-mis-card
@@ -1245,6 +1268,7 @@ export function LayoutViewport({
                   onDrop={(event) => onSlotDrop(event, nextEmptySlot)}
                   onClick={(event) => {
                     event.stopPropagation();
+                    onCursorMisChange(misTarget.hallId, misTarget.slice, misTarget.side, misTarget.misUnit);
                     toggleExpandedMis(misTarget);
                   }}
                 >

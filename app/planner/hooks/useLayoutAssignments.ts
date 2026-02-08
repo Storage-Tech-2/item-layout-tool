@@ -28,11 +28,15 @@ type UseLayoutAssignmentsResult = {
   itemById: Map<string, CatalogItem>;
   activeSlotAssignments: Record<string, string>;
   usedItemIds: Set<string>;
+  cursorSlotId: string | null;
   selectedSlotIdSet: Set<string>;
   draggedSourceSlotIdSet: Set<string>;
   dragPreviews: PreviewPlacement[];
   clearLayout: () => void;
   clearDragState: () => void;
+  setCursorSlot: (slotId: string) => void;
+  setCursorMisUnit: (hallId: HallId, slice: number, side: 0 | 1, misUnit: number) => void;
+  placeLibraryItemAtCursor: (itemId: string) => boolean;
   beginItemDrag: (event: DragEvent<HTMLElement>, itemId: string) => void;
   beginCategoryDrag: (event: DragEvent<HTMLElement>, itemIds: string[]) => void;
   beginSlotItemDrag: (
@@ -72,6 +76,7 @@ export function useLayoutAssignments({
   fillDirection,
 }: UseLayoutAssignmentsInput): UseLayoutAssignmentsResult {
   const [slotAssignments, setSlotAssignments] = useState<Record<string, string>>({});
+  const [cursorSlotId, setCursorSlotId] = useState<string | null>(null);
   const [selectedSlotIds, setSelectedSlotIdsState] = useState<string[]>([]);
   const [activeDragPayload, setActiveDragPayload] = useState<DragPayload | null>(null);
   const [dragPreviews, setDragPreviews] = useState<PreviewPlacement[]>([]);
@@ -177,6 +182,111 @@ export function useLayoutAssignments({
         const bi = Number(b.split(":")[5]);
         return ai - bi;
       });
+  }
+
+  function findFirstEmptySlotFrom(
+    startSlotId: string | null,
+    assignments: Record<string, string>,
+  ): string | null {
+    if (orderedSlotIds.length === 0) {
+      return null;
+    }
+
+    const startIndex =
+      startSlotId && orderedSlotIdSet.has(startSlotId)
+        ? orderedSlotIds.indexOf(startSlotId)
+        : 0;
+    const normalizedStartIndex = startIndex >= 0 ? startIndex : 0;
+
+    for (let offset = 0; offset < orderedSlotIds.length; offset += 1) {
+      const index = (normalizedStartIndex + offset) % orderedSlotIds.length;
+      const slotId = orderedSlotIds[index];
+      if (!assignments[slotId]) {
+        return slotId;
+      }
+    }
+
+    return null;
+  }
+
+  function findNextEmptySlotAfter(
+    slotId: string,
+    assignments: Record<string, string>,
+  ): string | null {
+    if (orderedSlotIds.length === 0) {
+      return null;
+    }
+
+    const baseIndex = orderedSlotIds.indexOf(slotId);
+    const startIndex = baseIndex >= 0 ? (baseIndex + 1) % orderedSlotIds.length : 0;
+
+    for (let offset = 0; offset < orderedSlotIds.length; offset += 1) {
+      const index = (startIndex + offset) % orderedSlotIds.length;
+      const candidate = orderedSlotIds[index];
+      if (!assignments[candidate]) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
+  function setCursorSlot(slotId: string): void {
+    if (!orderedSlotIdSet.has(slotId)) {
+      return;
+    }
+    setCursorSlotId(slotId);
+  }
+
+  function setCursorMisUnit(
+    hallId: HallId,
+    slice: number,
+    side: 0 | 1,
+    misUnit: number,
+  ): void {
+    const targetUnit: ParsedMisUnit = {
+      hallId,
+      slice,
+      side,
+      misUnit,
+    };
+    const unitSlotIds = getMisUnitSlotIds(targetUnit, orderedSlotIds);
+    if (unitSlotIds.length === 0) {
+      return;
+    }
+
+    const nextCursor =
+      unitSlotIds.find((slotId) => !activeSlotAssignments[slotId]) ?? unitSlotIds[0];
+    setCursorSlotId(nextCursor);
+  }
+
+  function placeLibraryItemAtCursor(itemId: string): boolean {
+    if (!itemById.has(itemId)) {
+      return false;
+    }
+
+    const anchorSlotId = findFirstEmptySlotFrom(cursorSlotId, activeSlotAssignments);
+    if (!anchorSlotId) {
+      return false;
+    }
+
+    const nextAssignments = { ...activeSlotAssignments, [anchorSlotId]: itemId };
+    const nextCursor = findNextEmptySlotAfter(anchorSlotId, nextAssignments) ?? anchorSlotId;
+
+    setSlotAssignments((current) => {
+      const next = retainValidAssignments(current, orderedSlotIdSet);
+      for (const [slotId, assignedItemId] of Object.entries(next)) {
+        if (assignedItemId === itemId) {
+          delete next[slotId];
+        }
+      }
+      next[anchorSlotId] = itemId;
+      return next;
+    });
+    setCursorSlotId(nextCursor);
+    setSelectedSlotIdsState([]);
+    clearDragState();
+    return true;
   }
 
   function buildMisSwapPreview(
@@ -303,6 +413,7 @@ export function useLayoutAssignments({
 
   function clearLayout(): void {
     setSlotAssignments({});
+    setCursorSlotId(null);
     setSelectedSlotIdsState([]);
   }
 
@@ -531,6 +642,7 @@ export function useLayoutAssignments({
     }
 
     if (placeMisUnitSwap(anchorSlotId, payload)) {
+      setCursorSlot(anchorSlotId);
       clearDragState();
       return;
     }
@@ -543,6 +655,7 @@ export function useLayoutAssignments({
     });
 
     placePayload(anchorSlotId, payload);
+    setCursorSlot(placements[0]?.slotId ?? anchorSlotId);
     if (payload.source === "layout") {
       setSelectedSlotIdsState(placements.map((placement) => placement.slotId));
     }
@@ -577,6 +690,7 @@ export function useLayoutAssignments({
     }
 
     placePayload(anchorSlotId, payload);
+    setCursorSlot(placements[0]?.slotId ?? anchorSlotId);
     if (payload.source === "layout") {
       setSelectedSlotIdsState(placements.map((placement) => placement.slotId));
     }
@@ -638,6 +752,7 @@ export function useLayoutAssignments({
 
   function replaceSlotAssignments(assignments: Record<string, string>): void {
     setSlotAssignments({ ...assignments });
+    setCursorSlotId(null);
     setSelectedSlotIdsState([]);
     clearDragState();
   }
@@ -760,6 +875,7 @@ export function useLayoutAssignments({
     });
 
     setSelectedSlotIdsState([]);
+    setCursorSlotId(null);
     clearDragState();
   }
 
@@ -767,11 +883,15 @@ export function useLayoutAssignments({
     itemById,
     activeSlotAssignments,
     usedItemIds,
+    cursorSlotId,
     selectedSlotIdSet,
     draggedSourceSlotIdSet,
     dragPreviews,
     clearLayout,
     clearDragState,
+    setCursorSlot,
+    setCursorMisUnit,
+    placeLibraryItemAtCursor,
     beginItemDrag,
     beginCategoryDrag,
     beginSlotItemDrag,

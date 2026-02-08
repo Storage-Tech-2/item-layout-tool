@@ -10,6 +10,7 @@ type ItemLibraryPanelProps = {
   usedItemIds: Set<string>;
   fillDirection: FillDirection;
   onFillDirectionChange: (direction: FillDirection) => void;
+  onItemContextPlace: (itemId: string) => boolean;
   onItemDragStart: (event: DragEvent<HTMLElement>, itemId: string) => void;
   onCategoryDragStart: (
     event: DragEvent<HTMLElement>,
@@ -27,6 +28,7 @@ export function ItemLibraryPanel({
   usedItemIds,
   fillDirection,
   onFillDirectionChange,
+  onItemContextPlace,
   onItemDragStart,
   onCategoryDragStart,
   onLibraryDragOver,
@@ -344,6 +346,9 @@ export function ItemLibraryPanel({
         <p className="m-0 mt-[-0.1rem] text-[0.72rem] text-[#4a6a5f]">
           Drop a placed layout item here to return it to the list.
         </p>
+        <p className="m-0 mt-[-0.1rem] text-[0.72rem] text-[#4a6a5f]">
+          Right-click an item to place it at the layout cursor.
+        </p>
 
         <label className="grid gap-[0.22rem]">
           <span className="text-[0.74rem] text-[#6d6256]">Search</span>
@@ -517,7 +522,12 @@ export function ItemLibraryPanel({
                           onItemDragStart(event, item.id);
                         }}
                         onDragEnd={onAnyDragEnd}
-                        title={`Drag ${toTitle(item.id)}`}
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onItemContextPlace(item.id);
+                        }}
+                        title={`Drag ${toTitle(item.id)} (right-click to place at cursor)`}
                         data-library-item-id={item.id}
                       >
                         <Image

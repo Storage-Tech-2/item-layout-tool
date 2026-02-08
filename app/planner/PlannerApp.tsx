@@ -62,10 +62,14 @@ export function PlannerApp() {
     itemById,
     activeSlotAssignments,
     usedItemIds,
+    cursorSlotId,
     selectedSlotIdSet,
     draggedSourceSlotIdSet,
     dragPreviews,
     clearDragState,
+    setCursorSlot,
+    setCursorMisUnit,
+    placeLibraryItemAtCursor,
     beginItemDrag,
     beginCategoryDrag,
     beginSlotItemDrag,
@@ -465,6 +469,7 @@ export function PlannerApp() {
             hallNames={labelNames.hallNames}
             sectionNames={labelNames.sectionNames}
             misNames={labelNames.misNames}
+            cursorSlotId={cursorSlotId}
             viewportRef={viewportRef}
             zoom={zoom}
             pan={pan}
@@ -477,6 +482,8 @@ export function PlannerApp() {
             onSlotDragOver={handleSlotDragOver}
             onSlotDrop={handleSlotDrop}
             onViewportDropFallback={handleViewportDropFallback}
+            onCursorSlotChange={setCursorSlot}
+            onCursorMisChange={setCursorMisUnit}
             onSectionSlicesChange={handleSectionSlicesChange}
             onSectionSideTypeChange={handleSectionSideTypeChange}
             onSectionSideRowsChange={handleSectionSideRowsChange}
@@ -506,6 +513,7 @@ export function PlannerApp() {
           usedItemIds={usedItemIds}
           fillDirection={fillDirection}
           onFillDirectionChange={setFillDirection}
+          onItemContextPlace={placeLibraryItemAtCursor}
           onItemDragStart={beginItemDrag}
           onCategoryDragStart={beginCategoryDrag}
           onLibraryDragOver={handleLibraryDragOver}
