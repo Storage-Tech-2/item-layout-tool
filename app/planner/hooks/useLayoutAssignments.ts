@@ -369,7 +369,19 @@ export function useLayoutAssignments({
         fromSlotId: anchorSlotId,
         toSlotId: nextSlotId,
         style: "hall-jump",
-        direction: toMeta.hallId >= fromMeta.hallId ? "right" : "left",
+        // Preserve "forward" flow when transitioning between halls.
+        direction: "right",
+      };
+    }
+
+    if (fromMeta.side !== toMeta.side) {
+      return {
+        fromSlotId: anchorSlotId,
+        toSlotId: nextSlotId,
+        style: "turn",
+        // Match cross-row turn semantics: vertical leg first, then forward leg.
+        direction: toMeta.side > fromMeta.side ? "down" : "up",
+        turnToDirection: toMeta.slice >= fromMeta.slice ? "right" : "left",
       };
     }
 

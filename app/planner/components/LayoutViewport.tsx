@@ -908,21 +908,22 @@ export function LayoutViewport({
       : null;
     const anchorStyle = indicatorAnchorStyle(primaryDirection);
 
-    const start = { x: 10, y: 10 };
+    const indicatorSize = 24;
+    const start = { x: 12, y: 12 };
     const primaryVector = directionVector(primaryDirection);
     const first = {
-      x: start.x + primaryVector.x * 5.6,
-      y: start.y + primaryVector.y * 5.6,
+      x: start.x + primaryVector.x * 5,
+      y: start.y + primaryVector.y * 5,
     };
 
     if (hint.style === "hall-jump") {
       const end = {
-        x: first.x + primaryVector.x * 4.8,
-        y: first.y + primaryVector.y * 4.8,
+        x: first.x + primaryVector.x * 4,
+        y: first.y + primaryVector.y * 4,
       };
       return (
         <span className="pointer-events-none absolute z-6" style={anchorStyle}>
-          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+          <svg width={indicatorSize} height={indicatorSize} viewBox={`0 0 ${indicatorSize} ${indicatorSize}`} aria-hidden="true">
             <path
               d={`M${start.x} ${start.y} L${end.x} ${end.y}`}
               fill="none"
@@ -954,12 +955,12 @@ export function LayoutViewport({
     if (hint.style === "turn" && secondaryDirection) {
       const secondaryVector = directionVector(secondaryDirection);
       const end = {
-        x: first.x + secondaryVector.x * 5.2,
-        y: first.y + secondaryVector.y * 5.2,
+        x: first.x + secondaryVector.x * 6.4,
+        y: first.y + secondaryVector.y * 6.4,
       };
       return (
         <span className="pointer-events-none absolute z-6" style={anchorStyle}>
-          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+          <svg width={indicatorSize} height={indicatorSize} viewBox={`0 0 ${indicatorSize} ${indicatorSize}`} aria-hidden="true">
             <path
               d={`M${start.x} ${start.y} L${first.x} ${first.y} L${end.x} ${end.y}`}
               fill="none"
@@ -982,12 +983,12 @@ export function LayoutViewport({
     }
 
     const end = {
-      x: first.x + primaryVector.x * 4.8,
-      y: first.y + primaryVector.y * 4.8,
+      x: first.x + primaryVector.x * 4,
+      y: first.y + primaryVector.y * 4,
     };
     return (
       <span className="pointer-events-none absolute z-6" style={anchorStyle}>
-        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+        <svg width={indicatorSize} height={indicatorSize} viewBox={`0 0 ${indicatorSize} ${indicatorSize}`} aria-hidden="true">
           <path
             d={`M${start.x} ${start.y} L${end.x} ${end.y}`}
             fill="none"
