@@ -125,7 +125,7 @@ const H_LAYOUT: StorageLayoutDefinition = {
         name: "Main Core",
         shape: "rectangle",
         width: Math.max(Math.round(CORE_SIZE * 0.5), 92),
-        height: Math.max(Math.round(CORE_SIZE * 2.5), 320),
+        height: Math.max(Math.round(CORE_SIZE * 2), 320),
         halls: [
             {
                 id: 1,
@@ -183,6 +183,15 @@ const STORAGE_LAYOUTS: Record<StorageLayoutPreset, StorageLayoutDefinition> = {
     cross: CROSS_LAYOUT,
     h: H_LAYOUT,
 };
+
+export function getLayoutHallName(
+    preset: StorageLayoutPreset,
+    hallId: HallId,
+): string | undefined {
+    const definition = STORAGE_LAYOUTS[preset];
+    const hallsById = mapHallsById(definition);
+    return hallsById[hallId]?.name;
+}
 
 function hallIdFromLayoutHall(hall: Hall, fallbackIndex: number): HallId {
     if (Number.isFinite(hall.id) && hall.id > 0) {

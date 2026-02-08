@@ -17,6 +17,7 @@ import {
 } from "../constants";
 import {
   directionOrientation,
+  getLayoutHallName,
   resolveStorageLayout,
   type HallDirection,
   type StorageLayoutPreset,
@@ -405,11 +406,26 @@ export function LayoutViewport({
 
   const updateHallName = useCallback((hallId: HallId, rawName: string): void => {
     const trimmed = rawName.trim();
-    setHallNames((current) => ({
-      ...current,
-      [hallId]: trimmed.length > 0 ? trimmed : defaultHallLabel(hallId),
-    }));
+    setHallNames((current) => {
+      if (trimmed.length === 0) {
+        const next = { ...current };
+        delete next[hallId];
+        return next;
+      }
+      return {
+        ...current,
+        [hallId]: trimmed,
+      };
+    });
   }, []);
+
+  const hallDisplayName = useCallback(
+    (hallId: HallId): string =>
+      hallNames[hallId] ??
+      getLayoutHallName(storageLayoutPreset, hallId) ??
+      defaultHallLabel(hallId),
+    [hallNames, storageLayoutPreset],
+  );
 
   function renderSideEditor(
     hallId: HallId,
@@ -1362,7 +1378,7 @@ export function LayoutViewport({
                 >
                   <div className="grid gap-[0.08rem]">
                     <div className="text-[0.78rem] font-bold uppercase tracking-[0.05em]">
-                      {(hallNames[panel.hallId] ?? hallConfigs[panel.hallId]?.name ?? defaultHallLabel(panel.hallId))} Slice {panel.slice + 1} •{" "}
+                      {hallDisplayName(panel.hallId)} Slice {panel.slice + 1} •{" "}
                       {panel.side === 0 ? "Left" : "Right"} MIS {panel.misUnit + 1}
                     </div>
                     <div className={`text-[0.68rem] ${subTextClass}`}>
@@ -1506,7 +1522,7 @@ export function LayoutViewport({
                       }}
                       title="Click to rename hall"
                     >
-                      {hallNames[hallId] ?? hall.name ?? defaultHallLabel(hallId)}
+                      {hallDisplayName(hallId)}
                     </span>
                       <button
                         type="button"
