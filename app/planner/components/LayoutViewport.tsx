@@ -17,7 +17,6 @@ import {
 } from "../constants";
 import {
   directionOrientation,
-  directionReverseSlices,
   resolveStorageLayout,
   type HallDirection,
   type StorageLayoutPreset,
@@ -155,17 +154,6 @@ function defaultHallLabel(hallId: HallId): string {
 
 function expandedMisKey(target: ExpandedMisTarget): string {
   return `${target.hallId}:${target.slice}:${target.side}:${target.misUnit}`;
-}
-
-function getVisualSliceOrder(
-  slices: number,
-  reverseSlices: boolean,
-): number[] {
-  const order = Array.from({ length: slices }, (_, index) => index);
-  if (reverseSlices) {
-    order.reverse();
-  }
-  return order;
 }
 
 function misPreviewLayout(cardWidth: number, cardHeight: number): { columns: number; maxItems: number } {
@@ -708,15 +696,13 @@ export function LayoutViewport({
   function renderHallContent(
     hallId: HallId,
     config: HallConfig,
+    layoutDirection: HallDirection,
     orientation: "horizontal" | "vertical",
-    reverseSlices: boolean,
     hallWidth: number,
     hallHeight: number,
   ): ReactNode {
     const slices = resolveHallSlices(config);
-    const visualSlices = getVisualSliceOrder(slices.length, reverseSlices).map(
-      (index) => slices[index],
-    );
+    const visualSlices = slices;
 
     let maxLeftDepth = 0;
     let maxRightDepth = 0;
@@ -746,10 +732,13 @@ export function LayoutViewport({
       );
 
     const slots: ReactNode[] = [];
+    const swapSidesForDirection = layoutDirection === "south" || layoutDirection === "west";
+    const reverseCrossAxisForDirection = layoutDirection === "south" || layoutDirection === "west";
     for (const slice of visualSlices) {
       for (const side of [0, 1] as const) {
         const sideConfig = side === 0 ? slice.sideLeft : slice.sideRight;
         const sideDepth = sideDepthPx(sideConfig);
+        const visualSide = swapSidesForDirection ? (side === 0 ? 1 : 0) : side;
 
         if (sideConfig.type === "mis") {
           const misWidth = Math.max(1, sideConfig.misWidth);
@@ -797,9 +786,12 @@ export function LayoutViewport({
 
             if (orientation === "horizontal") {
               const unitCrossSize = 112;
-              const baseTop = side === 0 ? 0 : hallHeight - sideDepth;
+              const baseTop = visualSide === 0 ? 0 : hallHeight - sideDepth;
+              const visualMisUnit = reverseCrossAxisForDirection
+                ? sideConfig.misUnitsPerSlice - 1 - misUnit
+                : misUnit;
               const x = misMainStart + 2;
-              const y = baseTop + misUnit * (unitCrossSize + SLOT_GAP) + 2;
+              const y = baseTop + visualMisUnit * (unitCrossSize + SLOT_GAP) + 2;
               const cardWidth = Math.max(12, misMainSize - 4);
               const cardHeight = Math.max(42, unitCrossSize - 4);
               const previewLayout = misPreviewLayout(cardWidth, cardHeight);
@@ -872,8 +864,11 @@ export function LayoutViewport({
               );
             } else {
               const unitCrossSize = 112;
-              const baseLeft = side === 0 ? 0 : hallWidth - sideDepth;
-              const x = baseLeft + misUnit * (unitCrossSize + SLOT_GAP) + 2;
+              const baseLeft = visualSide === 0 ? 0 : hallWidth - sideDepth;
+              const visualMisUnit = reverseCrossAxisForDirection
+                ? sideConfig.misUnitsPerSlice - 1 - misUnit
+                : misUnit;
+              const x = baseLeft + visualMisUnit * (unitCrossSize + SLOT_GAP) + 2;
               const y = misMainStart + 2;
               const cardWidth = Math.max(42, unitCrossSize - 4);
               const cardHeight = Math.max(12, misMainSize - 4);
@@ -952,18 +947,21 @@ export function LayoutViewport({
 
         for (let row = 0; row < sideConfig.rowsPerSlice; row += 1) {
           const slotKey = nonMisSlotId(hallId, slice.globalSlice, side, row);
+          const visualRow = reverseCrossAxisForDirection
+            ? sideConfig.rowsPerSlice - 1 - row
+            : row;
           if (orientation === "horizontal") {
-            const baseTop = side === 0 ? 0 : hallHeight - sideDepth;
+            const baseTop = visualSide === 0 ? 0 : hallHeight - sideDepth;
             const x = slice.mainStart + (slice.mainSize - SLOT_SIZE) / 2;
-            const y = baseTop + row * (SLOT_SIZE + SLOT_GAP);
+            const y = baseTop + visualRow * (SLOT_SIZE + SLOT_GAP);
             slots.push(
               <div key={slotKey} className="absolute" style={{ left: x, top: y }}>
                 {renderSlot(slotKey)}
               </div>,
             );
           } else {
-            const baseLeft = side === 0 ? 0 : hallWidth - sideDepth;
-            const x = baseLeft + row * (SLOT_SIZE + SLOT_GAP);
+            const baseLeft = visualSide === 0 ? 0 : hallWidth - sideDepth;
+            const x = baseLeft + visualRow * (SLOT_SIZE + SLOT_GAP);
             const y = slice.mainStart + (slice.mainSize - SLOT_SIZE) / 2;
             slots.push(
               <div key={slotKey} className="absolute" style={{ left: x, top: y }}>
@@ -1416,10 +1414,6 @@ export function LayoutViewport({
               viewMode === "flat"
                 ? "horizontal"
                 : directionOrientation(hallLayout.directions[hallId]);
-            const reverseSlices =
-              viewMode === "flat"
-                ? false
-                : directionReverseSlices(hallLayout.directions[hallId]);
             const placement = hallLayout.positions[hallId];
             const layoutDirection = hallLayout.directions[hallId];
             const controlAnchorStyle = (() => {
@@ -1530,8 +1524,8 @@ export function LayoutViewport({
                 {renderHallContent(
                   hallId,
                   hall,
+                  layoutDirection,
                   orientation,
-                  reverseSlices,
                   placement.width,
                   placement.height,
                 )}

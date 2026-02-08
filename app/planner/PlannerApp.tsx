@@ -22,7 +22,7 @@ export function PlannerApp() {
     addHallSection,
     removeHallSection,
   } = useHallConfigs();
-  const [fillDirection, setFillDirection] = useState<FillDirection>("column");
+  const [fillDirection, setFillDirection] = useState<FillDirection>("row");
   const {
     itemById,
     activeSlotAssignments,

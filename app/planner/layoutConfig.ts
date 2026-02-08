@@ -314,10 +314,6 @@ function directionAnchor(direction: HallDirection): HallAnchor {
     }
 }
 
-export function directionReverseSlices(direction: HallDirection): boolean {
-    return direction === "north" || direction === "west";
-}
-
 function laneOffset(index: number, count: number, spacing: number): number {
     return (index - (count - 1) / 2) * spacing;
 }
