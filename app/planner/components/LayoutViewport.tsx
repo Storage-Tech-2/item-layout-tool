@@ -245,6 +245,36 @@ function misPreviewLayout(cardWidth: number, cardHeight: number): { columns: num
   return { columns, maxItems: columns * rows };
 }
 
+type ParsedMisSlotId = {
+  hallId: HallId;
+  slice: number;
+  side: 0 | 1;
+  misUnit: number;
+  index: number;
+};
+
+function parseMisSlotIdValue(slotId: string): ParsedMisSlotId | null {
+  const parts = slotId.split(":");
+  if (parts.length !== 6 || parts[1] !== "m") {
+    return null;
+  }
+  const hallId = Number(parts[0]);
+  const slice = Number(parts[2]);
+  const side = Number(parts[3]);
+  const misUnit = Number(parts[4]);
+  const index = Number(parts[5]);
+  if (
+    !Number.isFinite(hallId) ||
+    !Number.isFinite(slice) ||
+    (side !== 0 && side !== 1) ||
+    !Number.isFinite(misUnit) ||
+    !Number.isFinite(index)
+  ) {
+    return null;
+  }
+  return { hallId, slice, side, misUnit, index };
+}
+
 function sideDepthPx(side: HallSideConfig): number {
   if (side.type === "mis") {
     return side.misUnitsPerSlice * 112 + Math.max(0, side.misUnitsPerSlice - 1) * SLOT_GAP;
@@ -853,6 +883,16 @@ export function LayoutViewport({
       .filter((panel): panel is ExpandedMisPanel => panel !== null);
   }, [expandedMisTargets, hallConfigs]);
 
+  const popupColumnsBySlotId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const panel of expandedMisPanels) {
+      for (const slotId of panel.slotIds) {
+        map.set(slotId, panel.columns);
+      }
+    }
+    return map;
+  }, [expandedMisPanels]);
+
   const toggleExpandedMis = useCallback((target: ExpandedMisTarget): void => {
     const targetKey = expandedMisKey(target);
     setExpandedMisTargets((current) => {
@@ -869,7 +909,11 @@ export function LayoutViewport({
     });
   }, []);
 
-  function renderSlot(slotId: string, slotTintClassName?: string): ReactNode {
+  function renderSlot(
+    slotId: string,
+    slotTintClassName?: string,
+    useHallDirectionMapping = true,
+  ): ReactNode {
     const assignedItemId = slotAssignments[slotId];
     const assignedItem = assignedItemId ? itemById.get(assignedItemId) : undefined;
     const isDraggedSource = draggedSourceSlotIds.has(slotId);
@@ -886,6 +930,43 @@ export function LayoutViewport({
       isCursorSlot && cursorMovementHint?.fromSlotId === slotId
         ? cursorMovementHint
         : null;
+    const popupAdjustedHint = (() => {
+      if (useHallDirectionMapping || !slotMovementHint || slotMovementHint.style !== "straight") {
+        return slotMovementHint;
+      }
+      const columns = popupColumnsBySlotId.get(slotId);
+      if (!columns || columns <= 1) {
+        return slotMovementHint;
+      }
+      const fromMeta = parseMisSlotIdValue(slotMovementHint.fromSlotId);
+      const toMeta = parseMisSlotIdValue(slotMovementHint.toSlotId);
+      if (!fromMeta || !toMeta) {
+        return slotMovementHint;
+      }
+      const sameMisUnit =
+        fromMeta.hallId === toMeta.hallId &&
+        fromMeta.slice === toMeta.slice &&
+        fromMeta.side === toMeta.side &&
+        fromMeta.misUnit === toMeta.misUnit;
+      if (!sameMisUnit || toMeta.index <= fromMeta.index) {
+        return slotMovementHint;
+      }
+      const fromRow = Math.floor(fromMeta.index / columns);
+      const toRow = Math.floor(toMeta.index / columns);
+      if (toRow === fromRow) {
+        return slotMovementHint;
+      }
+      return {
+        ...slotMovementHint,
+        style: "turn" as const,
+        direction: "down" as const,
+        turnToDirection: "left" as const,
+      };
+    })();
+
+    const indicatorHallDirections = useHallDirectionMapping
+      ? hallLayout.directions
+      : ({} as Record<HallId, HallDirection>);
 
     return (
       <button
@@ -1026,14 +1107,18 @@ export function LayoutViewport({
         {isCursorSlot ? (
           <span className="pointer-events-none absolute -right-[0.12rem] -top-[0.12rem] z-3 h-[0.45rem] w-[0.45rem] rounded-full border border-[rgba(120,53,15,0.9)] bg-[rgba(245,158,11,0.96)]" />
         ) : null}
-        {slotMovementHint ? (
+        {popupAdjustedHint ? (
           <CursorMovementIndicator
-            hint={slotMovementHint}
-            hallDirections={hallLayout.directions}
+            hint={popupAdjustedHint}
+            hallDirections={indicatorHallDirections}
           />
         ) : null}
       </button>
     );
+  }
+
+  function renderPopupSlot(slotId: string): ReactNode {
+    return renderSlot(slotId, undefined, false);
   }
 
   function renderHallContent(
@@ -1876,7 +1961,7 @@ export function LayoutViewport({
         }
         onRenameMis={updateMisName}
         misDisplayName={misDisplayName}
-        renderSlot={renderSlot}
+        renderSlot={renderPopupSlot}
       />
 
       <div
