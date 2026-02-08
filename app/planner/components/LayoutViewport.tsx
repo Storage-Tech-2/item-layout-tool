@@ -101,6 +101,8 @@ type FlatLayoutMetrics = {
   top: number;
 };
 
+const FLAT_VIEW_HALL_GAP = 56;
+
 function toExpandedMisKey(target: ExpandedMisTarget): string {
   return `${target.hallId}:${target.slice}:${target.misUnit}`;
 }
@@ -131,7 +133,6 @@ function buildFlatLayoutMetrics(
   hallConfigs: Record<HallId, HallConfig>,
   center: number,
 ): FlatLayoutMetrics {
-  const verticalGap = 34;
   const dimensions = HALL_ORDER.map((hallId) => {
     const config = hallConfigs[hallId];
     const orientation: "horizontal" | "vertical" = "horizontal";
@@ -140,7 +141,7 @@ function buildFlatLayoutMetrics(
   });
   const totalHeight =
     dimensions.reduce((sum, hall) => sum + hall.height, 0) +
-    Math.max(0, dimensions.length - 1) * verticalGap;
+    Math.max(0, dimensions.length - 1) * FLAT_VIEW_HALL_GAP;
   const maxWidth = dimensions.reduce((max, hall) => Math.max(max, hall.width), 0);
   return {
     dimensions,
@@ -349,7 +350,6 @@ export function LayoutViewport({
     };
 
     if (viewMode === "flat") {
-      const verticalGap = 34;
       const flatLayout = buildFlatLayoutMetrics(hallConfigs, center);
       let currentTop = flatLayout.top;
       const leftAlignedX = flatLayout.left;
@@ -366,7 +366,7 @@ export function LayoutViewport({
           width: hall.width,
           height: hall.height,
         };
-        currentTop += hall.height + verticalGap;
+        currentTop += hall.height + FLAT_VIEW_HALL_GAP;
       }
       return positions;
     }
