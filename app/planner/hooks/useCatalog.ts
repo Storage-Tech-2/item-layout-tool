@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { withBasePath } from "../base-path";
 import type { CatalogItem, CatalogResponse } from "../types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -20,18 +21,12 @@ function parseCreativeTabs(rawCreativeTabs: unknown): string[] {
 }
 
 function getCatalogCandidateUrls(): string[] {
-  const candidates: string[] = [];
-
-  if (typeof window !== "undefined") {
-    const segments = window.location.pathname.split("/").filter(Boolean);
-    if (segments.length > 0) {
-      candidates.push(`/${segments[0]}/items/items.json`);
-    }
-  }
-
-  candidates.push("/items/items.json");
-
-  return Array.from(new Set(candidates));
+  return Array.from(
+    new Set([
+      withBasePath("/items/items.json"),
+      "/items/items.json",
+    ]),
+  );
 }
 
 export function useCatalog(): {
@@ -83,7 +78,7 @@ export function useCatalog(): {
           .filter((item) => !hasNoLootTableFlag(item.blockLoot))
           .map((item) => ({
             id: item.id,
-            texturePath: item.texturePath as string,
+            texturePath: withBasePath(item.texturePath as string),
             creativeTabs: parseCreativeTabs(item.creativeTabs),
           }))
           .filter((item) => !item.creativeTabs.includes("spawn_eggs"))
