@@ -927,7 +927,7 @@ export function LayoutViewport({
         y: circleCenter.y - primaryVector.y * (circleRadius + 1.4),
       };
       return (
-        <span className="pointer-events-none absolute z-6" style={anchorStyle}>
+        <span className="pointer-events-none absolute z-[30]" style={anchorStyle}>
           <svg width={indicatorSize} height={indicatorSize} viewBox={`0 0 ${indicatorSize} ${indicatorSize}`} aria-hidden="true">
             <path
               d={`M${start.x} ${start.y} L${end.x} ${end.y}`}
@@ -964,7 +964,7 @@ export function LayoutViewport({
         y: first.y + secondaryVector.y * 6.4,
       };
       return (
-        <span className="pointer-events-none absolute z-6" style={anchorStyle}>
+        <span className="pointer-events-none absolute z-[30]" style={anchorStyle}>
           <svg width={indicatorSize} height={indicatorSize} viewBox={`0 0 ${indicatorSize} ${indicatorSize}`} aria-hidden="true">
             <path
               d={`M${start.x} ${start.y} L${first.x} ${first.y} L${end.x} ${end.y}`}
@@ -992,7 +992,7 @@ export function LayoutViewport({
       y: first.y + primaryVector.y * 4,
     };
     return (
-      <span className="pointer-events-none absolute z-6" style={anchorStyle}>
+      <span className="pointer-events-none absolute z-[30]" style={anchorStyle}>
         <svg width={indicatorSize} height={indicatorSize} viewBox={`0 0 ${indicatorSize} ${indicatorSize}`} aria-hidden="true">
           <path
             d={`M${start.x} ${start.y} L${end.x} ${end.y}`}
@@ -1036,7 +1036,7 @@ export function LayoutViewport({
       <button
         key={slotId}
         type="button"
-        className={`relative grid h-8.5 w-8.5 cursor-pointer place-items-center overflow-visible rounded-[0.45rem] border p-0 transition hover:-translate-y-px ${isSelected
+        className={`relative z-0 grid h-8.5 w-8.5 cursor-pointer place-items-center overflow-visible rounded-[0.45rem] border p-0 transition hover:z-20 hover:-translate-y-px ${isSelected
           ? "hover:shadow-[0_0_0_2px_rgba(37,99,235,0.55)]"
           : "hover:shadow-[0_3px_8px_rgba(57,47,30,0.22)]"
           } ${assignedItem
@@ -1047,7 +1047,7 @@ export function LayoutViewport({
               ? "border-[rgba(194,65,12,0.92)] shadow-[0_0_0_2px_rgba(251,146,60,0.45)]"
               : "border-[rgba(22,132,120,0.92)] shadow-[0_0_0_2px_rgba(85,204,178,0.38)]"
             : ""
-          } ${isSelected ? "shadow-[0_0_0_2px_rgba(37,99,235,0.55)]" : ""} ${isCursorSlot ? "shadow-[0_0_0_2px_rgba(217,119,6,0.9)] border-[rgba(180,83,9,0.86)]" : ""}`}
+          } ${isSelected ? "shadow-[0_0_0_2px_rgba(37,99,235,0.55)]" : ""} ${isCursorSlot ? "z-20 shadow-[0_0_0_2px_rgba(217,119,6,0.9)] border-[rgba(180,83,9,0.86)]" : ""}`}
         draggable={Boolean(assignedItem)}
         onPointerDown={(event) => {
           if (event.shiftKey) {
