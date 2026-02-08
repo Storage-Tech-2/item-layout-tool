@@ -1,12 +1,5 @@
 import type { NextConfig } from "next";
 
-const configuredBasePath = (process.env.NEXT_BASE_PATH ?? "").trim().replace(/\/$/, "");
-const basePath = configuredBasePath
-  ? configuredBasePath.startsWith("/")
-    ? configuredBasePath
-    : `/${configuredBasePath}`
-  : "";
-
 const nextConfig: NextConfig = {
   /**
    * Enable static exports.
@@ -21,12 +14,7 @@ const nextConfig: NextConfig = {
    *
    * @see https://nextjs.org/docs/app/api-reference/next-config-js/basePath
    */
-  ...(basePath
-    ? {
-        basePath,
-        assetPrefix: basePath,
-      }
-    : {}),
+  basePath: "/item-layout-tool",
 
   /**
    * Disable server-based image optimization. Next.js does not support
