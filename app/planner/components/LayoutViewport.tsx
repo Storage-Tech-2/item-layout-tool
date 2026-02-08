@@ -34,6 +34,8 @@ import type {
 import { getHallSize, misSlotId, nonMisSlotId, resolveHallSlices, toTitle } from "../utils";
 
 type LayoutViewportProps = {
+  storageLayoutPreset: StorageLayoutPreset;
+  onStorageLayoutPresetChange: (preset: StorageLayoutPreset) => void;
   hallConfigs: Record<HallId, HallConfig>;
   slotAssignments: Record<string, string>;
   itemById: Map<string, CatalogItem>;
@@ -250,6 +252,8 @@ function DeferredNumberInput({
 }
 
 export function LayoutViewport({
+  storageLayoutPreset,
+  onStorageLayoutPresetChange,
   hallConfigs,
   slotAssignments,
   itemById,
@@ -340,7 +344,6 @@ export function LayoutViewport({
     height: number;
   } | null>(null);
   const [viewMode, setViewMode] = useState<LayoutViewMode>("storage");
-  const [storageLayoutPreset, setStorageLayoutPreset] = useState<StorageLayoutPreset>("cross");
   const [expandedMisTargets, setExpandedMisTargets] = useState<ExpandedMisTarget[]>([]);
   const [hallNames, setHallNames] = useState<Record<HallId, string>>({});
   const hallIds = useMemo(() => Object.keys(hallConfigs).map((key) => Number(key)), [hallConfigs]);
@@ -581,7 +584,7 @@ export function LayoutViewport({
           <>
             <span className="text-[0.54rem] font-semibold">C</span>
             <DeferredNumberInput
-              className="w-[2.8rem] rounded-[0.25rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
+              className="w-[2.8rem] rounded-sm border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
               min={1}
               max={200}
               value={sideConfig.misSlotsPerSlice}
@@ -589,7 +592,7 @@ export function LayoutViewport({
             />
             <span className="text-[0.54rem] font-semibold">U</span>
             <DeferredNumberInput
-              className="w-[2.2rem] rounded-[0.25rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
+              className="w-[2.2rem] rounded-sm border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
               min={1}
               max={8}
               value={sideConfig.misUnitsPerSlice}
@@ -597,7 +600,7 @@ export function LayoutViewport({
             />
             <span className="text-[0.54rem] font-semibold">W</span>
             <DeferredNumberInput
-              className="w-[2.1rem] rounded-[0.25rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
+              className="w-[2.1rem] rounded-sm border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
               min={1}
               max={16}
               value={sideConfig.misWidth}
@@ -608,7 +611,7 @@ export function LayoutViewport({
           <>
             <span className="text-[0.54rem] font-semibold">R</span>
             <DeferredNumberInput
-              className="w-[2.2rem] rounded-[0.25rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
+              className="w-[2.2rem] rounded-sm border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
               min={1}
               max={9}
               value={sideConfig.rowsPerSlice}
@@ -779,7 +782,7 @@ export function LayoutViewport({
       <button
         key={slotId}
         type="button"
-        className={`relative grid h-[34px] w-[34px] cursor-pointer place-items-center overflow-hidden rounded-[0.45rem] border p-0 transition hover:-translate-y-px ${
+        className={`relative grid h-8.5 w-8.5 cursor-pointer place-items-center overflow-hidden rounded-[0.45rem] border p-0 transition hover:-translate-y-px ${
           isSelected
             ? "hover:shadow-[0_0_0_2px_rgba(37,99,235,0.55)]"
             : "hover:shadow-[0_3px_8px_rgba(57,47,30,0.22)]"
@@ -869,7 +872,7 @@ export function LayoutViewport({
             alt={assignedItem.id}
             width={22}
             height={22}
-            className="pointer-events-none relative z-[1]"
+            className="pointer-events-none relative z-1"
             style={{ imageRendering: "pixelated" }}
             draggable={false}
             unoptimized
@@ -877,7 +880,7 @@ export function LayoutViewport({
         ) : null}
         {showPreviewItem ? (
           <div
-            className={`pointer-events-none absolute inset-0 z-[1] ${
+            className={`pointer-events-none absolute inset-0 z-1 ${
               isSwapPreview
                 ? showAssignedItem
                   ? "bg-[rgba(251,146,60,0.2)]"
@@ -894,7 +897,7 @@ export function LayoutViewport({
             alt={previewItem.id}
             width={22}
             height={22}
-            className={`pointer-events-none absolute inset-0 z-[2] m-auto ${
+            className={`pointer-events-none absolute inset-0 z-2 m-auto ${
               showAssignedItem ? "opacity-40" : "opacity-[0.72]"
             }`}
             style={{ imageRendering: "pixelated" }}
@@ -1114,14 +1117,14 @@ export function LayoutViewport({
                     });
                   }}
                 >
-                  <div className="leading-[1] text-[0.5rem] font-bold uppercase tracking-[0.02em] text-[#355039]">
+                  <div className="leading-none text-[0.5rem] font-bold uppercase tracking-[0.02em] text-[#355039]">
                     MIS {misGroupNumber}
                   </div>
-                  <div className="leading-[1] text-[0.48rem] font-semibold text-[#33524f]">
+                  <div className="leading-none text-[0.48rem] font-semibold text-[#33524f]">
                     {previewEntries.length}/{sideConfig.misSlotsPerSlice}
                   </div>
                   <div
-                    className="grid content-start gap-[2px]"
+                    className="grid content-start gap-0.5"
                     style={{ gridTemplateColumns: `repeat(${previewColumns}, 16px)` }}
                   >
                     {previewEntries
@@ -1134,7 +1137,7 @@ export function LayoutViewport({
                       return (
                         <div
                           key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${entry.itemId}-${previewIndex}`}
-                          className={`grid h-[16px] w-[16px] place-items-center overflow-hidden rounded-[0.2rem] border ${
+                          className={`grid h-4 w-4 place-items-center overflow-hidden rounded-[0.2rem] border ${
                             entry.previewKind === "swap"
                               ? "border-[rgba(194,65,12,0.55)] bg-[rgba(255,233,213,0.92)]"
                               : entry.previewKind === "place"
@@ -1203,14 +1206,14 @@ export function LayoutViewport({
                     });
                   }}
                 >
-                  <div className="leading-[1] text-[0.5rem] font-bold uppercase tracking-[0.02em] text-[#355039]">
+                  <div className="leading-nonee text-[0.5rem] font-bold uppercase tracking-[0.02em] text-[#355039]">
                     MIS {misGroupNumber}
                   </div>
-                  <div className="leading-[1] text-[0.48rem] font-semibold text-[#33524f]">
+                  <div className="leading-none text-[0.48rem] font-semibold text-[#33524f]">
                     {previewEntries.length}/{sideConfig.misSlotsPerSlice}
                   </div>
                   <div
-                    className="grid content-start gap-[2px]"
+                    className="grid content-start gap-0.5"
                     style={{ gridTemplateColumns: `repeat(${previewColumns}, 16px)` }}
                   >
                     {previewEntries
@@ -1223,7 +1226,7 @@ export function LayoutViewport({
                       return (
                         <div
                           key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${entry.itemId}-${previewIndex}`}
-                          className={`grid h-[16px] w-[16px] place-items-center overflow-hidden rounded-[0.2rem] border ${
+                          className={`grid h-4 w-4 place-items-center overflow-hidden rounded-[0.2rem] border ${
                             entry.previewKind === "swap"
                               ? "border-[rgba(194,65,12,0.55)] bg-[rgba(255,233,213,0.92)]"
                               : entry.previewKind === "place"
@@ -1513,47 +1516,24 @@ export function LayoutViewport({
           <div className="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-[#5e513f]">
             Layout Options
           </div>
-          <div className="flex items-center gap-[0.25rem]">
-            <button
-              type="button"
-              className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
-                storageLayoutPreset === "cross"
-                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
-              }`}
-              onClick={() => {
-                setStorageLayoutPreset("cross");
-                if (viewMode === "storage") {
-                  onRecenterViewport();
-                }
-              }}
-            >
-              Cross Layout
-            </button>
-            <button
-              type="button"
-              className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
-                storageLayoutPreset === "h"
-                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
-              }`}
-              onClick={() => {
-                setStorageLayoutPreset("h");
-                if (viewMode === "storage") {
-                  onRecenterViewport();
-                }
-              }}
-            >
-              H Layout
-            </button>
-          </div>
+          <select
+            className="min-w-[8.2rem] rounded-[0.42rem] border border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] px-[0.45rem] py-[0.22rem] text-[0.7rem] font-semibold text-[#3b2f22]"
+            value={storageLayoutPreset}
+            onChange={(event) =>
+              onStorageLayoutPresetChange(event.target.value as StorageLayoutPreset)
+            }
+          >
+            <option value="cross">Cross Layout</option>
+            <option value="h">H Layout</option>
+            <option value="hcross">H-Cross Layout</option>
+          </select>
         </div>
       </div>
 
       <div className="absolute right-4 top-4 z-20 grid justify-items-end gap-[0.45rem]" data-no-pan>
         <div className="grid gap-[0.45rem]">
           <div className="grid gap-[0.35rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem]">
-            <div className="flex items-center gap-[0.25rem]">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
@@ -1598,7 +1578,7 @@ export function LayoutViewport({
         </div>
 
         <div
-          className="w-fit justify-self-end flex items-center gap-[0.45rem] rounded-full border border-[rgba(134,105,67,0.35)] bg-[rgba(255,250,239,0.92)] px-[0.45rem] py-[0.25rem]"
+          className="w-fit justify-self-end flex items-center gap-[0.45rem] rounded-full border border-[rgba(134,105,67,0.35)] bg-[rgba(255,250,239,0.92)] px-[0.45rem] py-1"
         >
         <button
           type="button"
@@ -1669,7 +1649,7 @@ export function LayoutViewport({
                   </div>
                   <button
                     type="button"
-                    className={`rounded-[0.4rem] border px-[0.5rem] py-[0.2rem] text-[0.72rem] font-semibold ${closeClass}`}
+                    className={`rounded-[0.4rem] border px-2 py-[0.2rem] text-[0.72rem] font-semibold ${closeClass}`}
                     onClick={() =>
                       setExpandedMisTargets((current) =>
                         current.filter(
@@ -1684,7 +1664,7 @@ export function LayoutViewport({
                 </header>
                 <div className="max-h-[64vh] overflow-auto p-3">
                   <div
-                    className="grid content-start gap-[4px]"
+                    className="grid content-start gap-1"
                     style={{
                       gridTemplateColumns: `repeat(${panel.columns}, ${SLOT_SIZE}px)`,
                     }}
@@ -1828,7 +1808,7 @@ export function LayoutViewport({
                         <span className="text-[0.56rem] font-semibold">#{sectionIndex + 1}</span>
                         <span className="text-[0.54rem] font-semibold">S</span>
                         <DeferredNumberInput
-                          className="w-[2.7rem] rounded-[0.25rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
+                          className="w-[2.7rem] rounded-sm border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
                           min={1}
                           max={200}
                           value={section.slices}

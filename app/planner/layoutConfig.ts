@@ -3,7 +3,7 @@ import type { HallConfig, HallId, HallOrientation, HallSideConfig } from "./type
 import { getHallSize } from "./utils";
 
 export type HallDirection = "north" | "east" | "south" | "west";
-export type StorageLayoutPreset = "cross" | "h";
+export type StorageLayoutPreset = "cross" | "h" | "hcross";
 
 export type HallCore = {
     name: string;
@@ -266,6 +266,7 @@ const HCROSS_LAYOUT: StorageLayoutDefinition = {
 const STORAGE_LAYOUTS: Record<StorageLayoutPreset, StorageLayoutDefinition> = {
     cross: CROSS_LAYOUT,
     h: H_LAYOUT,
+    hcross: HCROSS_LAYOUT,
 };
 
 export function getLayoutHallName(

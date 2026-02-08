@@ -8,11 +8,15 @@ import { useHallConfigs, type HallSideKey } from "./hooks/useHallConfigs";
 import { useLayoutAssignments } from "./hooks/useLayoutAssignments";
 import { useViewportNavigation } from "./hooks/useViewportNavigation";
 import type { FillDirection, HallId, HallType } from "./types";
+import { buildInitialHallConfigs, type StorageLayoutPreset } from "./layoutConfig";
+import { buildOrderedSlotIds } from "./utils";
 
 export function PlannerApp() {
   const { catalogItems, isLoadingCatalog, catalogError } = useCatalog();
   const {
+    storageLayoutPreset,
     hallConfigs,
+    applyLayoutPreset,
     setSectionSlices,
     setSectionSideType,
     setSectionSideRows,
@@ -40,6 +44,7 @@ export function PlannerApp() {
     handleViewportDropFallback,
     handleLibraryDragOver,
     handleLibraryDrop,
+    preserveAssignmentsForConfigChange,
     clearSlot,
     setSelectedSlotIds,
   } = useLayoutAssignments({
@@ -59,6 +64,10 @@ export function PlannerApp() {
     handlePointerMove,
     handlePointerEnd,
   } = useViewportNavigation();
+  const [pendingLayoutChange, setPendingLayoutChange] = useState<{
+    preset: StorageLayoutPreset;
+    removedCount: number;
+  } | null>(null);
 
   function handleSectionSlicesChange(hallId: HallId, sectionIndex: number, value: string): void {
     setSectionSlices(hallId, sectionIndex, value);
@@ -117,10 +126,47 @@ export function PlannerApp() {
     removeHallSection(hallId, sectionIndex);
   }
 
+  function applyPresetChange(nextPreset: StorageLayoutPreset): void {
+    if (nextPreset === storageLayoutPreset) {
+      return;
+    }
+
+    const nextHallConfigs = buildInitialHallConfigs(nextPreset);
+    const nextSlotCount = buildOrderedSlotIds(nextHallConfigs, fillDirection).length;
+    const assignedCount = Object.keys(activeSlotAssignments).length;
+    const removedCount = Math.max(0, assignedCount - nextSlotCount);
+
+    if (removedCount > 0) {
+      setPendingLayoutChange({
+        preset: nextPreset,
+        removedCount,
+      });
+      return;
+    }
+
+    preserveAssignmentsForConfigChange(hallConfigs, nextHallConfigs);
+    applyLayoutPreset(nextPreset);
+    recenterViewport();
+  }
+
+  function confirmPendingLayoutChange(): void {
+    if (!pendingLayoutChange) {
+      return;
+    }
+
+    const nextHallConfigs = buildInitialHallConfigs(pendingLayoutChange.preset);
+    preserveAssignmentsForConfigChange(hallConfigs, nextHallConfigs);
+    applyLayoutPreset(pendingLayoutChange.preset);
+    setPendingLayoutChange(null);
+    recenterViewport();
+  }
+
   return (
     <div className="flex h-screen min-h-screen overflow-hidden bg-[radial-gradient(circle_at_15%_12%,#fff8e8_0%,rgba(255,248,232,0)_35%),radial-gradient(circle_at_88%_8%,#e2f1ee_0%,rgba(226,241,238,0)_30%),linear-gradient(180deg,#f9f4ea_0%,#f2eadd_100%)] text-[#1f1a16] max-[1200px]:h-auto max-[1200px]:flex-col max-[1200px]:overflow-auto">
       <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r border-r-[rgba(114,88,46,0.24)] max-[1200px]:min-h-[62vh] max-[1200px]:border-r-0 max-[1200px]:border-b max-[1200px]:border-b-[rgba(114,88,46,0.24)]">
         <LayoutViewport
+          storageLayoutPreset={storageLayoutPreset}
+          onStorageLayoutPresetChange={applyPresetChange}
           hallConfigs={hallConfigs}
           slotAssignments={activeSlotAssignments}
           itemById={itemById}
@@ -168,6 +214,41 @@ export function PlannerApp() {
         onLibraryDrop={handleLibraryDrop}
         onAnyDragEnd={clearDragState}
       />
+
+      {pendingLayoutChange ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-[rgba(27,22,16,0.42)] px-4">
+          <div className="w-full max-w-md rounded-[0.9rem] border border-[rgba(137,107,67,0.45)] bg-[linear-gradient(180deg,rgba(255,251,241,0.98)_0%,rgba(248,238,220,0.98)_100%)] p-4 shadow-[0_16px_42px_rgba(23,19,13,0.34)]">
+            <h3 className="m-0 text-[1rem] font-bold text-[#3b3126]">Confirm Layout Change</h3>
+            <p className="mt-2 text-[0.85rem] leading-[1.35] text-[#5f5446]">
+              Switching to this layout will remove{" "}
+              <span className="font-semibold text-[#8a2f22]">
+                {pendingLayoutChange.removedCount}
+              </span>{" "}
+              placed item{pendingLayoutChange.removedCount === 1 ? "" : "s"} because the new
+              layout has fewer slots.
+            </p>
+            <p className="mt-1 text-[0.78rem] text-[#6c5f4e]">
+              Do you want to continue?
+            </p>
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.88)] px-3 py-[0.34rem] text-[0.78rem] font-semibold text-[#3b2f22]"
+                onClick={() => setPendingLayoutChange(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-[0.45rem] border border-[rgba(156,55,42,0.52)] bg-[rgba(255,235,231,0.95)] px-3 py-[0.34rem] text-[0.78rem] font-semibold text-[#7c2217]"
+                onClick={confirmPendingLayoutChange}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

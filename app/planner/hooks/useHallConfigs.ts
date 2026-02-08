@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { buildInitialHallConfigs } from "../layoutConfig";
+import {
+  buildInitialHallConfigs,
+  type StorageLayoutPreset,
+} from "../layoutConfig";
 import type {
   HallConfig,
   HallId,
@@ -12,7 +15,9 @@ import { clamp } from "../utils";
 export type HallSideKey = "left" | "right";
 
 type UseHallConfigsResult = {
+  storageLayoutPreset: StorageLayoutPreset;
   hallConfigs: Record<HallId, HallConfig>;
+  applyLayoutPreset: (preset: StorageLayoutPreset) => void;
   setSectionSlices: (hallId: HallId, sectionIndex: number, rawValue: string) => void;
   setSectionSideType: (
     hallId: HallId,
@@ -121,9 +126,15 @@ function updateSection(
 }
 
 export function useHallConfigs(): UseHallConfigsResult {
+  const [storageLayoutPreset, setStorageLayoutPreset] = useState<StorageLayoutPreset>("cross");
   const [hallConfigs, setHallConfigs] = useState<Record<HallId, HallConfig>>(() =>
     buildInitialHallConfigs("cross"),
   );
+
+  function applyLayoutPreset(preset: StorageLayoutPreset): void {
+    setStorageLayoutPreset(preset);
+    setHallConfigs(buildInitialHallConfigs(preset));
+  }
 
   function setSectionSlices(hallId: HallId, sectionIndex: number, rawValue: string): void {
     const slices = clamp(Number(rawValue) || 1, 1, 200);
@@ -274,7 +285,9 @@ export function useHallConfigs(): UseHallConfigsResult {
   }
 
   return {
+    storageLayoutPreset,
     hallConfigs,
+    applyLayoutPreset,
     setSectionSlices,
     setSectionSideType,
     setSectionSideRows,
