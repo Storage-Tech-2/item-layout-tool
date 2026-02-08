@@ -2303,7 +2303,11 @@ function shouldIncludeInPlannerCatalog(
   parsedItem: ParsedItem | null,
   creativeTabs: string[],
 ): boolean {
-  if (itemId === "ender_dragon_spawn_egg" || itemId === "wither_spawn_egg") {
+  if (
+    itemId === "ender_dragon_spawn_egg" ||
+    itemId === "wither_spawn_egg" ||
+    itemId === "vault"
+  ) {
     return false;
   }
 

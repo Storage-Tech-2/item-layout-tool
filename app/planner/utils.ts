@@ -1,8 +1,12 @@
 import {
   AISLE_GAP,
+  BRICK_INDEX,
+  BRICK_PREFIXES,
   COLOR_INDEX,
   COLOR_PREFIXES,
   MIS_CROSS,
+  STONE_INDEX,
+  STONE_PREFIXES,
   SLOT_GAP,
   SLOT_SIZE,
   WOOD_INDEX,
@@ -51,11 +55,107 @@ type CustomCategoryMatch = {
 };
 
 function matchCustomMaterialCategory(itemId: string): CustomCategoryMatch | null {
-  if (/(^|_)nether_brick(s)?($|_)/.test(itemId)) {
+  const brickItems = [
+    "brick",
+    "nether_brick",
+    "resin_brick",
+  ];
+  if (brickItems.includes(itemId)) {
     return {
-      id: "collection:nether_bricks",
-      label: "Nether Brick",
-      dragLabel: "nether brick set",
+      id: "collection:brick_items",
+      label: "Brick Items",
+      dragLabel: "brick item set",
+    };
+  }
+
+  const bambooItems = [
+    "bamboo",
+    "bamboo_block",
+    "bamboo_mosaic",
+  ];
+  if (bambooItems.includes(itemId)) {
+    return {
+      id: "collection:bamboo",
+      label: "Bamboo",
+      dragLabel: "bamboo set",
+    };
+  }
+
+  const fungusItems = [
+    "crimson_fungus",
+    "warped_fungus",
+  ];
+  if (fungusItems.includes(itemId)) {
+    return {
+      id: "collection:fungus",
+      label: "Fungus",
+      dragLabel: "fungus set",
+    };
+  }
+
+
+
+  // dirt
+  const dirtItems = [
+    "grass_block",
+    "dirt",
+    "coarse_dirt",
+    "rooted_dirt",
+    "podzol",
+    "dirt_path",
+    "farmland",
+    "mycelium"
+  ];
+  if (dirtItems.includes(itemId)) {
+    return {
+      id: "collection:dirt",
+      label: "Dirt",
+      dragLabel: "dirt set",
+    };
+  }
+  // grass, minus grass_block
+  const grassItems = [
+    "short_dry_grass",
+    "tall_dry_grass",
+    "fern",
+    "large_fern",
+    "dead_bush",
+    "tall_grass",
+    "short_grass",
+    "seagrass",
+  ];
+  if (grassItems.includes(itemId)) {
+    return {
+      id: "collection:grass",
+      label: "Grass & Ferns",
+      dragLabel: "grass & ferns set",
+    };
+  }
+
+  // heads/skulls
+  if (/(^|_)(player_)?head($|_)/.test(itemId) || /(^|_)skull($|_)/.test(itemId)) {
+    return {
+      id: "collection:heads",
+      label: "Heads & Skulls",
+      dragLabel: "heads & skulls set",
+    };
+  }
+
+  // seeds
+  if (/(^|_)seeds($|_)/.test(itemId)) {
+    return {
+      id: "collection:seeds",
+      label: "Seeds",
+      dragLabel: "seeds set",
+    };
+  }
+
+  // sherds
+  if (/(^|_)sherd($|_)/.test(itemId)) {
+    return {
+      id: "collection:sherds",
+      label: "Sherds",
+      dragLabel: "sherds set",
     };
   }
 
@@ -72,14 +172,6 @@ function matchCustomMaterialCategory(itemId: string): CustomCategoryMatch | null
       id: "collection:ice",
       label: "Ice",
       dragLabel: "ice set",
-    };
-  }
-
-  if (/(^|_)bamboo($|_)/.test(itemId)) {
-    return {
-      id: "collection:bamboo",
-      label: "Bamboo",
-      dragLabel: "bamboo set",
     };
   }
 
@@ -141,13 +233,27 @@ function matchCustomMaterialCategory(itemId: string): CustomCategoryMatch | null
     };
   }
 
+  // candles
+  if (/(^|_)candle($|_)/.test(itemId)) {
+    return {
+      id: "collection:candles",
+      label: "Candles",
+      dragLabel: "candle set",
+    };
+  }
+
   
 
   return null;
 }
 
 function resolvePrimaryCreativeTab(item: CatalogItem): string {
-  if (item.id.endsWith("sculk_sensor") && item.creativeTabs.includes("redstone_blocks")) {
+  // if (item.id.endsWith("sculk_sensor") && item.creativeTabs.includes("redstone_blocks")) {
+  //   return "redstone_blocks";
+  // }
+
+  // if it has redstone blocks, always return it
+  if (item.creativeTabs.includes("redstone_blocks")) {
     return "redstone_blocks";
   }
 
@@ -382,7 +488,7 @@ export function buildCategories(items: CatalogItem[]): Category[] {
       label: string;
       dragLabel: string;
       items: CatalogItem[];
-      sortMode: "color" | "wood" | "alpha";
+      sortMode: "color" | "wood" | "stone" | "brick" | "alpha";
     }
   >();
 
@@ -400,23 +506,6 @@ export function buildCategories(items: CatalogItem[]): Category[] {
         });
       }
       grouped.get(customCategory.id)?.items.push(item);
-      groupedItemIds.add(item.id);
-      continue;
-    }
-
-    const colorPrefix = startsWithVariantPrefix(item.id, COLOR_PREFIXES);
-    if (colorPrefix) {
-      const base = item.id.slice(colorPrefix.length + 1);
-      const key = `color:${base}`;
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          label: `${toTitle(base)} Colors`,
-          dragLabel: `${toTitle(base)} color set`,
-          items: [],
-          sortMode: "color",
-        });
-      }
-      grouped.get(key)?.items.push(item);
       groupedItemIds.add(item.id);
       continue;
     }
@@ -441,6 +530,64 @@ export function buildCategories(items: CatalogItem[]): Category[] {
       continue;
     }
 
+    const stonePrefix = startsWithVariantPrefix(item.id, STONE_PREFIXES);
+    if (stonePrefix) {
+      const base = item.id.slice(stonePrefix.length + 1);
+      const key = `stone:${base}`;
+      const baseTitle = toTitle(base);
+      const label = baseTitle === "Stone" ? "Stone Variants" : `${baseTitle} Stone Variants`;
+      const dragLabel = baseTitle === "Stone" ? "stone set" : `${baseTitle.toLowerCase()} stone set`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          label,
+          dragLabel,
+          items: [],
+          sortMode: "stone",
+        });
+      }
+      grouped.get(key)?.items.push(item);
+      groupedItemIds.add(item.id);
+      continue;
+    }
+
+    const brickPrefix = startsWithVariantPrefix(item.id, BRICK_PREFIXES);
+    if (brickPrefix) {
+      const base = item.id.slice(brickPrefix.length + 1);
+      const key = `brick:${base}`;
+      const baseTitle = toTitle(base);
+      const label = baseTitle === "Brick" ? "Brick Variants" : `${baseTitle} Brick Variants`;
+      const dragLabel = baseTitle === "Brick" ? "brick set" : `${baseTitle.toLowerCase()} brick set`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          label,
+          dragLabel,
+          items: [],
+          sortMode: "brick",
+        });
+      }
+      grouped.get(key)?.items.push(item);
+      groupedItemIds.add(item.id);
+      continue;
+    }
+
+
+    const colorPrefix = startsWithVariantPrefix(item.id, COLOR_PREFIXES);
+    if (colorPrefix) {
+      const base = item.id.slice(colorPrefix.length + 1);
+      const key = `color:${base}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          label: `${toTitle(base)} Colors`,
+          dragLabel: `${toTitle(base)} color set`,
+          items: [],
+          sortMode: "color",
+        });
+      }
+      grouped.get(key)?.items.push(item);
+      groupedItemIds.add(item.id);
+      continue;
+    }
+
   }
 
   const categories: Category[] = [];
@@ -457,6 +604,18 @@ export function buildCategories(items: CatalogItem[]): Category[] {
         const aPrefix = startsWithVariantPrefix(a.id, WOOD_PREFIXES) ?? "";
         const bPrefix = startsWithVariantPrefix(b.id, WOOD_PREFIXES) ?? "";
         return (WOOD_INDEX.get(aPrefix) ?? 999) - (WOOD_INDEX.get(bPrefix) ?? 999);
+      });
+    } else if (bucket.sortMode === "stone") {
+      bucket.items.sort((a, b) => {
+        const aPrefix = startsWithVariantPrefix(a.id, STONE_PREFIXES) ?? "";
+        const bPrefix = startsWithVariantPrefix(b.id, STONE_PREFIXES) ?? "";
+        return (STONE_INDEX.get(aPrefix) ?? 999) - (STONE_INDEX.get(bPrefix) ?? 999);
+      });
+    } else if (bucket.sortMode === "brick") {
+      bucket.items.sort((a, b) => {
+        const aPrefix = startsWithVariantPrefix(a.id, BRICK_PREFIXES) ?? "";
+        const bPrefix = startsWithVariantPrefix(b.id, BRICK_PREFIXES) ?? "";
+        return (BRICK_INDEX.get(aPrefix) ?? 999) - (BRICK_INDEX.get(bPrefix) ?? 999);
       });
     } else {
       bucket.items.sort((a, b) => a.id.localeCompare(b.id));
