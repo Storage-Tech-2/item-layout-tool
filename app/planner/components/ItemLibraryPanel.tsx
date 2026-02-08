@@ -470,6 +470,7 @@ export function ItemLibraryPanel({
                   <button
                     type="button"
                     className="h-[1.4rem] w-[1.4rem] cursor-pointer rounded-[0.32rem] border border-[rgba(114,87,52,0.38)] bg-[#fffcf5] p-0 text-[#4f3c23]"
+                    aria-label={isCollapsed ? "Expand category" : "Collapse category"}
                     onClick={() => {
                       setCollapsedOverrides((current) => ({
                         ...current,
@@ -477,7 +478,37 @@ export function ItemLibraryPanel({
                       }));
                     }}
                   >
-                    {isCollapsed ? "▸" : "▾"}
+                    {isCollapsed ? (
+                      <svg
+                        viewBox="0 0 16 16"
+                        className="mx-auto h-3.5 w-3.5"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M6 3.5L11 8L6 12.5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        viewBox="0 0 16 16"
+                        className="mx-auto h-3.5 w-3.5"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M3.5 6L8 11L12.5 6"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    )}
                   </button>
 
                   <div className="grid gap-[0.1rem]">
