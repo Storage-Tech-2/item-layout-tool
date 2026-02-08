@@ -175,6 +175,7 @@ type SectionVisualTheme = {
 };
 
 const VISIBILITY_OVERSCAN = 80;
+const LAYOUT_HINT_DISMISSED_STORAGE_KEY = "planner:layout-hint-dismissed";
 const SECTION_DIVIDER_CLASS_NAME =
   "bg-[rgba(104,84,58,0.62)] shadow-[0_0_0_1px_rgba(255,243,221,0.68)]";
 
@@ -556,6 +557,7 @@ export function LayoutViewport({
     width: number;
     height: number;
   } | null>(null);
+  const [isHintBoxVisible, setIsHintBoxVisible] = useState(false);
   const [viewMode, setViewMode] = useState<LayoutViewMode>("storage");
   const [expandedMisTargets, setExpandedMisTargets] = useState<ExpandedMisTarget[]>([]);
   const hallIds = useMemo(() => Object.keys(hallConfigs).map((key) => Number(key)), [hallConfigs]);
@@ -683,6 +685,16 @@ export function LayoutViewport({
       viewport.removeEventListener("contextmenu", preventContextMenu);
     };
   }, [viewportRef]);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(LAYOUT_HINT_DISMISSED_STORAGE_KEY);
+      setIsHintBoxVisible(stored !== "1");
+    } catch {
+      // Ignore storage access issues; default to showing hint.
+      setIsHintBoxVisible(true);
+    }
+  }, []);
 
   const updateHallName = useCallback((hallId: HallId, rawName: string): void => {
     onHallNameChange(hallId, rawName);
@@ -1725,12 +1737,11 @@ export function LayoutViewport({
       }}
       onClick={(event) => {
         const target = event.target as HTMLElement;
-        const clickedStorageBackground =
-          viewMode === "storage" &&
+        const clickedViewportBackground =
           !target.closest("[data-mis-panel]") &&
           !target.closest("[data-mis-card]") &&
           !target.closest("[data-no-pan]");
-        if (clickedStorageBackground) {
+        if (clickedViewportBackground) {
           setExpandedMisTargets([]);
         }
 
@@ -1841,15 +1852,28 @@ export function LayoutViewport({
         }
       }}
     >
-      <div
-        className="absolute bottom-4 left-4 z-20 grid gap-[0.1rem] rounded-[0.55rem] border border-[rgba(134,105,67,0.35)] bg-[rgba(255,252,245,0.92)] px-[0.55rem] py-[0.45rem] text-[0.72rem] leading-[1.3] text-[#6d6256]"
-        data-no-pan
-      >
-        <div>Mouse wheel to zoom</div>
-        <div>Drag to pan</div>
-        <div>Shift + drag to box-select slots</div>
-        <div>Right-click a placed slot to clear</div>
-      </div>
+      {isHintBoxVisible ? (
+        <button
+          type="button"
+          className="absolute bottom-4 left-4 z-20 grid cursor-pointer gap-[0.1rem] rounded-[0.55rem] border border-[rgba(134,105,67,0.35)] bg-[rgba(255,252,245,0.92)] px-[0.55rem] py-[0.45rem] text-left text-[0.72rem] leading-[1.3] text-[#6d6256]"
+          data-no-pan
+          title="Click to dismiss tips"
+          onClick={(event) => {
+            event.stopPropagation();
+            setIsHintBoxVisible(false);
+            try {
+              window.localStorage.setItem(LAYOUT_HINT_DISMISSED_STORAGE_KEY, "1");
+            } catch {
+              // Ignore storage access issues.
+            }
+          }}
+        >
+          <div>Mouse wheel to zoom</div>
+          <div>Drag to pan</div>
+          <div>Shift + drag to box-select slots</div>
+          <div>Right-click a placed slot to clear</div>
+        </button>
+      ) : null}
 
       <div className="absolute left-4 top-4 z-20 grid gap-[0.45rem]" data-no-pan>
         <div className="grid gap-[0.28rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem] text-[0.68rem] text-[#4f4639]">
