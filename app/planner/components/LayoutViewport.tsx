@@ -661,33 +661,6 @@ export function LayoutViewport({
     };
   }, [center, hallConfigs, hallIds, storageLayoutPreset, viewMode]);
 
-  const controlLaneByHall = useMemo<Record<HallId, number>>(() => {
-    const grouped = new Map<HallDirection, Array<{ hallId: HallId; axis: number }>>();
-    for (const hallId of hallIds) {
-      const direction = hallLayout.directions[hallId];
-      const placement = hallLayout.positions[hallId];
-      if (!direction || !placement) {
-        continue;
-      }
-      const topLeft = resolvePlacementTopLeft(placement);
-      const axis = direction === "north" || direction === "south" ? topLeft.left : topLeft.top;
-      if (!grouped.has(direction)) {
-        grouped.set(direction, []);
-      }
-      grouped.get(direction)!.push({ hallId, axis });
-    }
-
-    const lanes: Record<HallId, number> = {};
-    for (const group of grouped.values()) {
-      group
-        .sort((a, b) => a.axis - b.axis)
-        .forEach((entry, index) => {
-          lanes[entry.hallId] = index;
-        });
-    }
-    return lanes;
-  }, [hallIds, hallLayout.directions, hallLayout.positions]);
-
   const storageBounds = useMemo(() => {
     if (viewMode !== "storage") {
       return null;
@@ -1745,55 +1718,101 @@ export function LayoutViewport({
               return null;
             }
             const controlAnchorStyle = (() => {
-              const controlLane = controlLaneByHall[hallId] ?? 0;
-              const useEndAnchor = viewMode === "storage" && controlLane > 0;
               if (viewMode === "flat") {
                 return { left: "-0.36rem", top: "50%", transform: "translate(-100%, -50%)" };
               }
 
+              const sameDirectionHalls = hallIds.filter(
+                (otherHallId) =>
+                  hallLayout.directions[otherHallId] === layoutDirection,
+              );
+              const sameDirectionHallIndex = sameDirectionHalls.indexOf(hallId);
               switch (layoutDirection) {
                 case "south":
-                  return {
-                    left: "50%",
-                    bottom: `-0.36rem`,
-                    transform: "translate(-50%, 100%)",
-                  };
-                case "north":
-                  return {
-                    left: "50%",
-                    top: `-0.36rem`,
-                    transform: "translate(-50%, -100%)",
-                  };
-                case "east":
-                  if (useEndAnchor) {
+                  if (sameDirectionHalls.length === 1) {
                     return {
-                      right: "0",
+                      left: "50%",
                       bottom: `-0.36rem`,
-                      transform: "translate(0, 100%)",
+                      transform: "translate(-50%, 100%)",
                     };
-                  }
-
-                  return {
-                    right: "0",
-                    top: `-0.36rem`,
-                    transform: "translate(0, -100%)",
-                  };
-                case "west":
-                default:
-
-                  if (useEndAnchor) {
+                  } else if (sameDirectionHalls.length === 2) {
+                    if (sameDirectionHallIndex === 0) {
+                      return {
+                        right: "0",
+                        bottom: `-0.36rem`,
+                        transform: "translate(0, 100%)",
+                      };
+                    }
                     return {
                       left: "0",
                       bottom: `-0.36rem`,
                       transform: "translate(0, 100%)",
                     };
                   }
-
-                  return {
-                    left: "0",
-                    top: `-0.36rem`,
-                    transform: "translate(0, -100%)",
-                  };
+                case "north":
+                  if (sameDirectionHalls.length === 1) {
+                    return {
+                      left: "50%",
+                      top: `-0.36rem`,
+                      transform: "translate(-50%, -100%)",
+                    };
+                  } else if (sameDirectionHalls.length === 2) {
+                    if (sameDirectionHallIndex === 0) {
+                      return {
+                        right: "0",
+                        top: `-0.36rem`,
+                        transform: "translate(0, -100%)",
+                      };
+                    }
+                    return {
+                      left: "0",
+                      top: `-0.36rem`,
+                      transform: "translate(0, -100%)",
+                    };
+                  }
+                case "east":
+                  if (sameDirectionHalls.length === 1) {
+                    return {
+                      right: "0",
+                      top: `-0.36rem`,
+                      transform: "translate(0, -100%)",
+                    };
+                  } else if (sameDirectionHalls.length === 2) {
+                    if (sameDirectionHallIndex === 0) {
+                      return {
+                        right: "0",
+                        top: `-0.36rem`,
+                        transform: "translate(0, -100%)",
+                      };
+                    }
+                    return {
+                      right: "0",
+                      bottom: "-0.36rem",
+                      transform: "translate(0, 100%)",
+                    };
+                  }
+                case "west":
+                default:
+                  if (sameDirectionHalls.length === 1) {
+                    return {
+                      left: "0",
+                      top: `-0.36rem`,
+                      transform: "translate(0, -100%)",
+                    };
+                  } else if (sameDirectionHalls.length === 2) {
+                    if (sameDirectionHallIndex === 0) {
+                      return {
+                        left: "0",
+                        top: `-0.36rem`,
+                        transform: "translate(0, -100%)",
+                      };
+                    }
+                    return {
+                      left: "0",
+                      bottom: "-0.36rem",
+                      transform: "translate(0, 100%)",
+                    };
+                  }
               }
             })();
 
