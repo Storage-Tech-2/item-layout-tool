@@ -121,7 +121,7 @@ export function CursorMovementIndicator({
       y: circleCenter.y - primaryVector.y * (circleRadius + 1.4),
     };
     return (
-      <span className="pointer-events-none absolute z-[30]" style={anchorStyle}>
+      <span className="pointer-events-none absolute z-30" style={anchorStyle}>
         <svg width={indicatorSize} height={indicatorSize} viewBox={`0 0 ${indicatorSize} ${indicatorSize}`} aria-hidden="true">
           <path
             d={`M${start.x} ${start.y} L${end.x} ${end.y}`}
@@ -158,7 +158,7 @@ export function CursorMovementIndicator({
       y: first.y + secondaryVector.y * 6.4,
     };
     return (
-      <span className="pointer-events-none absolute z-[30]" style={anchorStyle}>
+      <span className="pointer-events-none absolute z-30" style={anchorStyle}>
         <svg width={indicatorSize} height={indicatorSize} viewBox={`0 0 ${indicatorSize} ${indicatorSize}`} aria-hidden="true">
           <path
             d={`M${start.x} ${start.y} L${first.x} ${first.y} L${end.x} ${end.y}`}
@@ -186,7 +186,7 @@ export function CursorMovementIndicator({
     y: first.y + primaryVector.y * 4,
   };
   return (
-    <span className="pointer-events-none absolute z-[30]" style={anchorStyle}>
+    <span className="pointer-events-none absolute z-30" style={anchorStyle}>
       <svg width={indicatorSize} height={indicatorSize} viewBox={`0 0 ${indicatorSize} ${indicatorSize}`} aria-hidden="true">
         <path
           d={`M${start.x} ${start.y} L${end.x} ${end.y}`}

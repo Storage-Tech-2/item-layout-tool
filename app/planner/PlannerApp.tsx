@@ -558,7 +558,7 @@ export function PlannerApp() {
         <div className="justify-self-center">
           <input
             type="text"
-            className="min-w-[12rem] max-w-[44vw] border-0 bg-transparent px-[0.25rem] py-[0.08rem] text-center text-[1.08rem] font-bold tracking-[0.02em] text-[#4b3a24] placeholder:text-[#8a7a63] focus:outline-none"
+            className="min-w-48 max-w-[44vw] border-0 bg-transparent px-1 py-[0.08rem] text-center text-[1.08rem] font-bold tracking-[0.02em] text-[#4b3a24] placeholder:text-[#8a7a63] focus:outline-none"
             title="Click to rename layout"
             placeholder="Untitled Layout"
             value={labelNames.layoutName}

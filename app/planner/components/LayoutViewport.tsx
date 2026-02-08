@@ -265,6 +265,18 @@ function emptyHallPlacements(hallIds: HallId[]): Record<HallId, HallPlacement> {
   return positions;
 }
 
+function readInitialHintVisibility(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  try {
+    return window.localStorage.getItem(LAYOUT_HINT_DISMISSED_STORAGE_KEY) !== "1";
+  } catch {
+    // Ignore storage access issues; default to showing hint.
+    return true;
+  }
+}
+
 function buildFlatLayoutMetrics(
   hallIds: HallId[],
   hallConfigs: Record<HallId, HallConfig>,
@@ -557,7 +569,7 @@ export function LayoutViewport({
     width: number;
     height: number;
   } | null>(null);
-  const [isHintBoxVisible, setIsHintBoxVisible] = useState(false);
+  const [isHintBoxVisible, setIsHintBoxVisible] = useState(readInitialHintVisibility);
   const [viewMode, setViewMode] = useState<LayoutViewMode>("storage");
   const [expandedMisTargets, setExpandedMisTargets] = useState<ExpandedMisTarget[]>([]);
   const hallIds = useMemo(() => Object.keys(hallConfigs).map((key) => Number(key)), [hallConfigs]);
@@ -685,16 +697,6 @@ export function LayoutViewport({
       viewport.removeEventListener("contextmenu", preventContextMenu);
     };
   }, [viewportRef]);
-
-  useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(LAYOUT_HINT_DISMISSED_STORAGE_KEY);
-      setIsHintBoxVisible(stored !== "1");
-    } catch {
-      // Ignore storage access issues; default to showing hint.
-      setIsHintBoxVisible(true);
-    }
-  }, []);
 
   const updateHallName = useCallback((hallId: HallId, rawName: string): void => {
     onHallNameChange(hallId, rawName);
@@ -1628,7 +1630,7 @@ export function LayoutViewport({
                 />
                 {boundary !== null ? (
                   <div
-                    className={`absolute w-[2px] rounded-full ${SECTION_DIVIDER_CLASS_NAME}`}
+                    className={`absolute w-0.5 rounded-full ${SECTION_DIVIDER_CLASS_NAME}`}
                     style={{ left: boundary - 1, top: 1, height: Math.max(6, hallHeight - 2) }}
                   />
                 ) : null}
@@ -1680,7 +1682,7 @@ export function LayoutViewport({
               />
               {boundary !== null ? (
                 <div
-                  className={`absolute h-[2px] rounded-full ${SECTION_DIVIDER_CLASS_NAME}`}
+                  className={`absolute h-0.5 rounded-full ${SECTION_DIVIDER_CLASS_NAME}`}
                   style={{ left: 1, top: boundary - 1, width: Math.max(6, hallWidth - 2) }}
                 />
               ) : null}
