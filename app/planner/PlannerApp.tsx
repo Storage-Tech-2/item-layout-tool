@@ -109,8 +109,12 @@ export function PlannerApp() {
     [plannerSnapshot],
   );
 
+  type ApplySnapshotOptions = {
+    recenter?: boolean;
+  };
+
   const applySnapshot = useCallback(
-    (snapshot: PlannerSnapshot) => {
+    (snapshot: PlannerSnapshot, options?: ApplySnapshotOptions) => {
       setPendingLayoutChange(null);
       clearDragState();
       setSelectedSlotIds([]);
@@ -118,7 +122,9 @@ export function PlannerApp() {
       setLayoutState(snapshot.storageLayoutPreset, cloneHallConfigs(snapshot.hallConfigs));
       replaceSlotAssignments(cloneSlotAssignments(snapshot.slotAssignments));
       replaceLabelNames(snapshot.labelNames);
-      recenterViewport();
+      if (options?.recenter ?? true) {
+        recenterViewport();
+      }
     },
     [
       clearDragState,
@@ -130,10 +136,17 @@ export function PlannerApp() {
     ],
   );
 
+  const applyHistorySnapshot = useCallback(
+    (snapshot: PlannerSnapshot) => {
+      applySnapshot(snapshot, { recenter: false });
+    },
+    [applySnapshot],
+  );
+
   const { canUndo, canRedo, undo, redo } = usePlannerHistory({
     snapshot: plannerSnapshot,
     snapshotKey: plannerSnapshotKey,
-    onApplySnapshot: applySnapshot,
+    onApplySnapshot: applyHistorySnapshot,
   });
 
   function handleSectionSlicesChange(hallId: HallId, sectionIndex: number, value: string): void {

@@ -1166,9 +1166,7 @@ export function LayoutViewport({
                           event.currentTarget.blur();
                         }
                       }}
-                    >
-                      {misDisplayName(misTarget, `MIS ${misGroupNumber}`)}
-                    </span>
+                    >{misDisplayName(misTarget, `MIS ${misGroupNumber}`)}</span>
                   </div>
                   <div className="leading-none text-[0.48rem] font-semibold text-[#33524f]">
                     {previewEntries.length}/{sideConfig.misSlotsPerSlice}
@@ -1269,9 +1267,7 @@ export function LayoutViewport({
                           event.currentTarget.blur();
                         }
                       }}
-                    >
-                      {misDisplayName(misTarget, `MIS ${misGroupNumber}`)}
-                    </span>
+                    >{misDisplayName(misTarget, `MIS ${misGroupNumber}`)}</span>
                   </div>
                   <div className="leading-none text-[0.48rem] font-semibold text-[#33524f]">
                     {previewEntries.length}/{sideConfig.misSlotsPerSlice}
@@ -1748,9 +1744,7 @@ export function LayoutViewport({
                   onDragEnd={onAnyDragEnd}
                 >
                   <div className="grid gap-[0.08rem]">
-                    <div className="text-[0.78rem] font-bold uppercase tracking-[0.05em]">
-                      {hallDisplayName(panel.hallId)} Slice {panel.slice + 1} •{" "}
-                      {panel.side === 0 ? "Left" : "Right"}{" "}
+                    <div className="text-[0.78rem] font-bold tracking-[0.02em]">
                       <span
                         className="rounded-[0.22rem] px-[0.12rem] normal-case focus:bg-[rgba(255,255,255,0.84)] focus:outline-none"
                         contentEditable
@@ -1769,9 +1763,7 @@ export function LayoutViewport({
                             event.currentTarget.blur();
                           }
                         }}
-                      >
-                        {misDisplayName(panelTarget, `MIS ${panel.misUnit + 1}`)}
-                      </span>
+                      >{misDisplayName(panelTarget, `MIS ${panel.misUnit + 1}`)}</span>
                     </div>
                     <div className={`text-[0.68rem] ${subTextClass}`}>
                       {panel.slotIds.filter((slotId) => Boolean(slotAssignments[slotId])).length}/
