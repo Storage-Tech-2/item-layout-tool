@@ -75,17 +75,17 @@ export function useLayoutAssignments({
   hallConfigs,
   fillDirection,
 }: UseLayoutAssignmentsInput): UseLayoutAssignmentsResult {
-  const [slotAssignments, setSlotAssignments] = useState<Record<string, string>>({});
-  const [cursorSlotId, setCursorSlotId] = useState<string | null>(null);
-  const [selectedSlotIds, setSelectedSlotIdsState] = useState<string[]>([]);
-  const [activeDragPayload, setActiveDragPayload] = useState<DragPayload | null>(null);
-  const [dragPreviews, setDragPreviews] = useState<PreviewPlacement[]>([]);
-
   const orderedSlotIds = useMemo(
     () => buildOrderedSlotIds(hallConfigs, fillDirection),
     [fillDirection, hallConfigs],
   );
   const orderedSlotIdSet = useMemo(() => new Set(orderedSlotIds), [orderedSlotIds]);
+
+  const [slotAssignments, setSlotAssignments] = useState<Record<string, string>>({});
+  const [cursorSlotId, setCursorSlotId] = useState<string | null>(() => orderedSlotIds[0] ?? null);
+  const [selectedSlotIds, setSelectedSlotIdsState] = useState<string[]>([]);
+  const [activeDragPayload, setActiveDragPayload] = useState<DragPayload | null>(null);
+  const [dragPreviews, setDragPreviews] = useState<PreviewPlacement[]>([]);
 
   const placementContext = useMemo(
     () => ({
@@ -260,6 +260,10 @@ export function useLayoutAssignments({
     setCursorSlotId(nextCursor);
   }
 
+  function resolveCursorForAssignments(assignments: Record<string, string>): string | null {
+    return findFirstEmptySlotFrom(cursorSlotId, assignments) ?? orderedSlotIds[0] ?? null;
+  }
+
   function placeLibraryItemAtCursor(itemId: string): boolean {
     if (!itemById.has(itemId)) {
       return false;
@@ -413,7 +417,7 @@ export function useLayoutAssignments({
 
   function clearLayout(): void {
     setSlotAssignments({});
-    setCursorSlotId(null);
+    setCursorSlotId(orderedSlotIds[0] ?? null);
     setSelectedSlotIdsState([]);
   }
 
@@ -642,7 +646,6 @@ export function useLayoutAssignments({
     }
 
     if (placeMisUnitSwap(anchorSlotId, payload)) {
-      setCursorSlot(anchorSlotId);
       clearDragState();
       return;
     }
@@ -655,7 +658,6 @@ export function useLayoutAssignments({
     });
 
     placePayload(anchorSlotId, payload);
-    setCursorSlot(placements[0]?.slotId ?? anchorSlotId);
     if (payload.source === "layout") {
       setSelectedSlotIdsState(placements.map((placement) => placement.slotId));
     }
@@ -690,7 +692,6 @@ export function useLayoutAssignments({
     }
 
     placePayload(anchorSlotId, payload);
-    setCursorSlot(placements[0]?.slotId ?? anchorSlotId);
     if (payload.source === "layout") {
       setSelectedSlotIdsState(placements.map((placement) => placement.slotId));
     }
@@ -751,8 +752,9 @@ export function useLayoutAssignments({
   }
 
   function replaceSlotAssignments(assignments: Record<string, string>): void {
-    setSlotAssignments({ ...assignments });
-    setCursorSlotId(null);
+    const normalizedAssignments = retainValidAssignments(assignments, orderedSlotIdSet);
+    setSlotAssignments({ ...normalizedAssignments });
+    setCursorSlotId(resolveCursorForAssignments(normalizedAssignments));
     setSelectedSlotIdsState([]);
     clearDragState();
   }
@@ -817,6 +819,7 @@ export function useLayoutAssignments({
       return bestSlotId;
     };
 
+    let nextAssignments: Record<string, string> = {};
     setSlotAssignments((current) => {
       const currentFromPrevious = retainValidAssignments(current, previousValidSlotIdSet);
       const entries = Object.entries(currentFromPrevious)
@@ -832,6 +835,7 @@ export function useLayoutAssignments({
         });
 
       if (entries.length === 0) {
+        nextAssignments = {};
         return {};
       }
 
@@ -871,11 +875,12 @@ export function useLayoutAssignments({
         }
       }
 
+      nextAssignments = remapped;
       return remapped;
     });
 
     setSelectedSlotIdsState([]);
-    setCursorSlotId(null);
+    setCursorSlotId(resolveCursorForAssignments(nextAssignments));
     clearDragState();
   }
 
