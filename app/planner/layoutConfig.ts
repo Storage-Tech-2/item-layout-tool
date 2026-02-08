@@ -179,6 +179,90 @@ const H_LAYOUT: StorageLayoutDefinition = {
     },
 };
 
+
+const HCROSS_LAYOUT: StorageLayoutDefinition = {
+    core: {
+        name: "Core",
+        shape: "rectangle",
+        width: Math.max(Math.round(CORE_SIZE * 0.5), 92),
+        height: Math.max(Math.round(CORE_SIZE * 2), 320),
+        halls: [
+            {
+                id: 1,
+                name: "Northwest Hall",
+                direction: "west",
+                sections: [
+                    {
+                        slices: 16,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+            {
+                id: 2,
+                name: "Southwest Hall",
+                direction: "west",
+                sections: [
+                    {
+                        slices: 16,
+                        sideLeft: { type: "chest", rowsPerSlice: 4 },
+                        sideRight: { type: "chest", rowsPerSlice: 4 },
+                    },
+                ],
+            },
+            {
+                id: 3,
+                name: "Northeast Hall",
+                direction: "east",
+                sections: [
+                    {
+                        slices: 16,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+            {
+                id: 4,
+                name: "Southeast Hall",
+                direction: "east",
+                sections: [
+                    {
+                        slices: 16,
+                        sideLeft: { type: "chest", rowsPerSlice: 4 },
+                        sideRight: { type: "chest", rowsPerSlice: 4 },
+                    },
+                ],
+            },
+            {
+                id: 5,
+                name: "North Hall",
+                direction: "north",
+                sections: [
+                    {
+                        slices: 16,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+            {
+                id: 6,
+                name: "South Hall",
+                direction: "south",
+                sections: [
+                    {
+                        slices: 16,
+                        sideLeft: { type: "mis", rowsPerSlice: 1, misSlotsPerSlice: 54 },
+                        sideRight: { type: "mis", rowsPerSlice: 1, misSlotsPerSlice: 54 },
+                    },
+                ],
+            },
+        ],
+    },
+};
+
 const STORAGE_LAYOUTS: Record<StorageLayoutPreset, StorageLayoutDefinition> = {
     cross: CROSS_LAYOUT,
     h: H_LAYOUT,
@@ -355,12 +439,12 @@ export function resolveStorageLayout(
                 hallIds.length <= 1
                     ? 0
                     : (() => {
-                          // Spread hall centers across the full core span for this direction.
-                          // Keep a shared lane center regardless of hall thickness so opposite
-                          // directions remain aligned.
-                          const t = index / (hallIds.length - 1);
-                          return -corePerpendicularSpan / 2 + t * corePerpendicularSpan;
-                      })();
+                        // Spread hall centers across the full core span for this direction.
+                        // Keep a shared lane center regardless of hall thickness so opposite
+                        // directions remain aligned.
+                        const t = index / (hallIds.length - 1);
+                        return -corePerpendicularSpan / 2 + t * corePerpendicularSpan;
+                    })();
             const offsetX = direction === "north" || direction === "south" ? offset : 0;
             const offsetY = direction === "east" || direction === "west" ? offset : 0;
 

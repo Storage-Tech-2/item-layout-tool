@@ -289,12 +289,27 @@ export function LayoutViewport({
   });
 
   function resolvePlacementTopLeft(placement: HallPlacement): { left: number; top: number } {
-    const match = /translate\(([-\d.]+)%\s*,\s*([-\d.]+)%\)/.exec(placement.transform);
-    const tx = match ? Number(match[1]) : 0;
-    const ty = match ? Number(match[2]) : 0;
+    const match = /translate\(\s*([^)]+?)\s*,\s*([^)]+?)\s*\)/.exec(placement.transform);
+    const parseTranslate = (
+      raw: string | undefined,
+      axisSpan: number,
+    ): number => {
+      if (!raw) {
+        return 0;
+      }
+      const value = raw.trim();
+      if (value.endsWith("%")) {
+        const numeric = Number(value.slice(0, -1));
+        return Number.isFinite(numeric) ? (numeric / 100) * axisSpan : 0;
+      }
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : 0;
+    };
+    const tx = parseTranslate(match?.[1], placement.width);
+    const ty = parseTranslate(match?.[2], placement.height);
     return {
-      left: placement.left + (tx / 100) * placement.width,
-      top: placement.top + (ty / 100) * placement.height,
+      left: placement.left + tx,
+      top: placement.top + ty,
     };
   }
 
