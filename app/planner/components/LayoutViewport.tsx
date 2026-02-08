@@ -43,6 +43,7 @@ type LayoutViewportProps = {
   sectionNames: Record<string, string>;
   misNames: Record<string, string>;
   cursorSlotId: string | null;
+  cursorMovementHint: CursorMovementHint | null;
   viewportRef: RefObject<HTMLDivElement | null>;
   zoom: number;
   pan: { x: number; y: number };
@@ -167,6 +168,13 @@ type ExpandedMisPanel = ExpandedMisTarget & {
   capacity: number;
 };
 
+type CursorMovementHint = {
+  fromSlotId: string;
+  toSlotId: string;
+  style: "straight" | "turn" | "hall-jump";
+  direction: "right" | "left" | "up" | "down";
+};
+
 type WorldBounds = {
   left: number;
   top: number;
@@ -205,6 +213,20 @@ function sideDepthPx(side: HallSideConfig): number {
     return side.misUnitsPerSlice * 112 + Math.max(0, side.misUnitsPerSlice - 1) * SLOT_GAP;
   }
   return side.rowsPerSlice * SLOT_SIZE + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
+}
+
+function movementRotationDegrees(direction: CursorMovementHint["direction"]): number {
+  switch (direction) {
+    case "up":
+      return -90;
+    case "down":
+      return 90;
+    case "left":
+      return 180;
+    case "right":
+    default:
+      return 0;
+  }
 }
 
 function emptyHallPlacements(hallIds: HallId[]): Record<HallId, HallPlacement> {
@@ -280,6 +302,7 @@ export function LayoutViewport({
   sectionNames,
   misNames,
   cursorSlotId,
+  cursorMovementHint,
   viewportRef,
   zoom,
   pan,
@@ -801,6 +824,90 @@ export function LayoutViewport({
     });
   }, []);
 
+  function renderCursorMovementIndicator(hint: CursorMovementHint): ReactNode {
+    const rotation = movementRotationDegrees(hint.direction);
+
+    if (hint.style === "hall-jump") {
+      return (
+        <span
+          className="pointer-events-none absolute -left-[0.2rem] -top-[0.24rem] z-4"
+          style={{ transform: `rotate(${rotation}deg)` }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path
+              d="M1.2 7 H8.2"
+              fill="none"
+              stroke="rgba(146,64,14,0.95)"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+            <circle
+              cx="10.9"
+              cy="7"
+              r="2.1"
+              fill="none"
+              stroke="rgba(146,64,14,0.95)"
+              strokeWidth="1.4"
+            />
+          </svg>
+        </span>
+      );
+    }
+
+    if (hint.style === "turn") {
+      return (
+        <span
+          className="pointer-events-none absolute -left-[0.22rem] -top-[0.24rem] z-4"
+          style={{ transform: `rotate(${rotation}deg)` }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path
+              d="M2 2 V9 H10"
+              fill="none"
+              stroke="rgba(146,64,14,0.95)"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M8.2 7.5 L10.8 9 L8.2 10.5"
+              fill="none"
+              stroke="rgba(146,64,14,0.95)"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      );
+    }
+
+    return (
+      <span
+        className="pointer-events-none absolute -left-[0.2rem] -top-[0.24rem] z-4"
+        style={{ transform: `rotate(${rotation}deg)` }}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+          <path
+            d="M1.5 7 H10.5"
+            fill="none"
+            stroke="rgba(146,64,14,0.95)"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+          <path
+            d="M8.5 4.8 L11.2 7 L8.5 9.2"
+            fill="none"
+            stroke="rgba(146,64,14,0.95)"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+    );
+  }
+
   function renderSlot(slotId: string): ReactNode {
     const assignedItemId = slotAssignments[slotId];
     const assignedItem = assignedItemId ? itemById.get(assignedItemId) : undefined;
@@ -814,6 +921,10 @@ export function LayoutViewport({
     const showAssignedItem = Boolean(assignedItem) && !showPreviewItem && !isDraggedSource;
     const isSelected = selectedSlotIds.has(slotId) && Boolean(assignedItem);
     const isCursorSlot = cursorSlotId === slotId;
+    const slotMovementHint =
+      isCursorSlot && cursorMovementHint?.fromSlotId === slotId
+        ? cursorMovementHint
+        : null;
 
     return (
       <button
@@ -949,6 +1060,7 @@ export function LayoutViewport({
         {isCursorSlot ? (
           <span className="pointer-events-none absolute -right-[0.12rem] -top-[0.12rem] z-3 h-[0.45rem] w-[0.45rem] rounded-full border border-[rgba(120,53,15,0.9)] bg-[rgba(245,158,11,0.96)]" />
         ) : null}
+        {slotMovementHint ? renderCursorMovementIndicator(slotMovementHint) : null}
       </button>
     );
   }
@@ -1128,6 +1240,10 @@ export function LayoutViewport({
             const misCardCursorClass = cursorSlotId && unitSlotIds.includes(cursorSlotId)
               ? "shadow-[0_0_0_2px_rgba(217,119,6,0.85)] border-[rgba(180,83,9,0.9)]"
               : "";
+            const misCardMovementHint =
+              cursorMovementHint && unitSlotIds.includes(cursorMovementHint.fromSlotId)
+                ? cursorMovementHint
+                : null;
 
             if (orientation === "horizontal") {
               const unitCrossSize = 112;
@@ -1170,6 +1286,7 @@ export function LayoutViewport({
                     toggleExpandedMis(misTarget);
                   }}
                 >
+                  {misCardMovementHint ? renderCursorMovementIndicator(misCardMovementHint) : null}
                   <div className="leading-none text-[0.5rem] font-bold tracking-[0.02em] text-[#355039]">
                     <span
                       className="inline-block min-w-[1.6rem] rounded-[0.18rem] px-[0.06rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none"
@@ -1272,6 +1389,7 @@ export function LayoutViewport({
                     toggleExpandedMis(misTarget);
                   }}
                 >
+                  {misCardMovementHint ? renderCursorMovementIndicator(misCardMovementHint) : null}
                   <div className="leading-none text-[0.5rem] font-bold tracking-[0.02em] text-[#355039]">
                     <span
                       className="inline-block min-w-[1.6rem] rounded-[0.18rem] px-[0.06rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none"

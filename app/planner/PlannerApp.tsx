@@ -63,6 +63,7 @@ export function PlannerApp() {
     activeSlotAssignments,
     usedItemIds,
     cursorSlotId,
+    cursorMovementHint,
     selectedSlotIdSet,
     draggedSourceSlotIdSet,
     dragPreviews,
@@ -470,6 +471,7 @@ export function PlannerApp() {
             sectionNames={labelNames.sectionNames}
             misNames={labelNames.misNames}
             cursorSlotId={cursorSlotId}
+            cursorMovementHint={cursorMovementHint}
             viewportRef={viewportRef}
             zoom={zoom}
             pan={pan}

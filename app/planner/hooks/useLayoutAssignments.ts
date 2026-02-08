@@ -29,6 +29,12 @@ type UseLayoutAssignmentsResult = {
   activeSlotAssignments: Record<string, string>;
   usedItemIds: Set<string>;
   cursorSlotId: string | null;
+  cursorMovementHint: {
+    fromSlotId: string;
+    toSlotId: string;
+    style: "straight" | "turn" | "hall-jump";
+    direction: "right" | "left" | "up" | "down";
+  } | null;
   selectedSlotIdSet: Set<string>;
   draggedSourceSlotIdSet: Set<string>;
   dragPreviews: PreviewPlacement[];
@@ -68,6 +74,16 @@ type ParsedMisUnit = {
   slice: number;
   side: number;
   misUnit: number;
+};
+
+type ParsedSlotMeta = {
+  hallId: HallId;
+  kind: "g" | "m";
+  slice: number;
+  side: 0 | 1;
+  row?: number;
+  misUnit?: number;
+  index?: number;
 };
 
 export function useLayoutAssignments({
@@ -160,6 +176,57 @@ export function useLayoutAssignments({
       return null;
     }
     return { hallId, slice, side, misUnit };
+  }
+
+  function parseSlotMeta(slotId: string): ParsedSlotMeta | null {
+    const parts = slotId.split(":");
+    if (parts.length < 5) {
+      return null;
+    }
+
+    const hallId = Number(parts[0]);
+    const kind = parts[1];
+    const slice = Number(parts[2]);
+    const side = Number(parts[3]) as 0 | 1;
+    if (
+      !Number.isFinite(hallId) ||
+      !Number.isFinite(slice) ||
+      (side !== 0 && side !== 1)
+    ) {
+      return null;
+    }
+
+    if (kind === "g" && parts.length >= 5) {
+      const row = Number(parts[4]);
+      if (!Number.isFinite(row)) {
+        return null;
+      }
+      return {
+        hallId,
+        kind: "g",
+        slice,
+        side,
+        row,
+      };
+    }
+
+    if (kind === "m" && parts.length >= 6) {
+      const misUnit = Number(parts[4]);
+      const index = Number(parts[5]);
+      if (!Number.isFinite(misUnit) || !Number.isFinite(index)) {
+        return null;
+      }
+      return {
+        hallId,
+        kind: "m",
+        slice,
+        side,
+        misUnit,
+        index,
+      };
+    }
+
+    return null;
   }
 
   function isSameMisUnit(a: ParsedMisUnit, b: ParsedMisUnit): boolean {
@@ -263,6 +330,102 @@ export function useLayoutAssignments({
   function resolveCursorForAssignments(assignments: Record<string, string>): string | null {
     return findFirstEmptySlotFrom(cursorSlotId, assignments) ?? orderedSlotIds[0] ?? null;
   }
+
+  function resolveCursorMovementHint(): {
+    fromSlotId: string;
+    toSlotId: string;
+    style: "straight" | "turn" | "hall-jump";
+    direction: "right" | "left" | "up" | "down";
+  } | null {
+    const anchorSlotId = findFirstEmptySlotFrom(cursorSlotId, activeSlotAssignments);
+    if (!anchorSlotId) {
+      return null;
+    }
+
+    const simulatedAssignments = {
+      ...activeSlotAssignments,
+      [anchorSlotId]: "__cursor__",
+    };
+    const nextSlotId = findNextEmptySlotAfter(anchorSlotId, simulatedAssignments);
+    if (!nextSlotId || nextSlotId === anchorSlotId) {
+      return null;
+    }
+
+    const fromMeta = parseSlotMeta(anchorSlotId);
+    const toMeta = parseSlotMeta(nextSlotId);
+    if (!fromMeta || !toMeta) {
+      return {
+        fromSlotId: anchorSlotId,
+        toSlotId: nextSlotId,
+        style: "straight",
+        direction: "right",
+      };
+    }
+
+    if (fromMeta.hallId !== toMeta.hallId) {
+      return {
+        fromSlotId: anchorSlotId,
+        toSlotId: nextSlotId,
+        style: "hall-jump",
+        direction: toMeta.hallId >= fromMeta.hallId ? "right" : "left",
+      };
+    }
+
+    if (fromMeta.kind === "g" && toMeta.kind === "g") {
+      if (fillDirection === "row") {
+        if (fromMeta.row !== toMeta.row) {
+          return {
+            fromSlotId: anchorSlotId,
+            toSlotId: nextSlotId,
+            style: "turn",
+            direction: (toMeta.row ?? 0) >= (fromMeta.row ?? 0) ? "down" : "up",
+          };
+        }
+        return {
+          fromSlotId: anchorSlotId,
+          toSlotId: nextSlotId,
+          style: "straight",
+          direction: toMeta.slice >= fromMeta.slice ? "right" : "left",
+        };
+      }
+
+      if (fromMeta.slice !== toMeta.slice) {
+        return {
+          fromSlotId: anchorSlotId,
+          toSlotId: nextSlotId,
+          style: "turn",
+          direction: toMeta.slice >= fromMeta.slice ? "right" : "left",
+        };
+      }
+      return {
+        fromSlotId: anchorSlotId,
+        toSlotId: nextSlotId,
+        style: "straight",
+        direction: (toMeta.row ?? 0) >= (fromMeta.row ?? 0) ? "down" : "up",
+      };
+    }
+
+    if (fromMeta.kind === "m" && toMeta.kind === "m") {
+      const wrappedWithinMis =
+        (toMeta.misUnit ?? 0) !== (fromMeta.misUnit ?? 0) ||
+        (toMeta.index ?? 0) < (fromMeta.index ?? 0);
+      return {
+        fromSlotId: anchorSlotId,
+        toSlotId: nextSlotId,
+        style: wrappedWithinMis ? "turn" : "straight",
+        direction: wrappedWithinMis ? "down" : "right",
+      };
+    }
+
+    return {
+      fromSlotId: anchorSlotId,
+      toSlotId: nextSlotId,
+      style: "turn",
+      direction: "right",
+    };
+  }
+
+  const cursorMovementHint = resolveCursorMovementHint();
 
   function placeLibraryItemAtCursor(itemId: string): boolean {
     if (!itemById.has(itemId)) {
@@ -889,6 +1052,7 @@ export function useLayoutAssignments({
     activeSlotAssignments,
     usedItemIds,
     cursorSlotId,
+    cursorMovementHint,
     selectedSlotIdSet,
     draggedSourceSlotIdSet,
     dragPreviews,
