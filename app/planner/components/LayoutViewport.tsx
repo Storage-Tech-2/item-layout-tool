@@ -147,7 +147,7 @@ type FlatLayoutMetrics = {
   top: number;
 };
 
-const FLAT_VIEW_HALL_GAP = 56;
+const FLAT_VIEW_HALL_GAP = 25;
 
 type HallLayoutState = {
   positions: Record<HallId, HallPlacement>;
