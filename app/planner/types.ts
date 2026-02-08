@@ -44,11 +44,14 @@ export type CatalogItem = {
   id: string;
   texturePath: string;
   creativeTabs: string[];
+  registration: "block" | "item" | "unknown";
+  maxStackSize: number;
 };
 
 export type RawCatalogItem = {
   id: string;
   texturePath: string | null;
+  registration?: unknown;
   maxStackSize?: unknown;
   blockLoot?: unknown;
   creativeTabs?: unknown;

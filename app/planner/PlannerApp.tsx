@@ -26,6 +26,11 @@ import {
   loadPlannerAutosaveDraft,
   savePlannerAutosaveDraft,
 } from "./lib/plannerDraftStore";
+import {
+  LITEMATIC_EXPORT_OPTIONS,
+  exportLayoutAsLitematic,
+  type LayoutExportMode,
+} from "./lib/layoutExport";
 import type { FillDirection, HallId, HallType } from "./types";
 import { buildInitialHallConfigs, type StorageLayoutPreset } from "./layoutConfig";
 import { buildOrderedSlotIds } from "./utils";
@@ -151,7 +156,10 @@ export function PlannerApp() {
     null,
   );
   const [isAutosaveRestoreResolved, setIsAutosaveRestoreResolved] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isExportingLayout, setIsExportingLayout] = useState(false);
   const openFileInputRef = useRef<HTMLInputElement | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const plannerSnapshot = useMemo<PlannerSnapshot>(
@@ -269,6 +277,36 @@ export function PlannerApp() {
       document.removeEventListener("pointerdown", handleDocumentPointerDown, true);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isExportMenuOpen) {
+      return;
+    }
+
+    function handleDocumentPointerDown(event: PointerEvent): void {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+      if (exportMenuRef.current?.contains(target)) {
+        return;
+      }
+      setIsExportMenuOpen(false);
+    }
+
+    function handleDocumentKeyDown(event: KeyboardEvent): void {
+      if (event.key === "Escape") {
+        setIsExportMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handleDocumentPointerDown);
+    document.addEventListener("keydown", handleDocumentKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handleDocumentPointerDown);
+      document.removeEventListener("keydown", handleDocumentKeyDown);
+    };
+  }, [isExportMenuOpen]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -483,6 +521,48 @@ export function PlannerApp() {
     URL.revokeObjectURL(downloadUrl);
   }
 
+  async function handleExportLayoutClick(mode: LayoutExportMode): Promise<void> {
+    setIsExportMenuOpen(false);
+
+    if (Object.keys(activeSlotAssignments).length === 0) {
+      window.alert("Cannot export an empty layout. Assign at least one item first.");
+      return;
+    }
+
+    try {
+      setIsExportingLayout(true);
+      const exported = await exportLayoutAsLitematic({
+        mode,
+        layoutName: labelNames.layoutName,
+        hallConfigs,
+        slotAssignments: activeSlotAssignments,
+        itemById,
+      });
+
+      const now = new Date().toISOString().replace(/[:]/g, "-");
+      const layoutFileName = toFilenameSegment(labelNames.layoutName);
+      const exportBuffer = exported.bytes.buffer.slice(
+        exported.bytes.byteOffset,
+        exported.bytes.byteOffset + exported.bytes.byteLength,
+      ) as ArrayBuffer;
+      const blob = new Blob([exportBuffer], {
+        type: "application/octet-stream",
+      });
+      const downloadUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = downloadUrl;
+      anchor.download = `${layoutFileName}-${exported.option.fileSuffix}-${now}.litematic`;
+      anchor.click();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Could not export litematic file.";
+      window.alert(message);
+    } finally {
+      setIsExportingLayout(false);
+    }
+  }
+
   function handleRestoreAutosaveClick(): void {
     if (!pendingAutosaveRestore) {
       return;
@@ -548,12 +628,38 @@ export function PlannerApp() {
           >
             Save
           </button>
-          <button
-            type="button"
-            className={TOOLBAR_BUTTON_CLASS}
+          <div
+            ref={exportMenuRef}
+            className="relative"
           >
-            Export
-          </button>
+            <button
+              type="button"
+              className={TOOLBAR_BUTTON_CLASS}
+              aria-haspopup="menu"
+              aria-expanded={isExportMenuOpen}
+              onClick={() => setIsExportMenuOpen((current) => !current)}
+              disabled={isExportingLayout}
+            >
+              {isExportingLayout ? "Exporting..." : "Export"}
+            </button>
+            {isExportMenuOpen ? (
+              <div className="absolute left-0 top-[calc(100%+0.35rem)] z-20 min-w-64 rounded-[0.45rem] border border-[rgba(114,88,46,0.3)] bg-[rgba(255,250,242,0.98)] p-1 shadow-[0_10px_22px_rgba(64,48,24,0.18)]">
+                {LITEMATIC_EXPORT_OPTIONS.map((option) => (
+                  <button
+                    key={option.mode}
+                    type="button"
+                    className="block w-full rounded-[0.35rem] px-2 py-1.5 text-left text-[0.78rem] leading-tight text-[#3b2f22] hover:bg-[rgba(210,184,142,0.2)]"
+                    onClick={() => void handleExportLayoutClick(option.mode)}
+                  >
+                    <span className="block text-[0.8rem] font-semibold">{option.label}</span>
+                    <span className="mt-0.5 block text-[0.72rem] text-[#6d5a3f]">
+                      {option.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
         <div className="justify-self-center">
           <input

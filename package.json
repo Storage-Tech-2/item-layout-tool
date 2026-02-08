@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "fetch:items": "tsx itemfetch/fetch-items.ts"
+    "fetch:items": "tsx itemfetch/fetch-items.ts",
+    "build:nucleation": "cd nucleation && ./build-wasm.sh && mkdir -p ../public/nucleation && rm -rf ../public/nucleation/pkg && cp -R pkg ../public/nucleation/pkg"
   },
   "dependencies": {
     "tsx": "^4.20.5",

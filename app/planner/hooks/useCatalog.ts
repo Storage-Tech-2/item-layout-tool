@@ -9,6 +9,20 @@ function parseCreativeTabs(rawCreativeTabs: unknown): string[] {
   return rawCreativeTabs.filter((entry): entry is string => typeof entry === "string");
 }
 
+function parseRegistration(rawRegistration: unknown): CatalogItem["registration"] {
+  if (rawRegistration === "block" || rawRegistration === "item") {
+    return rawRegistration;
+  }
+  return "unknown";
+}
+
+function parseMaxStackSize(rawMaxStackSize: unknown): number {
+  if (typeof rawMaxStackSize === "number" && Number.isFinite(rawMaxStackSize) && rawMaxStackSize > 0) {
+    return Math.floor(rawMaxStackSize);
+  }
+  return 64;
+}
+
 function getCatalogCandidateUrls(): string[] {
   return Array.from(
     new Set([
@@ -67,6 +81,8 @@ export function useCatalog(): {
             id: item.id,
             texturePath: withBasePath(item.texturePath as string),
             creativeTabs: parseCreativeTabs(item.creativeTabs),
+            registration: parseRegistration(item.registration),
+            maxStackSize: parseMaxStackSize(item.maxStackSize),
           }))
           .sort((a, b) => a.id.localeCompare(b.id));
 
