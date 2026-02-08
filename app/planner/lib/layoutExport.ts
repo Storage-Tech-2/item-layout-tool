@@ -313,7 +313,7 @@ function buildExportSlotEntries(
   const xIndex = new Map(xKeys.map((value, index) => [value, index]));
   const yIndex = new Map(yKeys.map((value, index) => [value, index]));
 
-  const spacing = 2;
+  const spacing = 1;
 
   return raw
     .map((entry) => ({
