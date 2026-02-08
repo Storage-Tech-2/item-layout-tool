@@ -756,6 +756,8 @@ export function LayoutViewport({
             const previewIds = assignedIds.slice(0, 6);
             const hasAssigned = assignedIds.length > 0;
             const firstSlot = unitSlotIds[0];
+            const nextEmptySlot =
+              unitSlotIds.find((slotId) => !slotAssignments[slotId]) ?? firstSlot;
             const previewColumns = Math.max(1, Math.min(3, sideConfig.misWidth));
             const expandedIndex = expandedMisTargets.findIndex(
               (entry) =>
@@ -796,8 +798,8 @@ export function LayoutViewport({
                     onSlotGroupDragStart(event, unitSlotIds, firstSlot);
                   }}
                   onDragEnd={onAnyDragEnd}
-                  onDragOver={(event) => onSlotDragOver(event, firstSlot)}
-                  onDrop={(event) => onSlotDrop(event, firstSlot)}
+                  onDragOver={(event) => onSlotDragOver(event, nextEmptySlot)}
+                  onDrop={(event) => onSlotDrop(event, nextEmptySlot)}
                   onClick={(event) => {
                     event.stopPropagation();
                     toggleExpandedMis({
@@ -868,8 +870,8 @@ export function LayoutViewport({
                     onSlotGroupDragStart(event, unitSlotIds, firstSlot);
                   }}
                   onDragEnd={onAnyDragEnd}
-                  onDragOver={(event) => onSlotDragOver(event, firstSlot)}
-                  onDrop={(event) => onSlotDrop(event, firstSlot)}
+                  onDragOver={(event) => onSlotDragOver(event, nextEmptySlot)}
+                  onDrop={(event) => onSlotDrop(event, nextEmptySlot)}
                   onClick={(event) => {
                     event.stopPropagation();
                     toggleExpandedMis({
@@ -1383,19 +1385,6 @@ export function LayoutViewport({
               }
             })();
 
-            const hallFirstSlot =
-              (() => {
-                const firstSlice = getVisualSliceOrder(
-                  resolveHallSlices(hall).length,
-                  reverseSlices,
-                )[0] ?? 0;
-                const firstSection = hall.sections[0];
-                const sideType = firstSection?.sideLeft.type ?? "bulk";
-                return sideType === "mis"
-                  ? misSlotId(hallId, firstSlice, 0, 0, 0)
-                  : nonMisSlotId(hallId, firstSlice, 0, 0);
-              })();
-
             return (
               <section
                 key={hallId}
@@ -1408,19 +1397,12 @@ export function LayoutViewport({
                   width: `${placement.width}px`,
                   height: `${placement.height}px`,
                 }}
-                onDragOver={(event) => {
-                  if (event.target !== event.currentTarget) {
-                    return;
-                  }
-                  event.stopPropagation();
-                  onSlotDragOver(event, hallFirstSlot);
-                }}
                 onDrop={(event) => {
                   if (event.target !== event.currentTarget) {
                     return;
                   }
+                  event.preventDefault();
                   event.stopPropagation();
-                  onSlotDrop(event, hallFirstSlot);
                 }}
               >
                 <div

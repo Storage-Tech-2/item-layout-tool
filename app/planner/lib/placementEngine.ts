@@ -151,6 +151,31 @@ function projectRepresentationTargetSlotId(
   return null;
 }
 
+function findNextEmptyMisSlot(
+  anchorSlotId: string,
+  orderedSlotIds: string[],
+  assignments: Record<string, string>,
+): string {
+  const parsed = parseSlotId(anchorSlotId);
+  if (!parsed || parsed.kind !== "mis") {
+    return anchorSlotId;
+  }
+
+  const groupSlots = orderedSlotIds.filter((slotId) => {
+    const candidate = parseSlotId(slotId);
+    return (
+      candidate?.kind === "mis" &&
+      candidate.hallId === parsed.hallId &&
+      candidate.slice === parsed.slice &&
+      candidate.side === parsed.side &&
+      candidate.misUnit === parsed.misUnit
+    );
+  });
+
+  const nextEmpty = groupSlots.find((slotId) => !assignments[slotId]);
+  return nextEmpty ?? anchorSlotId;
+}
+
 export function getIncomingEntries(
   payload: DragPayload,
   itemById: Map<string, CatalogItem>,
@@ -242,9 +267,10 @@ export function buildPlacements({
   }
 
   if (payload.kind === "item") {
+    const targetSlotId = findNextEmptyMisSlot(anchorSlotId, orderedSlotIds, working);
     return [
       {
-        slotId: anchorSlotId,
+        slotId: targetSlotId,
         itemId: incoming[0],
         kind: "place",
       },
