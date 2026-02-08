@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type DragEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItem, FillDirection } from "../types";
 import { buildCategories, toTitle } from "../utils";
 
@@ -42,6 +42,16 @@ export function ItemLibraryPanel({
   const [listHeight, setListHeight] = useState(0);
   const [listWidth, setListWidth] = useState(0);
   const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
+  const [selectedLibraryItemIds, setSelectedLibraryItemIds] = useState<Set<string>>(new Set());
+  const [selectionBox, setSelectionBox] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const selectionPointerId = useRef<number | null>(null);
+  const selectionStart = useRef<{ x: number; y: number } | null>(null);
+  const selectionAnchorSet = useRef<Set<string>>(new Set());
   const defaultCollapseThreshold = 48;
   const listOverscan = 520;
   const sectionGap = 10;
@@ -186,6 +196,113 @@ export function ItemLibraryPanel({
     });
   }
 
+  function collectLibrarySelectionWithinRect(
+    left: number,
+    top: number,
+    right: number,
+    bottom: number,
+  ): string[] {
+    const root = listRef.current;
+    if (!root) {
+      return [];
+    }
+
+    const rootRect = root.getBoundingClientRect();
+    const itemNodes = root.querySelectorAll<HTMLElement>("[data-library-item-id]");
+    const selected: string[] = [];
+
+    for (const node of itemNodes) {
+      const itemId = node.dataset.libraryItemId;
+      if (!itemId) {
+        continue;
+      }
+      const rect = node.getBoundingClientRect();
+      const itemLeft = rect.left - rootRect.left;
+      const itemTop = rect.top - rootRect.top;
+      const itemRight = itemLeft + rect.width;
+      const itemBottom = itemTop + rect.height;
+      const intersects =
+        itemRight >= left &&
+        itemLeft <= right &&
+        itemBottom >= top &&
+        itemTop <= bottom;
+      if (intersects) {
+        selected.push(itemId);
+      }
+    }
+
+    return selected;
+  }
+
+  function handleListPointerDown(event: PointerEvent<HTMLDivElement>): void {
+    if (event.button !== 0 || !event.shiftKey) {
+      return;
+    }
+
+    const root = listRef.current;
+    if (!root) {
+      return;
+    }
+
+    const rect = root.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    selectionPointerId.current = event.pointerId;
+    selectionStart.current = { x, y };
+    selectionAnchorSet.current = new Set(selectedLibraryItemIds);
+    setSelectionBox({ left: x, top: y, width: 0, height: 0 });
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function handleListPointerMove(event: PointerEvent<HTMLDivElement>): void {
+    if (
+      selectionPointerId.current === null ||
+      selectionPointerId.current !== event.pointerId ||
+      !selectionStart.current ||
+      !listRef.current
+    ) {
+      return;
+    }
+
+    const rect = listRef.current.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const left = Math.min(selectionStart.current.x, x);
+    const top = Math.min(selectionStart.current.y, y);
+    const right = Math.max(selectionStart.current.x, x);
+    const bottom = Math.max(selectionStart.current.y, y);
+
+    setSelectionBox({
+      left,
+      top,
+      width: right - left,
+      height: bottom - top,
+    });
+
+    const intersected = collectLibrarySelectionWithinRect(left, top, right, bottom);
+    const next = new Set(selectionAnchorSet.current);
+    for (const itemId of intersected) {
+      next.add(itemId);
+    }
+    setSelectedLibraryItemIds(next);
+  }
+
+  function handleListPointerEnd(event: PointerEvent<HTMLDivElement>): void {
+    if (selectionPointerId.current === null || selectionPointerId.current !== event.pointerId) {
+      return;
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    selectionPointerId.current = null;
+    selectionStart.current = null;
+    setSelectionBox(null);
+  }
+
   return (
     <aside
       className="flex min-h-0 w-[min(420px,36vw)] min-w-[300px] max-w-[500px] flex-col overflow-hidden bg-gradient-to-b from-[#fff7e7] to-[#feecd2] max-[1200px]:min-h-[38vh] max-[1200px]:w-full max-[1200px]:min-w-0 max-[1200px]:max-w-none"
@@ -255,8 +372,29 @@ export function ItemLibraryPanel({
       {!isLoadingCatalog && !catalogError ? (
         <div
           ref={listRef}
-          className="flex-1 overflow-y-auto overscroll-contain px-[0.8rem] pb-[0.8rem] pt-[0.6rem]"
+          className="relative flex-1 overflow-y-auto overscroll-contain px-[0.8rem] pb-[0.8rem] pt-[0.6rem]"
+          onPointerDown={handleListPointerDown}
+          onPointerMove={handleListPointerMove}
+          onPointerUp={handleListPointerEnd}
+          onPointerCancel={handleListPointerEnd}
+          onClick={(event) => {
+            const target = event.target as HTMLElement;
+            if (!event.shiftKey && !target.closest("[data-library-item-id]")) {
+              setSelectedLibraryItemIds(new Set());
+            }
+          }}
         >
+          {selectionBox ? (
+            <div
+              className="pointer-events-none absolute z-10 rounded-[0.35rem] border border-[rgba(47,118,105,0.68)] bg-[rgba(129,219,199,0.2)]"
+              style={{
+                left: selectionBox.left,
+                top: selectionBox.top,
+                width: selectionBox.width,
+                height: selectionBox.height,
+              }}
+            />
+          ) : null}
           {categories.length > 0 ? (
             <div style={{ minHeight: `${Math.ceil(virtualizedList.totalHeight)}px` }}>
               {virtualizedList.topSpacer > 0 ? (
@@ -324,11 +462,63 @@ export function ItemLibraryPanel({
                       <button
                         key={item.id}
                         type="button"
-                        className="flex min-h-[2rem] cursor-grab items-center gap-[0.4rem] rounded-[0.5rem] border border-[rgba(116,92,59,0.36)] bg-[rgba(255,253,247,0.95)] px-[0.4rem] py-[0.3rem] text-left text-[#342b21] hover:border-[rgba(38,109,88,0.5)] hover:bg-[#f0fff8]"
+                        className={`flex min-h-[2rem] cursor-grab items-center gap-[0.4rem] rounded-[0.5rem] border px-[0.4rem] py-[0.3rem] text-left text-[#342b21] ${
+                          selectedLibraryItemIds.has(item.id)
+                            ? "border-[rgba(30,117,94,0.62)] bg-[rgba(223,250,240,0.98)]"
+                            : "border-[rgba(116,92,59,0.36)] bg-[rgba(255,253,247,0.95)] hover:border-[rgba(38,109,88,0.5)] hover:bg-[#f0fff8]"
+                        }`}
                         draggable
-                        onDragStart={(event) => onItemDragStart(event, item.id)}
+                        onClick={(event) => {
+                          if (event.shiftKey) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setSelectedLibraryItemIds((current) => {
+                              const next = new Set(current);
+                              if (next.has(item.id)) {
+                                next.delete(item.id);
+                              } else {
+                                next.add(item.id);
+                              }
+                              return next;
+                            });
+                            return;
+                          }
+
+                          if (!selectedLibraryItemIds.has(item.id)) {
+                            return;
+                          }
+
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setSelectedLibraryItemIds((current) => {
+                            if (!current.has(item.id)) {
+                              return current;
+                            }
+                            const next = new Set(current);
+                            next.delete(item.id);
+                            return next;
+                          });
+                        }}
+                        onDragStart={(event) => {
+                          if (event.shiftKey) {
+                            event.preventDefault();
+                            return;
+                          }
+                          const selectedInViewOrder = visibleItems
+                            .filter((entry) => selectedLibraryItemIds.has(entry.id))
+                            .map((entry) => entry.id);
+                          if (
+                            selectedLibraryItemIds.has(item.id) &&
+                            selectedInViewOrder.length > 1
+                          ) {
+                            onCategoryDragStart(event, selectedInViewOrder);
+                            return;
+                          }
+                          onItemDragStart(event, item.id);
+                        }}
                         onDragEnd={onAnyDragEnd}
                         title={`Drag ${toTitle(item.id)}`}
+                        data-library-item-id={item.id}
                       >
                         <Image
                           src={item.texturePath}
