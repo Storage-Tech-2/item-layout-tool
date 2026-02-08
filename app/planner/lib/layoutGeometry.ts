@@ -63,10 +63,26 @@ export function buildSlotCenters(
         const sideDepth = sideDepthPx(sideConfig);
 
         if (sideConfig.type === "mis") {
+          const misWidth = Math.max(1, sideConfig.misWidth);
+          const groupStartSectionSlice = Math.floor(slice.sectionSlice / misWidth) * misWidth;
+          if (slice.sectionSlice !== groupStartSectionSlice) {
+            continue;
+          }
+          const groupSlices = slices.filter(
+            (entry) =>
+              entry.sectionIndex === slice.sectionIndex &&
+              entry.sectionSlice >= groupStartSectionSlice &&
+              entry.sectionSlice < groupStartSectionSlice + misWidth,
+          );
+          const groupFirstSlice = groupSlices[0] ?? slice;
+          const groupLastSlice = groupSlices[groupSlices.length - 1] ?? slice;
+          const misSlice = groupFirstSlice.globalSlice;
+          const groupMainStart = groupFirstSlice.mainStart;
+          const groupMainSize = groupLastSlice.mainStart + groupLastSlice.mainSize - groupFirstSlice.mainStart;
           const unitColumns = misColumns(sideConfig.misSlotsPerSlice);
           const unitRows = Math.max(1, Math.ceil(sideConfig.misSlotsPerSlice / unitColumns));
           for (let misUnit = 0; misUnit < sideConfig.misUnitsPerSlice; misUnit += 1) {
-            const unitMain = slice.mainSize;
+            const unitMain = groupMainSize;
             const unitCross = sideDepth / sideConfig.misUnitsPerSlice;
             const cellMain = unitMain / unitColumns;
             const cellCross = unitCross / unitRows;
@@ -77,14 +93,14 @@ export function buildSlotCenters(
 
               if (orientation === "horizontal") {
                 const baseY = side === 0 ? hallTopLeft.y : hallTopLeft.y + hallTopLeft.height - sideDepth;
-                const x = hallTopLeft.x + slice.mainStart + (column + 0.5) * cellMain;
+                const x = hallTopLeft.x + groupMainStart + (column + 0.5) * cellMain;
                 const y = baseY + misUnit * unitCross + (row + 0.5) * cellCross;
-                slotCenters.set(`${hallId}:m:${slice.globalSlice}:${side}:${misUnit}:${index}`, { x, y });
+                slotCenters.set(`${hallId}:m:${misSlice}:${side}:${misUnit}:${index}`, { x, y });
               } else {
                 const baseX = side === 0 ? hallTopLeft.x : hallTopLeft.x + hallTopLeft.width - sideDepth;
                 const x = baseX + misUnit * unitCross + (row + 0.5) * cellCross;
-                const y = hallTopLeft.y + slice.mainStart + (column + 0.5) * cellMain;
-                slotCenters.set(`${hallId}:m:${slice.globalSlice}:${side}:${misUnit}:${index}`, { x, y });
+                const y = hallTopLeft.y + groupMainStart + (column + 0.5) * cellMain;
+                slotCenters.set(`${hallId}:m:${misSlice}:${side}:${misUnit}:${index}`, { x, y });
               }
             }
           }

@@ -38,6 +38,12 @@ type UseHallConfigsResult = {
     side: HallSideKey,
     rawValue: string,
   ) => void;
+  setSectionSideMisWidth: (
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    rawValue: string,
+  ) => void;
   addHallSection: (hallId: HallId) => void;
   removeHallSection: (hallId: HallId, sectionIndex: number) => void;
 };
@@ -50,6 +56,7 @@ function hallTypeDefaults(type: HallType): HallSideConfig {
         rowsPerSlice: 1,
         misSlotsPerSlice: 54,
         misUnitsPerSlice: 1,
+        misWidth: 1,
       };
     case "chest":
       return {
@@ -57,6 +64,7 @@ function hallTypeDefaults(type: HallType): HallSideConfig {
         rowsPerSlice: 4,
         misSlotsPerSlice: 54,
         misUnitsPerSlice: 1,
+        misWidth: 1,
       };
     case "mis":
       return {
@@ -64,6 +72,7 @@ function hallTypeDefaults(type: HallType): HallSideConfig {
         rowsPerSlice: 4,
         misSlotsPerSlice: 54,
         misUnitsPerSlice: 1,
+        misWidth: 2,
       };
   }
 }
@@ -200,6 +209,24 @@ export function useHallConfigs(): UseHallConfigsResult {
     );
   }
 
+  function setSectionSideMisWidth(
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    rawValue: string,
+  ): void {
+    const misWidth = clamp(Number(rawValue) || 1, 1, 16);
+    setHallConfigs((current) =>
+      updateSection(current, hallId, sectionIndex, (section) => {
+        const currentSide = sideAt(section, side);
+        return replaceSide(section, side, {
+          ...currentSide,
+          misWidth,
+        });
+      }),
+    );
+  }
+
   function addHallSection(hallId: HallId): void {
     setHallConfigs((current) => {
       const hall = current[hallId];
@@ -253,6 +280,7 @@ export function useHallConfigs(): UseHallConfigsResult {
     setSectionSideRows,
     setSectionSideMisCapacity,
     setSectionSideMisUnits,
+    setSectionSideMisWidth,
     addHallSection,
     removeHallSection,
   };

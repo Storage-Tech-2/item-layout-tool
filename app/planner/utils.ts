@@ -242,12 +242,19 @@ export function buildOrderedSlotIds(configs: Record<HallId, HallConfig>): string
     const slices = resolveHallSlices(hall);
 
     for (const side of [0, 1] as const) {
+      const seenMisSlices = new Set<number>();
       for (const slice of slices) {
         const sideConfig = side === 0 ? slice.sideLeft : slice.sideRight;
         if (sideConfig.type === "mis") {
+          const misWidth = Math.max(1, sideConfig.misWidth);
+          const misSlice = slice.globalSlice - (slice.sectionSlice % misWidth);
+          if (seenMisSlices.has(misSlice)) {
+            continue;
+          }
+          seenMisSlices.add(misSlice);
           for (let misUnit = 0; misUnit < sideConfig.misUnitsPerSlice; misUnit += 1) {
             for (let index = 0; index < sideConfig.misSlotsPerSlice; index += 1) {
-              ordered.push(misSlotId(hallId, slice.globalSlice, side, misUnit, index));
+              ordered.push(misSlotId(hallId, misSlice, side, misUnit, index));
             }
           }
           continue;

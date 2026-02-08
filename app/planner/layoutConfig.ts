@@ -31,6 +31,7 @@ export type HallSide = {
     type: "bulk" | "chest" | "mis";
     rowsPerSlice: number;
     misSlotsPerSlice?: number;
+    misWidth?: number;
 };
 
 type HallAnchor = {
@@ -85,8 +86,8 @@ const CROSS_LAYOUT: StorageLayoutDefinition = {
                     {
                         name: "North",
                         slices: 8,
-                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
-                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                        sideLeft: { type: "bulk", rowsPerSlice: 1 },
+                        sideRight: { type: "bulk", rowsPerSlice: 1 },
                     },
                 ],
             },
@@ -148,8 +149,8 @@ const H_LAYOUT: StorageLayoutDefinition = {
                     {
                         name: "North",
                         slices: 8,
-                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
-                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                        sideLeft: { type: "bulk", rowsPerSlice: 1 },
+                        sideRight: { type: "bulk", rowsPerSlice: 1 },
                     },
                 ],
             },
@@ -208,13 +209,16 @@ function normalizeSide(side: HallSide | HallSideConfig | undefined): HallSideCon
             rowsPerSlice: 1,
             misSlotsPerSlice: 54,
             misUnitsPerSlice: 1,
+            misWidth: 1,
         };
     }
+    const misWidth = side.type === "mis" ? side.misWidth ?? 2 : 1;
     return {
         type: side.type,
         rowsPerSlice: side.rowsPerSlice,
         misSlotsPerSlice: side.misSlotsPerSlice ?? 54,
         misUnitsPerSlice: side.rowsPerSlice ?? 1,
+        misWidth,
     };
 }
 

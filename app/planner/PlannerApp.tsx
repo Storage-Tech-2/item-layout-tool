@@ -17,6 +17,7 @@ export function PlannerApp() {
     setSectionSideRows,
     setSectionSideMisCapacity,
     setSectionSideMisUnits,
+    setSectionSideMisWidth,
     addHallSection,
     removeHallSection,
   } = useHallConfigs();
@@ -95,6 +96,15 @@ export function PlannerApp() {
     setSectionSideMisUnits(hallId, sectionIndex, side, value);
   }
 
+  function handleSectionSideMisWidthChange(
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    value: string,
+  ): void {
+    setSectionSideMisWidth(hallId, sectionIndex, side, value);
+  }
+
   function handleAddSection(hallId: HallId): void {
     addHallSection(hallId);
   }
@@ -126,6 +136,7 @@ export function PlannerApp() {
           onSectionSideRowsChange={handleSectionSideRowsChange}
           onSectionSideMisCapacityChange={handleSectionSideMisCapacityChange}
           onSectionSideMisUnitsChange={handleSectionSideMisUnitsChange}
+          onSectionSideMisWidthChange={handleSectionSideMisWidthChange}
           onAddSection={handleAddSection}
           onRemoveSection={handleRemoveSection}
           onSlotItemDragStart={beginSlotItemDrag}

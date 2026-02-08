@@ -9,6 +9,7 @@ export type HallSideConfig = {
   rowsPerSlice: number;
   misSlotsPerSlice: number;
   misUnitsPerSlice: number;
+  misWidth: number;
 };
 
 export type HallSectionConfig = {
@@ -28,6 +29,7 @@ export type LegacyHallConfig = {
   rowsPerSide: number;
   misSlotsPerSlice: number;
   misUnitsPerSlice: number;
+  misWidth?: number;
 };
 
 export type CatalogItem = {

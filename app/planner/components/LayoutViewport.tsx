@@ -74,6 +74,12 @@ type LayoutViewportProps = {
     side: HallSideKey,
     value: string,
   ) => void;
+  onSectionSideMisWidthChange: (
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    value: string,
+  ) => void;
   onAddSection: (hallId: HallId) => void;
   onRemoveSection: (hallId: HallId, sectionIndex: number) => void;
   onSlotItemDragStart: (
@@ -259,6 +265,7 @@ export function LayoutViewport({
   onSectionSideRowsChange,
   onSectionSideMisCapacityChange,
   onSectionSideMisUnitsChange,
+  onSectionSideMisWidthChange,
   onAddSection,
   onRemoveSection,
   onSlotItemDragStart,
@@ -427,6 +434,14 @@ export function LayoutViewport({
               max={8}
               value={sideConfig.misUnitsPerSlice}
               onCommit={(value) => onSectionSideMisUnitsChange(hallId, sectionIndex, side, value)}
+            />
+            <span className="text-[0.54rem] font-semibold">W</span>
+            <DeferredNumberInput
+              className="w-[2.1rem] rounded-[0.25rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
+              min={1}
+              max={16}
+              value={sideConfig.misWidth}
+              onCommit={(value) => onSectionSideMisWidthChange(hallId, sectionIndex, side, value)}
             />
           </>
         ) : (
@@ -713,10 +728,26 @@ export function LayoutViewport({
         const sideDepth = sideDepthPx(sideConfig);
 
         if (sideConfig.type === "mis") {
+          const misWidth = Math.max(1, sideConfig.misWidth);
+          const groupStartSectionSlice = Math.floor(slice.sectionSlice / misWidth) * misWidth;
+          if (slice.sectionSlice !== groupStartSectionSlice) {
+            continue;
+          }
+          const groupSlices = slices.filter(
+            (entry) =>
+              entry.sectionIndex === slice.sectionIndex &&
+              entry.sectionSlice >= groupStartSectionSlice &&
+              entry.sectionSlice < groupStartSectionSlice + misWidth,
+          );
+          const groupFirstSlice = groupSlices[0] ?? slice;
+          const groupLastSlice = groupSlices[groupSlices.length - 1] ?? slice;
+          const misSlice = groupFirstSlice.globalSlice;
+          const misMainStart = groupFirstSlice.mainStart;
+          const misMainSize = groupLastSlice.mainStart + groupLastSlice.mainSize - groupFirstSlice.mainStart;
           Array.from({ length: sideConfig.misUnitsPerSlice }, (_, misUnit) => {
             const unitSlotIds = Array.from(
               { length: sideConfig.misSlotsPerSlice },
-              (_, index) => misSlotId(hallId, slice.globalSlice, side, misUnit, index),
+              (_, index) => misSlotId(hallId, misSlice, side, misUnit, index),
             );
             const assignedIds = unitSlotIds
               .map((slotId) => slotAssignments[slotId])
@@ -727,7 +758,7 @@ export function LayoutViewport({
             const expandedIndex = expandedMisTargets.findIndex(
               (entry) =>
                 entry.hallId === hallId &&
-                entry.slice === slice.globalSlice &&
+                entry.slice === misSlice &&
                 entry.side === side &&
                 entry.misUnit === misUnit,
             );
@@ -741,9 +772,9 @@ export function LayoutViewport({
             if (orientation === "horizontal") {
               const unitCrossSize = 112;
               const baseTop = side === 0 ? 0 : hallHeight - sideDepth;
-              const x = slice.mainStart + 2;
+              const x = misMainStart + 2;
               const y = baseTop + misUnit * (unitCrossSize + SLOT_GAP) + 2;
-              const cardWidth = Math.max(52, slice.mainSize - 4);
+              const cardWidth = Math.max(52, misMainSize - 4);
               const cardHeight = Math.max(42, unitCrossSize - 4);
               slots.push(
                 <div
@@ -769,7 +800,7 @@ export function LayoutViewport({
                     event.stopPropagation();
                     toggleExpandedMis({
                       hallId,
-                      slice: slice.globalSlice,
+                      slice: misSlice,
                       side,
                       misUnit,
                     });
@@ -811,9 +842,9 @@ export function LayoutViewport({
               const unitCrossSize = 112;
               const baseLeft = side === 0 ? 0 : hallWidth - sideDepth;
               const x = baseLeft + misUnit * (unitCrossSize + SLOT_GAP) + 2;
-              const y = slice.mainStart + 2;
+              const y = misMainStart + 2;
               const cardWidth = Math.max(42, unitCrossSize - 4);
-              const cardHeight = Math.max(52, slice.mainSize - 4);
+              const cardHeight = Math.max(52, misMainSize - 4);
               slots.push(
                 <div
                   key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
@@ -838,7 +869,7 @@ export function LayoutViewport({
                     event.stopPropagation();
                     toggleExpandedMis({
                       hallId,
-                      slice: slice.globalSlice,
+                      slice: misSlice,
                       side,
                       misUnit,
                     });
