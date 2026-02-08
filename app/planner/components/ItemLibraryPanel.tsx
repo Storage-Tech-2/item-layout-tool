@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { type DragEvent, useMemo, useState } from "react";
+import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogItem } from "../types";
 import { buildCategories, toTitle } from "../utils";
 
@@ -29,11 +29,18 @@ export function ItemLibraryPanel({
   onLibraryDrop,
   onAnyDragEnd,
 }: ItemLibraryPanelProps) {
+  const listRef = useRef<HTMLDivElement | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [collapsedOverrides, setCollapsedOverrides] = useState<
     Record<string, boolean>
   >({});
+  const [scrollTop, setScrollTop] = useState(0);
+  const [listHeight, setListHeight] = useState(0);
+  const [listWidth, setListWidth] = useState(0);
+  const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
   const defaultCollapseThreshold = 48;
+  const listOverscan = 520;
+  const sectionGap = 10;
 
   const availableItems = useMemo(
     () => catalogItems.filter((item) => !usedItemIds.has(item.id)),
@@ -54,6 +61,120 @@ export function ItemLibraryPanel({
   }, [availableItems, normalizedSearch]);
 
   const categories = useMemo(() => buildCategories(visibleItems), [visibleItems]);
+  const categoryColumns = listWidth <= 860 ? 1 : 2;
+
+  useEffect(() => {
+    const element = listRef.current;
+    if (!element) {
+      return;
+    }
+
+    const syncMetrics = (): void => {
+      setListHeight(element.clientHeight);
+      setListWidth(element.clientWidth);
+    };
+    syncMetrics();
+
+    const onScroll = (): void => {
+      setScrollTop(element.scrollTop);
+    };
+
+    const observer = new ResizeObserver(() => {
+      syncMetrics();
+    });
+    observer.observe(element);
+    element.addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      observer.disconnect();
+      element.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  const categoryMeta = useMemo(() => {
+    return categories.map((category) => {
+      const isCollapsed = normalizedSearch
+        ? false
+        : (collapsedOverrides[category.id] ??
+          (category.items.length > defaultCollapseThreshold));
+      const estimatedHeight = (() => {
+        const headerHeight = 56;
+        if (isCollapsed) {
+          return headerHeight;
+        }
+        const rows = Math.max(1, Math.ceil(category.items.length / Math.max(1, categoryColumns)));
+        const gridHeight = rows * 44 + Math.max(0, rows - 1) * 6 + 16;
+        return headerHeight + gridHeight;
+      })();
+      return { category, isCollapsed, estimatedHeight };
+    });
+  }, [
+    categories,
+    categoryColumns,
+    collapsedOverrides,
+    defaultCollapseThreshold,
+    normalizedSearch,
+  ]);
+
+  const virtualizedList = useMemo(() => {
+    if (categoryMeta.length === 0) {
+      return {
+        totalHeight: 0,
+        startIndex: 0,
+        endIndex: -1,
+        topSpacer: 0,
+        bottomSpacer: 0,
+      };
+    }
+
+    const heights = categoryMeta.map((entry) => measuredHeights[entry.category.id] ?? entry.estimatedHeight);
+    const offsets: number[] = new Array(heights.length);
+    let cursor = 0;
+    for (let index = 0; index < heights.length; index += 1) {
+      offsets[index] = cursor;
+      cursor += heights[index] + (index < heights.length - 1 ? sectionGap : 0);
+    }
+    const totalHeight = cursor;
+
+    const minY = Math.max(0, scrollTop - listOverscan);
+    const maxY = scrollTop + Math.max(0, listHeight) + listOverscan;
+
+    let startIndex = 0;
+    while (
+      startIndex < heights.length &&
+      offsets[startIndex] + heights[startIndex] < minY
+    ) {
+      startIndex += 1;
+    }
+
+    let endIndex = startIndex;
+    while (endIndex < heights.length && offsets[endIndex] <= maxY) {
+      endIndex += 1;
+    }
+    endIndex = Math.min(heights.length - 1, Math.max(startIndex, endIndex - 1));
+
+    const topSpacer = startIndex > 0 ? offsets[startIndex] : 0;
+    const visibleBottom =
+      endIndex >= startIndex ? offsets[endIndex] + heights[endIndex] : topSpacer;
+    const bottomSpacer = Math.max(0, totalHeight - visibleBottom);
+
+    return {
+      totalHeight,
+      startIndex,
+      endIndex,
+      topSpacer,
+      bottomSpacer,
+    };
+  }, [categoryMeta, listHeight, listOverscan, measuredHeights, scrollTop]);
+
+  function updateMeasuredHeight(categoryId: string, nextHeight: number): void {
+    setMeasuredHeights((current) => {
+      if (current[categoryId] === nextHeight) {
+        return current;
+      }
+      return { ...current, [categoryId]: nextHeight };
+    });
+  }
 
   return (
     <aside
@@ -96,21 +217,36 @@ export function ItemLibraryPanel({
       ) : null}
 
       {!isLoadingCatalog && !catalogError ? (
-        <div className="grid flex-1 auto-rows-min gap-[0.6rem] overflow-y-auto overscroll-contain px-[0.8rem] pb-[0.8rem] pt-[0.6rem]">
-          {categories.map((category) => {
-            const isCollapsed = normalizedSearch
-              ? false
-              : (collapsedOverrides[category.id] ??
-                (category.items.length > defaultCollapseThreshold));
-            const categoryLabel = category.label || toTitle(category.id) || "Category";
+        <div
+          ref={listRef}
+          className="flex-1 overflow-y-auto overscroll-contain px-[0.8rem] pb-[0.8rem] pt-[0.6rem]"
+        >
+          {categories.length > 0 ? (
+            <div style={{ minHeight: `${Math.ceil(virtualizedList.totalHeight)}px` }}>
+              {virtualizedList.topSpacer > 0 ? (
+                <div style={{ height: `${Math.ceil(virtualizedList.topSpacer)}px` }} />
+              ) : null}
 
-            const categoryItemIds = category.items.map((item) => item.id);
+              {categoryMeta
+                .slice(virtualizedList.startIndex, virtualizedList.endIndex + 1)
+                .map(({ category, isCollapsed }, visibleIndex, visibleArray) => {
+                  const categoryLabel = category.label || toTitle(category.id) || "Category";
+                  const categoryItemIds = category.items.map((item) => item.id);
+                  const isLastVisible = visibleIndex === visibleArray.length - 1;
 
-            return (
-              <section
-                key={category.id}
-                className="overflow-hidden rounded-[0.68rem] border border-[rgba(137,107,67,0.35)] bg-[rgba(255,251,241,0.9)]"
-              >
+                  return (
+                    <section
+                      key={category.id}
+                      ref={(element) => {
+                        if (!element) {
+                          return;
+                        }
+                        updateMeasuredHeight(category.id, element.offsetHeight);
+                      }}
+                      className={`overflow-hidden rounded-[0.68rem] border border-[rgba(137,107,67,0.35)] bg-[rgba(255,251,241,0.9)] ${
+                        !isLastVisible ? "mb-[0.6rem]" : ""
+                      }`}
+                    >
                 <div className="grid min-h-[2.35rem] grid-cols-[auto_1fr_auto] items-center gap-[0.4rem] border-b border-b-[rgba(145,114,73,0.22)] bg-[rgba(255,245,226,0.98)] px-[0.5rem] py-[0.5rem]">
                   <button
                     type="button"
@@ -175,9 +311,15 @@ export function ItemLibraryPanel({
                     ))}
                   </div>
                 ) : null}
-              </section>
-            );
-          })}
+                    </section>
+                  );
+                })}
+
+              {virtualizedList.bottomSpacer > 0 ? (
+                <div style={{ height: `${Math.ceil(virtualizedList.bottomSpacer)}px` }} />
+              ) : null}
+            </div>
+          ) : null}
 
           {categories.length === 0 ? (
             <div className="mx-[0.95rem] my-[0.8rem] rounded-[0.6rem] border border-[rgba(122,99,66,0.32)] bg-[rgba(255,252,245,0.85)] px-[0.75rem] py-[0.65rem] text-[0.84rem] text-[#6d6256]">
