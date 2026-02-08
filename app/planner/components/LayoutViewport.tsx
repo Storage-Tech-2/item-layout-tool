@@ -26,6 +26,7 @@ import {
 import type { HallSideKey } from "../hooks/useHallConfigs";
 import type {
   CatalogItem,
+  FillDirection,
   HallConfig,
   HallId,
   HallSideConfig,
@@ -41,7 +42,9 @@ type LayoutViewportProps = {
   viewportRef: RefObject<HTMLDivElement | null>;
   zoom: number;
   pan: { x: number; y: number };
+  fillDirection: FillDirection;
   onAdjustZoom: (delta: number) => void;
+  onFillDirectionChange: (direction: FillDirection) => void;
   onRecenterViewport: (focusPoint?: { x: number; y: number }) => void;
   onPointerDown: (event: PointerEvent<HTMLDivElement>) => boolean;
   onPointerMove: (event: PointerEvent<HTMLDivElement>) => void;
@@ -175,6 +178,18 @@ function getVisualSliceOrder(
   return order;
 }
 
+function misPreviewLayout(cardWidth: number, cardHeight: number): { columns: number; maxItems: number } {
+  const tile = 16;
+  const gap = 2;
+  const usableWidth = Math.max(16, Math.floor(cardWidth) - 4);
+  const columns = Math.max(1, Math.min(6, Math.floor((usableWidth + gap) / (tile + gap))));
+
+  // Card layout is [title][count][preview-grid]; reserve compact header space.
+  const usableHeight = Math.max(16, Math.floor(cardHeight) - 24);
+  const rows = Math.max(1, Math.floor((usableHeight + gap) / (tile + gap)));
+  return { columns, maxItems: columns * rows };
+}
+
 function sideDepthPx(side: HallSideConfig): number {
   if (side.type === "mis") {
     return side.misUnitsPerSlice * 112 + Math.max(0, side.misUnitsPerSlice - 1) * SLOT_GAP;
@@ -252,7 +267,9 @@ export function LayoutViewport({
   viewportRef,
   zoom,
   pan,
+  fillDirection,
   onAdjustZoom,
+  onFillDirectionChange,
   onRecenterViewport,
   onPointerDown,
   onPointerMove,
@@ -343,10 +360,34 @@ export function LayoutViewport({
       const viewportRect = viewport.getBoundingClientRect();
       const slots = viewport.querySelectorAll<HTMLElement>("[data-slot-id]");
       const selected: string[] = [];
+      const popupPanels = Array.from(
+        viewport.querySelectorAll<HTMLElement>("[data-mis-panel]"),
+      );
+      const intersectsAnyPopup = popupPanels.some((panel) => {
+        const panelRect = panel.getBoundingClientRect();
+        const panelLeft = panelRect.left - viewportRect.left;
+        const panelTop = panelRect.top - viewportRect.top;
+        const panelRight = panelLeft + panelRect.width;
+        const panelBottom = panelTop + panelRect.height;
+        return (
+          panelRight >= left &&
+          panelLeft <= right &&
+          panelBottom >= top &&
+          panelTop <= bottom
+        );
+      });
 
       for (const slot of slots) {
         const slotId = slot.dataset.slotId;
         if (!slotId || !slotAssignments[slotId]) {
+          continue;
+        }
+
+        const slotPanel = slot.closest("[data-mis-panel]");
+        if (intersectsAnyPopup && !slotPanel) {
+          continue;
+        }
+        if (!intersectsAnyPopup && slotPanel) {
           continue;
         }
 
@@ -753,12 +794,10 @@ export function LayoutViewport({
             const assignedIds = unitSlotIds
               .map((slotId) => slotAssignments[slotId])
               .filter((itemId): itemId is string => Boolean(itemId));
-            const previewIds = assignedIds.slice(0, 6);
             const hasAssigned = assignedIds.length > 0;
             const firstSlot = unitSlotIds[0];
             const nextEmptySlot =
               unitSlotIds.find((slotId) => !slotAssignments[slotId]) ?? firstSlot;
-            const previewColumns = Math.max(1, Math.min(3, sideConfig.misWidth));
             const expandedIndex = expandedMisTargets.findIndex(
               (entry) =>
                 entry.hallId === hallId &&
@@ -780,10 +819,13 @@ export function LayoutViewport({
               const y = baseTop + misUnit * (unitCrossSize + SLOT_GAP) + 2;
               const cardWidth = Math.max(12, misMainSize - 4);
               const cardHeight = Math.max(42, unitCrossSize - 4);
+              const previewLayout = misPreviewLayout(cardWidth, cardHeight);
+              const previewColumns = previewLayout.columns;
+              const previewIds = assignedIds.slice(0, previewLayout.maxItems);
               slots.push(
                 <div
                   key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
-                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.1rem] rounded-[0.45rem] border p-[0.2rem] ${misCardSurfaceClass}`}
+                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-hidden rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass}`}
                   style={{ left: x, top: y, width: cardWidth, height: cardHeight }}
                   data-no-pan
                   data-mis-card
@@ -810,15 +852,15 @@ export function LayoutViewport({
                     });
                   }}
                 >
-                  <div className="text-[0.53rem] font-bold uppercase tracking-[0.03em] text-[#355039]">
+                  <div className="leading-[1] text-[0.5rem] font-bold uppercase tracking-[0.02em] text-[#355039]">
                     MIS {misGroupNumber}
                   </div>
-                  <div className="text-[0.52rem] font-semibold text-[#33524f]">
+                  <div className="leading-[1] text-[0.48rem] font-semibold text-[#33524f]">
                     {assignedIds.length}/{sideConfig.misSlotsPerSlice}
                   </div>
                   <div
                     className="grid content-start gap-[2px]"
-                    style={{ gridTemplateColumns: `repeat(${previewColumns}, minmax(0, 1fr))` }}
+                    style={{ gridTemplateColumns: `repeat(${previewColumns}, 16px)` }}
                   >
                     {previewIds.map((itemId) => {
                       const item = itemById.get(itemId);
@@ -828,7 +870,7 @@ export function LayoutViewport({
                       return (
                         <div
                           key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${itemId}`}
-                          className="grid aspect-square place-items-center overflow-hidden rounded-[0.2rem] border border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
+                          className="grid h-[16px] w-[16px] place-items-center overflow-hidden rounded-[0.2rem] border border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
                         >
                           <Image
                             src={item.texturePath}
@@ -852,10 +894,13 @@ export function LayoutViewport({
               const y = misMainStart + 2;
               const cardWidth = Math.max(42, unitCrossSize - 4);
               const cardHeight = Math.max(12, misMainSize - 4);
+              const previewLayout = misPreviewLayout(cardWidth, cardHeight);
+              const previewColumns = previewLayout.columns;
+              const previewIds = assignedIds.slice(0, previewLayout.maxItems);
               slots.push(
                 <div
                   key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
-                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.1rem] rounded-[0.45rem] border p-[0.2rem] ${misCardSurfaceClass}`}
+                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-hidden rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass}`}
                   style={{ left: x, top: y, width: cardWidth, height: cardHeight }}
                   data-no-pan
                   data-mis-card
@@ -882,15 +927,15 @@ export function LayoutViewport({
                     });
                   }}
                 >
-                  <div className="text-[0.53rem] font-bold uppercase tracking-[0.03em] text-[#355039]">
+                  <div className="leading-[1] text-[0.5rem] font-bold uppercase tracking-[0.02em] text-[#355039]">
                     MIS {misGroupNumber}
                   </div>
-                  <div className="text-[0.52rem] font-semibold text-[#33524f]">
+                  <div className="leading-[1] text-[0.48rem] font-semibold text-[#33524f]">
                     {assignedIds.length}/{sideConfig.misSlotsPerSlice}
                   </div>
                   <div
                     className="grid content-start gap-[2px]"
-                    style={{ gridTemplateColumns: `repeat(${previewColumns}, minmax(0, 1fr))` }}
+                    style={{ gridTemplateColumns: `repeat(${previewColumns}, 16px)` }}
                   >
                     {previewIds.map((itemId) => {
                       const item = itemById.get(itemId);
@@ -900,7 +945,7 @@ export function LayoutViewport({
                       return (
                         <div
                           key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${itemId}`}
-                          className="grid aspect-square place-items-center overflow-hidden rounded-[0.2rem] border border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
+                          className="grid h-[16px] w-[16px] place-items-center overflow-hidden rounded-[0.2rem] border border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
                         >
                           <Image
                             src={item.texturePath}
@@ -1049,7 +1094,9 @@ export function LayoutViewport({
         }
 
         const target = event.target as HTMLElement;
-        if (target.closest("[data-no-pan]")) {
+        const inNoPanArea = Boolean(target.closest("[data-no-pan]"));
+        const inMisPanel = Boolean(target.closest("[data-mis-panel]"));
+        if (inNoPanArea && !inMisPanel) {
           return;
         }
 
@@ -1148,6 +1195,30 @@ export function LayoutViewport({
           View Controls
         </div>
         <div className="flex flex-wrap gap-[0.28rem]">
+        </div>
+        <div className="flex items-center gap-[0.25rem]">
+          <button
+            type="button"
+            className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
+              fillDirection === "row"
+                ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+            }`}
+            onClick={() => onFillDirectionChange("row")}
+          >
+            Fill Row First
+          </button>
+          <button
+            type="button"
+            className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
+              fillDirection === "column"
+                ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+            }`}
+            onClick={() => onFillDirectionChange("column")}
+          >
+            Fill Column First
+          </button>
         </div>
         <div className="flex items-center gap-[0.25rem]">
           <button
@@ -1489,7 +1560,7 @@ export function LayoutViewport({
 
       {selectionBox ? (
         <div
-          className="pointer-events-none absolute border border-[rgba(37,99,235,0.9)] bg-[rgba(37,99,235,0.18)]"
+          className="pointer-events-none absolute z-40 border border-[rgba(37,99,235,0.9)] bg-[rgba(37,99,235,0.18)]"
           style={{
             left: `${selectionBox.left}px`,
             top: `${selectionBox.top}px`,

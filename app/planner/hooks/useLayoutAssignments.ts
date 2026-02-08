@@ -11,6 +11,7 @@ import {
 import type {
   CatalogItem,
   DragPayload,
+  FillDirection,
   HallConfig,
   HallId,
   PreviewPlacement,
@@ -20,6 +21,7 @@ import { buildOrderedSlotIds, parseDragPayload } from "../utils";
 type UseLayoutAssignmentsInput = {
   catalogItems: CatalogItem[];
   hallConfigs: Record<HallId, HallConfig>;
+  fillDirection: FillDirection;
 };
 
 type UseLayoutAssignmentsResult = {
@@ -59,13 +61,17 @@ type UseLayoutAssignmentsResult = {
 export function useLayoutAssignments({
   catalogItems,
   hallConfigs,
+  fillDirection,
 }: UseLayoutAssignmentsInput): UseLayoutAssignmentsResult {
   const [slotAssignments, setSlotAssignments] = useState<Record<string, string>>({});
   const [selectedSlotIds, setSelectedSlotIdsState] = useState<string[]>([]);
   const [activeDragPayload, setActiveDragPayload] = useState<DragPayload | null>(null);
   const [dragPreviews, setDragPreviews] = useState<PreviewPlacement[]>([]);
 
-  const orderedSlotIds = useMemo(() => buildOrderedSlotIds(hallConfigs), [hallConfigs]);
+  const orderedSlotIds = useMemo(
+    () => buildOrderedSlotIds(hallConfigs, fillDirection),
+    [fillDirection, hallConfigs],
+  );
   const orderedSlotIdSet = useMemo(() => new Set(orderedSlotIds), [orderedSlotIds]);
 
   const placementContext = useMemo(
@@ -449,8 +455,8 @@ export function useLayoutAssignments({
     previousConfigs: Record<HallId, HallConfig>,
     nextConfigs: Record<HallId, HallConfig>,
   ): void {
-    const previousOrderedSlotIds = buildOrderedSlotIds(previousConfigs);
-    const nextOrderedSlotIds = buildOrderedSlotIds(nextConfigs);
+    const previousOrderedSlotIds = buildOrderedSlotIds(previousConfigs, fillDirection);
+    const nextOrderedSlotIds = buildOrderedSlotIds(nextConfigs, fillDirection);
     const previousValidSlotIdSet = new Set(previousOrderedSlotIds);
     const nextOrderIndex = new Map(
       nextOrderedSlotIds.map((slotId, index) => [slotId, index]),

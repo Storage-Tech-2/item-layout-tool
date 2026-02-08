@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { ItemLibraryPanel } from "./components/ItemLibraryPanel";
 import { LayoutViewport } from "./components/LayoutViewport";
 import { useCatalog } from "./hooks/useCatalog";
 import { useHallConfigs, type HallSideKey } from "./hooks/useHallConfigs";
 import { useLayoutAssignments } from "./hooks/useLayoutAssignments";
 import { useViewportNavigation } from "./hooks/useViewportNavigation";
-import type { HallId, HallType } from "./types";
+import type { FillDirection, HallId, HallType } from "./types";
 
 export function PlannerApp() {
   const { catalogItems, isLoadingCatalog, catalogError } = useCatalog();
@@ -21,6 +22,7 @@ export function PlannerApp() {
     addHallSection,
     removeHallSection,
   } = useHallConfigs();
+  const [fillDirection, setFillDirection] = useState<FillDirection>("column");
   const {
     itemById,
     activeSlotAssignments,
@@ -43,6 +45,7 @@ export function PlannerApp() {
   } = useLayoutAssignments({
     catalogItems,
     hallConfigs,
+    fillDirection,
   });
 
   const {
@@ -123,7 +126,9 @@ export function PlannerApp() {
           viewportRef={viewportRef}
           zoom={zoom}
           pan={pan}
+          fillDirection={fillDirection}
           onAdjustZoom={adjustZoom}
+          onFillDirectionChange={setFillDirection}
           onRecenterViewport={recenterViewport}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}

@@ -111,7 +111,7 @@ const CROSS_LAYOUT: StorageLayoutDefinition = {
                 sections: [
                     {
                         name: "South",
-                        slices: 4,
+                        slices: 8,
                         sideLeft: { type: "mis", rowsPerSlice: 1, misSlotsPerSlice: 54 },
                         sideRight: { type: "mis", rowsPerSlice: 1, misSlotsPerSlice: 54 },
                     },
@@ -174,7 +174,7 @@ const H_LAYOUT: StorageLayoutDefinition = {
                 sections: [
                     {
                         name: "South",
-                        slices: 4,
+                        slices: 8,
                         sideLeft: { type: "mis", rowsPerSlice: 1, misSlotsPerSlice: 54 },
                         sideRight: { type: "mis", rowsPerSlice: 1, misSlotsPerSlice: 54 },
                     },
