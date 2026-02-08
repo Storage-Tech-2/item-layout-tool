@@ -1045,6 +1045,7 @@ export function LayoutViewport({
   ): ReactNode {
     const slices = resolveHallSlices(config);
     const flipMainAxis = layoutDirection === "north" || layoutDirection === "west";
+    const swapSidesForDirection = layoutDirection === "south" || layoutDirection === "west";
     const visualSlices = flipMainAxis ? [...slices].reverse() : slices;
     const mainSpan =
       slices.length === 0
@@ -1059,8 +1060,10 @@ export function LayoutViewport({
       maxLeftDepth = Math.max(maxLeftDepth, sideDepthPx(slice.sideLeft));
       maxRightDepth = Math.max(maxRightDepth, sideDepthPx(slice.sideRight));
     }
+    const crossAxisStartDepth = swapSidesForDirection ? maxRightDepth : maxLeftDepth;
+    const crossAxisEndDepth = swapSidesForDirection ? maxLeftDepth : maxRightDepth;
     const aisleSpan = Math.max(8, hallWidth - maxLeftDepth - maxRightDepth);
-    const aisleCenterX = maxLeftDepth + aisleSpan / 2;
+    const aisleCenterX = crossAxisStartDepth + aisleSpan / 2;
     const sectionRanges = config.sections
       .map((section, sectionIndex) => {
         const sectionSlices = slices.filter((slice) => slice.sectionIndex === sectionIndex);
@@ -1113,7 +1116,6 @@ export function LayoutViewport({
         top <= visibleBounds.bottom + VISIBILITY_OVERSCAN
       );
     };
-    const swapSidesForDirection = layoutDirection === "south" || layoutDirection === "west";
     const reverseCrossAxisForDirection = layoutDirection === "south" || layoutDirection === "west";
     for (const slice of visualSlices) {
       for (const side of [0, 1] as const) {
@@ -1477,12 +1479,18 @@ export function LayoutViewport({
         {orientation === "horizontal" ? (
           <div
             className="absolute left-0 right-0 rounded-[99px] bg-[linear-gradient(180deg,rgba(45,119,127,0.18)_0%,rgba(45,119,127,0.08)_100%)]"
-            style={{ top: maxLeftDepth, height: Math.max(8, hallHeight - maxLeftDepth - maxRightDepth) }}
+            style={{
+              top: crossAxisStartDepth,
+              height: Math.max(8, hallHeight - crossAxisStartDepth - crossAxisEndDepth),
+            }}
           />
         ) : (
           <div
             className="absolute top-0 bottom-0 rounded-[99px] bg-[linear-gradient(180deg,rgba(45,119,127,0.18)_0%,rgba(45,119,127,0.08)_100%)]"
-            style={{ left: maxLeftDepth, width: Math.max(8, hallWidth - maxLeftDepth - maxRightDepth) }}
+            style={{
+              left: crossAxisStartDepth,
+              width: Math.max(8, hallWidth - crossAxisStartDepth - crossAxisEndDepth),
+            }}
           />
         )}
         {sectionRanges.length > 0 ? sectionRanges.map((section, index) => {
@@ -1515,7 +1523,7 @@ export function LayoutViewport({
                 ) : null}
                 <div
                   className={`pointer-events-auto absolute flex -translate-x-1/2 items-center gap-[0.12rem] rounded-[0.32rem] border px-[0.22rem] py-[0.06rem] text-[0.5rem] font-bold tracking-[0.03em] ${theme.labelClassName}`}
-                  style={{ left: center, top: maxLeftDepth + 2 }}
+                  style={{ left: center, top: crossAxisStartDepth + 2 }}
                   data-no-pan
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={(event) => event.stopPropagation()}
