@@ -986,20 +986,39 @@ export function LayoutViewport({
             const assignedIds = unitSlotIds
               .map((slotId) => slotAssignments[slotId])
               .filter((itemId): itemId is string => Boolean(itemId));
-            const previewAssignedIds = unitSlotIds
+            const previewEntries = unitSlotIds
               .map((slotId) => {
                 const preview = previewBySlot.get(slotId);
                 if (preview?.itemId) {
-                  return preview.itemId;
+                  return {
+                    itemId: preview.itemId,
+                    previewKind: preview.kind,
+                  };
                 }
                 if (draggedSourceSlotIds.has(slotId)) {
                   return undefined;
                 }
-                return slotAssignments[slotId];
+                const assigned = slotAssignments[slotId];
+                return assigned
+                  ? {
+                      itemId: assigned,
+                      previewKind: null,
+                    }
+                  : undefined;
               })
-              .filter((itemId): itemId is string => Boolean(itemId));
+              .filter(
+                (
+                  entry,
+                ): entry is {
+                  itemId: string;
+                  previewKind: "place" | "swap" | null;
+                } => Boolean(entry),
+              );
             const hasAssigned = assignedIds.length > 0;
             const hasPreview = unitSlotIds.some((slotId) => previewBySlot.has(slotId));
+            const hasSwapPreview = unitSlotIds.some(
+              (slotId) => previewBySlot.get(slotId)?.kind === "swap",
+            );
             const firstSlot = unitSlotIds[0];
             const nextEmptySlot =
               unitSlotIds.find((slotId) => !slotAssignments[slotId]) ?? firstSlot;
@@ -1017,7 +1036,9 @@ export function LayoutViewport({
                   ? "border-[rgba(50,91,168,0.95)] bg-[linear-gradient(180deg,rgba(220,235,255,0.98)_0%,rgba(193,218,250,0.98)_100%)]"
                   : "border-[rgba(73,97,78,0.45)] bg-[linear-gradient(180deg,rgba(244,250,240,0.95)_0%,rgba(221,235,212,0.95)_100%)]";
             const misCardPreviewClass = hasPreview
-              ? "shadow-[0_0_0_2px_rgba(85,204,178,0.38)] border-[rgba(22,132,120,0.92)]"
+              ? hasSwapPreview
+                ? "shadow-[0_0_0_2px_rgba(251,146,60,0.45)] border-[rgba(194,65,12,0.92)]"
+                : "shadow-[0_0_0_2px_rgba(85,204,178,0.38)] border-[rgba(22,132,120,0.92)]"
               : "";
 
             if (orientation === "horizontal") {
@@ -1069,27 +1090,36 @@ export function LayoutViewport({
                     MIS {misGroupNumber}
                   </div>
                   <div className="leading-[1] text-[0.48rem] font-semibold text-[#33524f]">
-                    {previewAssignedIds.length}/{sideConfig.misSlotsPerSlice}
+                    {previewEntries.length}/{sideConfig.misSlotsPerSlice}
                   </div>
                   <div
                     className="grid content-start gap-[2px]"
                     style={{ gridTemplateColumns: `repeat(${previewColumns}, 16px)` }}
                   >
-                    {previewAssignedIds.slice(0, previewLayout.maxItems).map((itemId) => {
-                      const item = itemById.get(itemId);
+                    {previewEntries
+                      .slice(0, previewLayout.maxItems)
+                      .map((entry, previewIndex) => {
+                      const item = itemById.get(entry.itemId);
                       if (!item) {
                         return null;
                       }
                       return (
                         <div
-                          key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${itemId}`}
-                          className="grid h-[16px] w-[16px] place-items-center overflow-hidden rounded-[0.2rem] border border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
+                          key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${entry.itemId}-${previewIndex}`}
+                          className={`grid h-[16px] w-[16px] place-items-center overflow-hidden rounded-[0.2rem] border ${
+                            entry.previewKind === "swap"
+                              ? "border-[rgba(194,65,12,0.55)] bg-[rgba(255,233,213,0.92)]"
+                              : entry.previewKind === "place"
+                                ? "border-[rgba(22,132,120,0.55)] bg-[rgba(203,246,236,0.92)]"
+                                : "border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
+                          }`}
                         >
                           <Image
                             src={item.texturePath}
                             alt={item.id}
                             width={14}
                             height={14}
+                            className={entry.previewKind ? "opacity-[0.72]" : ""}
                             style={{ imageRendering: "pixelated" }}
                             draggable={false}
                             unoptimized
@@ -1149,27 +1179,36 @@ export function LayoutViewport({
                     MIS {misGroupNumber}
                   </div>
                   <div className="leading-[1] text-[0.48rem] font-semibold text-[#33524f]">
-                    {previewAssignedIds.length}/{sideConfig.misSlotsPerSlice}
+                    {previewEntries.length}/{sideConfig.misSlotsPerSlice}
                   </div>
                   <div
                     className="grid content-start gap-[2px]"
                     style={{ gridTemplateColumns: `repeat(${previewColumns}, 16px)` }}
                   >
-                    {previewAssignedIds.slice(0, previewLayout.maxItems).map((itemId) => {
-                      const item = itemById.get(itemId);
+                    {previewEntries
+                      .slice(0, previewLayout.maxItems)
+                      .map((entry, previewIndex) => {
+                      const item = itemById.get(entry.itemId);
                       if (!item) {
                         return null;
                       }
                       return (
                         <div
-                          key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${itemId}`}
-                          className="grid h-[16px] w-[16px] place-items-center overflow-hidden rounded-[0.2rem] border border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
+                          key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${entry.itemId}-${previewIndex}`}
+                          className={`grid h-[16px] w-[16px] place-items-center overflow-hidden rounded-[0.2rem] border ${
+                            entry.previewKind === "swap"
+                              ? "border-[rgba(194,65,12,0.55)] bg-[rgba(255,233,213,0.92)]"
+                              : entry.previewKind === "place"
+                                ? "border-[rgba(22,132,120,0.55)] bg-[rgba(203,246,236,0.92)]"
+                                : "border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
+                          }`}
                         >
                           <Image
                             src={item.texturePath}
                             alt={item.id}
                             width={14}
                             height={14}
+                            className={entry.previewKind ? "opacity-[0.72]" : ""}
                             style={{ imageRendering: "pixelated" }}
                             draggable={false}
                             unoptimized
