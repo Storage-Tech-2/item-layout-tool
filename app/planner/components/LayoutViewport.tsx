@@ -56,6 +56,9 @@ type LayoutViewportProps = {
   viewportRef: RefObject<HTMLDivElement | null>;
   zoom: number;
   pan: { x: number; y: number };
+  subscribeViewportTransform: (
+    listener: (state: { zoom: number; pan: { x: number; y: number } }) => void,
+  ) => () => void;
   onAdjustZoom: (delta: number) => void;
   onFitViewportToBounds: (
     bounds: { left: number; top: number; right: number; bottom: number },
@@ -413,6 +416,7 @@ export function LayoutViewport({
   viewportRef,
   zoom,
   pan,
+  subscribeViewportTransform,
   onAdjustZoom,
   onFitViewportToBounds,
   onRecenterViewport,
@@ -445,10 +449,33 @@ export function LayoutViewport({
   onSelectionChange,
 }: LayoutViewportProps) {
   const didInitialFit = useRef(false);
+  const panLayerRef = useRef<HTMLDivElement | null>(null);
+  const zoomLayerRef = useRef<HTMLDivElement | null>(null);
   const [viewportSize, setViewportSize] = useState<{ width: number; height: number }>({
     width: 0,
     height: 0,
   });
+
+  const applyViewportTransform = useCallback((nextPan: { x: number; y: number }, nextZoom: number): void => {
+    const panLayer = panLayerRef.current;
+    if (panLayer) {
+      panLayer.style.transform = `translate3d(${nextPan.x}px, ${nextPan.y}px, 0)`;
+    }
+    const zoomLayer = zoomLayerRef.current;
+    if (zoomLayer) {
+      zoomLayer.style.transform = `scale(${nextZoom})`;
+    }
+  }, []);
+
+  useEffect(() => {
+    return subscribeViewportTransform((nextState) => {
+      applyViewportTransform(nextState.pan, nextState.zoom);
+    });
+  }, [applyViewportTransform, subscribeViewportTransform]);
+
+  useEffect(() => {
+    applyViewportTransform(pan, zoom);
+  }, [applyViewportTransform, pan, zoom]);
 
   function resolvePlacementTopLeft(placement: HallPlacement): { left: number; top: number } {
     const match = /translate\(\s*([^)]+?)\s*,\s*([^)]+?)\s*\)/.exec(placement.transform);
@@ -1921,12 +1948,14 @@ export function LayoutViewport({
       />
 
       <div
+        ref={panLayerRef}
         className="absolute left-0 top-0 origin-top-left"
         style={{
           transform: `translate3d(${pan.x}px, ${pan.y}px, 0)`,
         }}
       >
         <div
+          ref={zoomLayerRef}
           className="absolute left-0 top-0 origin-top-left"
           style={{
             width: `${STAGE_SIZE}px`,

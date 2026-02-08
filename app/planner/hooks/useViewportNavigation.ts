@@ -20,10 +20,15 @@ type ViewportState = {
   pan: { x: number; y: number };
 };
 
+const PAN_ZOOM_COMMIT_INTERVAL_MS = 33;
+
 export function useViewportNavigation(): {
   viewportRef: RefObject<HTMLDivElement | null>;
   zoom: number;
   pan: { x: number; y: number };
+  subscribeViewportTransform: (
+    listener: (state: ViewportState) => void,
+  ) => () => void;
   adjustZoom: (delta: number) => void;
   fitViewportToBounds: (
     bounds: { left: number; top: number; right: number; bottom: number },
@@ -38,11 +43,82 @@ export function useViewportNavigation(): {
   const didInitializePan = useRef(false);
   const panSessionRef = useRef<PanSession | null>(null);
   const previousBodyUserSelect = useRef("");
+  const liveStateRef = useRef<ViewportState>({
+    zoom: 1,
+    pan: { x: 0, y: 0 },
+  });
+  const transformListenersRef = useRef(new Set<(state: ViewportState) => void>());
+  const commitRafRef = useRef<number | null>(null);
+  const lastCommitTimestampRef = useRef(0);
 
   const [state, setState] = useState<ViewportState>({
     zoom: 1,
     pan: { x: 0, y: 0 },
   });
+
+  const notifyTransformListeners = useCallback((nextState: ViewportState): void => {
+    for (const listener of transformListenersRef.current) {
+      listener(nextState);
+    }
+  }, []);
+
+  const commitLiveStateToReact = useCallback((): void => {
+    const nextState = liveStateRef.current;
+    setState((current) => {
+      if (
+        current.zoom === nextState.zoom &&
+        current.pan.x === nextState.pan.x &&
+        current.pan.y === nextState.pan.y
+      ) {
+        return current;
+      }
+      return nextState;
+    });
+  }, []);
+
+  const scheduleReactCommit = useCallback((): void => {
+    if (commitRafRef.current !== null) {
+      return;
+    }
+
+    const tick = (timestamp: number): void => {
+      commitRafRef.current = null;
+      if (timestamp - lastCommitTimestampRef.current < PAN_ZOOM_COMMIT_INTERVAL_MS) {
+        commitRafRef.current = window.requestAnimationFrame(tick);
+        return;
+      }
+      lastCommitTimestampRef.current = timestamp;
+      commitLiveStateToReact();
+    };
+
+    commitRafRef.current = window.requestAnimationFrame(tick);
+  }, [commitLiveStateToReact]);
+
+  const updateViewportState = useCallback(
+    (
+      updater: (current: ViewportState) => ViewportState,
+      commitMode: "immediate" | "throttled" = "throttled",
+    ): void => {
+      const current = liveStateRef.current;
+      const next = updater(current);
+      if (
+        next.zoom === current.zoom &&
+        next.pan.x === current.pan.x &&
+        next.pan.y === current.pan.y
+      ) {
+        return;
+      }
+      liveStateRef.current = next;
+      notifyTransformListeners(next);
+      if (commitMode === "immediate") {
+        lastCommitTimestampRef.current = typeof performance !== "undefined" ? performance.now() : 0;
+        commitLiveStateToReact();
+        return;
+      }
+      scheduleReactCommit();
+    },
+    [commitLiveStateToReact, notifyTransformListeners, scheduleReactCommit],
+  );
 
   useEffect(() => {
     if (didInitializePan.current || !viewportRef.current) {
@@ -50,22 +126,39 @@ export function useViewportNavigation(): {
     }
 
     const rect = viewportRef.current.getBoundingClientRect();
-    setState((current) => ({
-      ...current,
-      pan: {
-        x: rect.width / 2 - (STAGE_SIZE / 2) * current.zoom,
-        y: rect.height / 2 - (STAGE_SIZE / 2) * current.zoom,
-      },
-    }));
+    updateViewportState(
+      (current) => ({
+        ...current,
+        pan: {
+          x: rect.width / 2 - (STAGE_SIZE / 2) * current.zoom,
+          y: rect.height / 2 - (STAGE_SIZE / 2) * current.zoom,
+        },
+      }),
+      "immediate",
+    );
     didInitializePan.current = true;
-  }, []);
+  }, [updateViewportState]);
 
   useEffect(() => {
     return () => {
+      if (commitRafRef.current !== null) {
+        window.cancelAnimationFrame(commitRafRef.current);
+        commitRafRef.current = null;
+      }
       if (panSessionRef.current) {
         document.body.style.userSelect = previousBodyUserSelect.current;
         panSessionRef.current = null;
       }
+    };
+  }, []);
+
+  const subscribeViewportTransform = useCallback((
+    listener: (nextState: ViewportState) => void,
+  ): (() => void) => {
+    transformListenersRef.current.add(listener);
+    listener(liveStateRef.current);
+    return () => {
+      transformListenersRef.current.delete(listener);
     };
   }, []);
 
@@ -74,8 +167,9 @@ export function useViewportNavigation(): {
       viewportX: number,
       viewportY: number,
       getNextZoom: (currentZoom: number) => number,
+      commitMode: "immediate" | "throttled" = "throttled",
     ): void => {
-      setState((current) => {
+      updateViewportState((current) => {
         const nextZoom = clamp(getNextZoom(current.zoom), MIN_ZOOM, MAX_ZOOM);
         if (nextZoom === current.zoom) {
           return current;
@@ -90,9 +184,9 @@ export function useViewportNavigation(): {
             y: viewportY - (viewportY - current.pan.y) * zoomFactor,
           },
         };
-      });
+      }, commitMode);
     },
-    [],
+    [updateViewportState],
   );
 
   function adjustZoom(delta: number): void {
@@ -101,7 +195,7 @@ export function useViewportNavigation(): {
     }
 
     const rect = viewportRef.current.getBoundingClientRect();
-    applyZoomAt(rect.width / 2, rect.height / 2, (currentZoom) => currentZoom + delta);
+    applyZoomAt(rect.width / 2, rect.height / 2, (currentZoom) => currentZoom + delta, "immediate");
   }
 
   const fitViewportToBounds = useCallback((
@@ -125,14 +219,17 @@ export function useViewportNavigation(): {
     const centerX = (bounds.left + bounds.right) / 2;
     const centerY = (bounds.top + bounds.bottom) / 2;
 
-    setState({
-      zoom: targetZoom,
-      pan: {
-        x: rect.width / 2 - centerX * targetZoom,
-        y: rect.height / 2 - centerY * targetZoom,
-      },
-    });
-  }, []);
+    updateViewportState(
+      () => ({
+        zoom: targetZoom,
+        pan: {
+          x: rect.width / 2 - centerX * targetZoom,
+          y: rect.height / 2 - centerY * targetZoom,
+        },
+      }),
+      "immediate",
+    );
+  }, [updateViewportState]);
 
   const recenterViewport = useCallback((focusPoint?: { x: number; y: number }): void => {
     if (!viewportRef.current) {
@@ -142,14 +239,17 @@ export function useViewportNavigation(): {
     const rect = viewportRef.current.getBoundingClientRect();
     const focusX = focusPoint?.x ?? STAGE_SIZE / 2;
     const focusY = focusPoint?.y ?? STAGE_SIZE / 2;
-    setState((current) => ({
-      ...current,
-      pan: {
-        x: rect.width / 2 - focusX * current.zoom,
-        y: rect.height / 2 - focusY * current.zoom,
-      },
-    }));
-  }, []);
+    updateViewportState(
+      (current) => ({
+        ...current,
+        pan: {
+          x: rect.width / 2 - focusX * current.zoom,
+          y: rect.height / 2 - focusY * current.zoom,
+        },
+      }),
+      "immediate",
+    );
+  }, [updateViewportState]);
 
   const handleWheelFromViewport = useCallback((
     clientX: number,
@@ -233,7 +333,7 @@ export function useViewportNavigation(): {
     session.lastX = event.clientX;
     session.lastY = event.clientY;
 
-    setState((current) => ({
+    updateViewportState((current) => ({
       ...current,
       pan: {
         x: current.pan.x + dx,
@@ -261,6 +361,7 @@ export function useViewportNavigation(): {
     viewportRef,
     zoom: state.zoom,
     pan: state.pan,
+    subscribeViewportTransform,
     adjustZoom,
     fitViewportToBounds,
     recenterViewport,

@@ -135,6 +135,7 @@ export function PlannerApp() {
     viewportRef,
     zoom,
     pan,
+    subscribeViewportTransform,
     adjustZoom,
     fitViewportToBounds,
     recenterViewport,
@@ -600,6 +601,7 @@ export function PlannerApp() {
             viewportRef={viewportRef}
             zoom={zoom}
             pan={pan}
+            subscribeViewportTransform={subscribeViewportTransform}
             onAdjustZoom={adjustZoom}
             onFitViewportToBounds={fitViewportToBounds}
             onRecenterViewport={recenterViewport}
