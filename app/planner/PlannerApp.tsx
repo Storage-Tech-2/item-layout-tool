@@ -9,7 +9,6 @@ import {
   nextConfigsForHallRows,
   nextConfigsForHallSlices,
   nextConfigsForHallType,
-  nextConfigsForPreset,
   useHallConfigs,
 } from "./hooks/useHallConfigs";
 import { useLayoutAssignments } from "./hooks/useLayoutAssignments";
@@ -25,7 +24,6 @@ export function PlannerApp() {
     setHallRowsPerSide,
     setHallMisCapacity,
     setHallMisUnitsPerSlice,
-    applyHallPreset,
   } = useHallConfigs();
   const {
     itemById,
@@ -34,7 +32,6 @@ export function PlannerApp() {
     selectedSlotIdSet,
     draggedSourceSlotIdSet,
     dragPreviews,
-    clearLayout,
     clearDragState,
     beginItemDrag,
     beginCategoryDrag,
@@ -94,12 +91,6 @@ export function PlannerApp() {
     setHallMisUnitsPerSlice(hallId, value);
   }
 
-  function handleApplyPreset(type: HallType): void {
-    const nextConfigs = nextConfigsForPreset(hallConfigs, type);
-    preserveAssignmentsForConfigChange(hallConfigs, nextConfigs);
-    applyHallPreset(type);
-  }
-
   return (
     <div className="flex h-screen min-h-screen overflow-hidden bg-[radial-gradient(circle_at_15%_12%,#fff8e8_0%,rgba(255,248,232,0)_35%),radial-gradient(circle_at_88%_8%,#e2f1ee_0%,rgba(226,241,238,0)_30%),linear-gradient(180deg,#f9f4ea_0%,#f2eadd_100%)] text-[#1f1a16] max-[1200px]:h-auto max-[1200px]:flex-col max-[1200px]:overflow-auto">
       <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r border-r-[rgba(114,88,46,0.24)] max-[1200px]:min-h-[62vh] max-[1200px]:border-r-0 max-[1200px]:border-b max-[1200px]:border-b-[rgba(114,88,46,0.24)]">
@@ -118,8 +109,6 @@ export function PlannerApp() {
           onSlotDragOver={handleSlotDragOver}
           onSlotDrop={handleSlotDrop}
           onViewportDropFallback={handleViewportDropFallback}
-          onApplyPreset={handleApplyPreset}
-          onClearLayout={clearLayout}
           onHallTypeChange={handleHallTypeChange}
           onHallSlicesChange={handleHallSlicesChange}
           onHallRowsChange={handleHallRowsChange}

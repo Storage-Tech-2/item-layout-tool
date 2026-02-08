@@ -44,8 +44,6 @@ type LayoutViewportProps = {
   onSlotDragOver: (event: DragEvent<HTMLElement>, slotId: string) => void;
   onSlotDrop: (event: DragEvent<HTMLElement>, slotId: string) => void;
   onViewportDropFallback: (event: DragEvent<HTMLElement>) => void;
-  onApplyPreset: (type: HallType) => void;
-  onClearLayout: () => void;
   onHallTypeChange: (hallId: HallId, type: HallType) => void;
   onHallSlicesChange: (hallId: HallId, value: string) => void;
   onHallRowsChange: (hallId: HallId, value: string) => void;
@@ -198,8 +196,6 @@ export function LayoutViewport({
   onSlotDragOver,
   onSlotDrop,
   onViewportDropFallback,
-  onApplyPreset,
-  onClearLayout,
   onHallTypeChange,
   onHallSlicesChange,
   onHallRowsChange,
@@ -214,6 +210,23 @@ export function LayoutViewport({
   selectedSlotIds,
   onSelectionChange,
 }: LayoutViewportProps) {
+  function blurLayoutConfigIfNeeded(target: EventTarget | null): void {
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement)) {
+      return;
+    }
+
+    const activeInConfig = Boolean(active.closest("[data-layout-config]"));
+    const clickInConfig = Boolean(target.closest("[data-layout-config]"));
+    if (activeInConfig && !clickInConfig) {
+      active.blur();
+    }
+  }
+
   const center = STAGE_SIZE / 2;
   const selectionPointerId = useRef<number | null>(null);
   const selectionStart = useRef<{ x: number; y: number } | null>(null);
@@ -225,6 +238,12 @@ export function LayoutViewport({
   } | null>(null);
   const [expandedMisSlices, setExpandedMisSlices] = useState<ExpandedMisTarget[]>([]);
   const [viewMode, setViewMode] = useState<LayoutViewMode>("storage");
+  const [hallNames, setHallNames] = useState<Record<HallId, string>>({
+    north: HALL_LABELS.north,
+    east: HALL_LABELS.east,
+    south: HALL_LABELS.south,
+    west: HALL_LABELS.west,
+  });
 
   const viewportBackgroundStyle = useMemo(
     () => ({
@@ -336,6 +355,14 @@ export function LayoutViewport({
       const next = [...current, target];
       return next.slice(-2);
     });
+  }, []);
+
+  const updateHallName = useCallback((hallId: HallId, rawName: string): void => {
+    const trimmed = rawName.trim();
+    setHallNames((current) => ({
+      ...current,
+      [hallId]: trimmed.length > 0 ? trimmed : HALL_LABELS[hallId],
+    }));
   }, []);
 
   const hallPlacement = useMemo(() => {
@@ -808,6 +835,8 @@ export function LayoutViewport({
         onViewportDropFallback(event);
       }}
       onPointerDown={(event) => {
+        blurLayoutConfigIfNeeded(event.target);
+
         const didStartPan = onPointerDown(event);
         if (didStartPan || event.button !== 0 || !event.shiftKey) {
           return;
@@ -910,37 +939,9 @@ export function LayoutViewport({
         data-no-pan
       >
         <div className="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-[#5e513f]">
-          Layout Controls
+          View Controls
         </div>
         <div className="flex flex-wrap gap-[0.28rem]">
-          <button
-            type="button"
-            className="rounded-[0.4rem] border border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] px-[0.42rem] py-[0.2rem] text-[0.7rem] font-semibold text-[#3b2f22]"
-            onClick={() => onApplyPreset("chest")}
-          >
-            All Chest
-          </button>
-          <button
-            type="button"
-            className="rounded-[0.4rem] border border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] px-[0.42rem] py-[0.2rem] text-[0.7rem] font-semibold text-[#3b2f22]"
-            onClick={() => onApplyPreset("bulk")}
-          >
-            All Bulk
-          </button>
-          <button
-            type="button"
-            className="rounded-[0.4rem] border border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] px-[0.42rem] py-[0.2rem] text-[0.7rem] font-semibold text-[#3b2f22]"
-            onClick={() => onApplyPreset("mis")}
-          >
-            All MIS
-          </button>
-          <button
-            type="button"
-            className="rounded-[0.4rem] border border-[rgba(153,53,40,0.48)] bg-[rgba(255,237,232,0.98)] px-[0.42rem] py-[0.2rem] text-[0.7rem] font-semibold text-[#7a2318]"
-            onClick={onClearLayout}
-          >
-            Clear Layout
-          </button>
         </div>
         <div className="flex items-center gap-[0.25rem]">
           <button
@@ -1037,7 +1038,7 @@ export function LayoutViewport({
                 >
                   <div className="grid gap-[0.08rem] text-[#2e5042]">
                     <div className="text-[0.78rem] font-bold uppercase tracking-[0.05em]">
-                      {HALL_LABELS[entry.target.hallId]} MIS Slice {entry.target.slice + 1} • MIS{" "}
+                      {hallNames[entry.target.hallId]} MIS Slice {entry.target.slice + 1} • MIS{" "}
                       {entry.target.misUnit + 1}
                     </div>
                     <div className="text-[0.68rem] text-[#3e6455]">
@@ -1164,6 +1165,7 @@ export function LayoutViewport({
                   className="absolute z-10"
                   style={controlAnchorStyle}
                   data-no-pan
+                  data-layout-config
                   onPointerDown={(event) => {
                     event.stopPropagation();
                   }}
@@ -1172,8 +1174,24 @@ export function LayoutViewport({
                   }}
                 >
                   <div className="flex items-center gap-[0.2rem] rounded-[0.55rem] border border-[rgba(132,100,63,0.4)] bg-[rgba(255,244,223,0.96)] px-[0.32rem] py-[0.2rem] text-[#5f4c33]">
-                    <span className="text-[0.62rem] font-bold uppercase tracking-[0.04em]">
-                      {HALL_LABELS[hallId]}
+                    <span
+                      className="cursor-text rounded-[0.2rem] px-[0.08rem] text-[0.62rem] font-bold uppercase tracking-[0.04em] hover:text-[#2d6a4f] focus:bg-white focus:text-[#2d6a4f] focus:outline-none"
+                      contentEditable
+                      suppressContentEditableWarning
+                      role="textbox"
+                      tabIndex={0}
+                      onBlur={(event) =>
+                        updateHallName(hallId, event.currentTarget.textContent ?? "")
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          event.currentTarget.blur();
+                        }
+                      }}
+                      title="Click to rename hall"
+                    >
+                      {hallNames[hallId]}
                     </span>
                     <select
                       className="rounded-[0.35rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.24rem] py-[0.1rem] text-[0.62rem] font-semibold text-[#2b251f]"
