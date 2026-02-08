@@ -115,14 +115,6 @@ function matchCustomMaterialCategory(itemId: string): CustomCategoryMatch | null
     };
   }
 
-  if (/(^|_)flowering_azalea($|_)/.test(itemId)) {
-    return {
-      id: "collection:flowering_azalea",
-      label: "Flowering Azalea",
-      dragLabel: "flowering azalea set",
-    };
-  }
-
   if (/(^|_)azalea($|_)/.test(itemId)) {
     return {
       id: "collection:azalea",
