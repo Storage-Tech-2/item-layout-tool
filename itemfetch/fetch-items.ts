@@ -2298,6 +2298,25 @@ function omitNullOrFalseProperties(value: unknown): unknown {
   return cleaned;
 }
 
+function shouldIncludeInPlannerCatalog(
+  parsedItem: ParsedItem | null,
+  creativeTabs: string[],
+): boolean {
+  if (parsedItem?.maxStackSize === 1) {
+    return false;
+  }
+
+  if (parsedItem?.blockLoot?.noLootTable === true) {
+    return false;
+  }
+
+  if (creativeTabs.includes("spawn_eggs")) {
+    return false;
+  }
+
+  return true;
+}
+
 async function main(): Promise<void> {
   const {
     itemsJavaSource,
@@ -2362,26 +2381,38 @@ async function main(): Promise<void> {
   await rm(OUTPUT_TEXTURE_ROOT, { recursive: true, force: true });
   await mkdir(OUTPUT_TEXTURE_ROOT, { recursive: true });
 
-  const outputItems: OutputItem[] = new Array(itemIds.length);
+  const outputItems: OutputItem[] = [];
   const missingTextureItems: string[] = [];
   const otherSpecialItems: string[] = [];
+  const skippedFilteredItems: string[] = [];
 
   let processedCount = 0;
   let texturedCount = 0;
+  let skippedCount = 0;
 
   await mapWithConcurrency(itemIds, CONCURRENCY, async (itemId, index) => {
     const definition = itemIndex[itemId] ?? {};
+    const parsedItem = parsedItemById.get(itemId) ?? null;
+    const creativeTabs = parsedItem
+      ? Array.from(creativeTabIdsByItemId.get(parsedItem.id) ?? [])
+      : [];
+    if (!shouldIncludeInPlannerCatalog(parsedItem, creativeTabs)) {
+      skippedFilteredItems.push(itemId);
+      skippedCount += 1;
+      processedCount += 1;
+      if (processedCount % 100 === 0 || processedCount === itemIds.length) {
+        console.log(`Processed ${processedCount}/${itemIds.length} items...`);
+      }
+      return;
+    }
+
     const hasSpecial = hasSpecialRenderer(definition.model);
     const resolved = await resolveItemTexture(itemId, definition);
-    const parsedItem = parsedItemById.get(itemId) ?? null;
     const parsedFood = resolveParsedFood(
       parsedItem?.foodReference ?? null,
       parsedFoodByReference,
       parsedFoodByFieldName,
     );
-    const creativeTabs = parsedItem
-      ? Array.from(creativeTabIdsByItemId.get(parsedItem.id) ?? [])
-      : [];
 
     if (resolved) {
       const textureFilename = `${itemId}.png`;
@@ -2390,7 +2421,7 @@ async function main(): Promise<void> {
         otherSpecialItems.push(itemId);
       }
 
-      outputItems[index] = toOutputItem(
+      outputItems.push(toOutputItem(
         itemId,
         {
           texturePath: `/items/textures/${textureFilename}`,
@@ -2400,23 +2431,12 @@ async function main(): Promise<void> {
         parsedItem,
         parsedFood,
         creativeTabs,
-      );
+      ));
       texturedCount += 1;
     } else {
       if (hasSpecial) {
         otherSpecialItems.push(itemId);
       }
-      outputItems[index] = toOutputItem(
-        itemId,
-        {
-          texturePath: null,
-          sourceTexture: null,
-          sourceModel: null,
-        },
-        parsedItem,
-        parsedFood,
-        creativeTabs,
-      );
       missingTextureItems.push(itemId);
     }
 
@@ -2429,9 +2449,10 @@ async function main(): Promise<void> {
   const output = {
     generatedAt: new Date().toISOString(),
     counts: {
-      itemCount: itemIds.length,
+      itemCount: outputItems.length,
       texturedItemCount: texturedCount,
       missingTextureItemCount: missingTextureItems.length,
+      filteredOutItemCount: skippedCount,
       codeItemCount: parsedItems.length,
       itemsWithCodeDataCount: outputItems.filter((item) => item.registration !== null).length,
       blockCount: parsedBlocks.length,
@@ -2462,6 +2483,12 @@ async function main(): Promise<void> {
     const suffix = missingTextureItems.length > 12 ? ", ..." : "";
     console.warn(
       `Missing texture for ${missingTextureItems.length} items: ${sample}${suffix}`,
+    );
+  }
+
+  if (skippedFilteredItems.length > 0) {
+    console.log(
+      `Filtered out ${skippedFilteredItems.length} unused items before rendering`,
     );
   }
 
