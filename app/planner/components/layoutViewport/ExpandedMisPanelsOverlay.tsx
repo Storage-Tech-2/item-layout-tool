@@ -13,6 +13,7 @@ export type ExpandedMisPanel = ExpandedMisTarget & {
   slotIds: string[];
   columns: number;
   capacity: number;
+  fallbackLabel: string;
 };
 
 type ExpandedMisPanelsOverlayProps = {
@@ -106,7 +107,7 @@ export function ExpandedMisPanelsOverlay({
                         event.currentTarget.blur();
                       }
                     }}
-                  >{misDisplayName(panelTarget, `MIS ${panel.misUnit + 1}`)}</span>
+                  >{misDisplayName(panelTarget, panel.fallbackLabel)}</span>
                 </div>
                 <div className={`text-[0.68rem] ${subTextClass}`}>
                   {panel.slotIds.filter((slotId) => Boolean(slotAssignments[slotId])).length}/

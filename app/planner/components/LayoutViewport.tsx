@@ -832,6 +832,8 @@ export function LayoutViewport({
         if (sideConfig.type !== "mis" || target.misUnit >= sideConfig.misUnitsPerSlice) {
           return null;
         }
+        const misWidth = Math.max(1, sideConfig.misWidth);
+        const fallbackLabel = `MIS ${Math.floor(slice.sectionSlice / misWidth) + 1}`;
         const slotIds = Array.from(
           { length: sideConfig.misSlotsPerSlice },
           (_, index) => misSlotId(target.hallId, target.slice, target.side, target.misUnit, index),
@@ -845,6 +847,7 @@ export function LayoutViewport({
           slotIds,
           columns,
           capacity: sideConfig.misSlotsPerSlice,
+          fallbackLabel,
         };
       })
       .filter((panel): panel is ExpandedMisPanel => panel !== null);
