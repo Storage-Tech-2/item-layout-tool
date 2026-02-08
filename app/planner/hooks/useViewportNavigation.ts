@@ -25,6 +25,10 @@ export function useViewportNavigation(): {
   zoom: number;
   pan: { x: number; y: number };
   adjustZoom: (delta: number) => void;
+  fitViewportToBounds: (
+    bounds: { left: number; top: number; right: number; bottom: number },
+    padding?: number,
+  ) => void;
   recenterViewport: (focusPoint?: { x: number; y: number }) => void;
   handlePointerDown: (event: PointerEvent<HTMLDivElement>) => boolean;
   handlePointerMove: (event: PointerEvent<HTMLDivElement>) => void;
@@ -36,8 +40,8 @@ export function useViewportNavigation(): {
   const previousBodyUserSelect = useRef("");
 
   const [state, setState] = useState<ViewportState>({
-    zoom: 0.6,
-    pan: { x: 160, y: 110 },
+    zoom: 1,
+    pan: { x: 0, y: 0 },
   });
 
   useEffect(() => {
@@ -99,6 +103,36 @@ export function useViewportNavigation(): {
     const rect = viewportRef.current.getBoundingClientRect();
     applyZoomAt(rect.width / 2, rect.height / 2, (currentZoom) => currentZoom + delta);
   }
+
+  const fitViewportToBounds = useCallback((
+    bounds: { left: number; top: number; right: number; bottom: number },
+    padding = 24,
+  ): void => {
+    if (!viewportRef.current) {
+      return;
+    }
+
+    const rect = viewportRef.current.getBoundingClientRect();
+    const boundsWidth = Math.max(1, bounds.right - bounds.left);
+    const boundsHeight = Math.max(1, bounds.bottom - bounds.top);
+    const availableWidth = Math.max(1, rect.width - padding * 2);
+    const availableHeight = Math.max(1, rect.height - padding * 2);
+    const targetZoom = clamp(
+      Math.min(availableWidth / boundsWidth, availableHeight / boundsHeight),
+      MIN_ZOOM,
+      MAX_ZOOM,
+    );
+    const centerX = (bounds.left + bounds.right) / 2;
+    const centerY = (bounds.top + bounds.bottom) / 2;
+
+    setState({
+      zoom: targetZoom,
+      pan: {
+        x: rect.width / 2 - centerX * targetZoom,
+        y: rect.height / 2 - centerY * targetZoom,
+      },
+    });
+  }, []);
 
   const recenterViewport = useCallback((focusPoint?: { x: number; y: number }): void => {
     if (!viewportRef.current) {
@@ -228,6 +262,7 @@ export function useViewportNavigation(): {
     zoom: state.zoom,
     pan: state.pan,
     adjustZoom,
+    fitViewportToBounds,
     recenterViewport,
     handlePointerDown,
     handlePointerMove,

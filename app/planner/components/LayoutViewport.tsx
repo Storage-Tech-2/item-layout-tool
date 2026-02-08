@@ -43,6 +43,10 @@ type LayoutViewportProps = {
   pan: { x: number; y: number };
   fillDirection: FillDirection;
   onAdjustZoom: (delta: number) => void;
+  onFitViewportToBounds: (
+    bounds: { left: number; top: number; right: number; bottom: number },
+    padding?: number,
+  ) => void;
   onFillDirectionChange: (direction: FillDirection) => void;
   onRecenterViewport: (focusPoint?: { x: number; y: number }) => void;
   onPointerDown: (event: PointerEvent<HTMLDivElement>) => boolean;
@@ -248,6 +252,7 @@ export function LayoutViewport({
   pan,
   fillDirection,
   onAdjustZoom,
+  onFitViewportToBounds,
   onFillDirectionChange,
   onRecenterViewport,
   onPointerDown,
@@ -273,6 +278,18 @@ export function LayoutViewport({
   selectedSlotIds,
   onSelectionChange,
 }: LayoutViewportProps) {
+  const didInitialFit = useRef(false);
+
+  function resolvePlacementTopLeft(placement: HallPlacement): { left: number; top: number } {
+    const match = /translate\(([-\d.]+)%\s*,\s*([-\d.]+)%\)/.exec(placement.transform);
+    const tx = match ? Number(match[1]) : 0;
+    const ty = match ? Number(match[2]) : 0;
+    return {
+      left: placement.left + (tx / 100) * placement.width,
+      top: placement.top + (ty / 100) * placement.height,
+    };
+  }
+
   function blurLayoutConfigIfNeeded(target: EventTarget | null): void {
     if (!(target instanceof HTMLElement)) {
       return;
@@ -528,6 +545,61 @@ export function LayoutViewport({
       core: resolved.core,
     };
   }, [center, hallConfigs, hallIds, storageLayoutPreset, viewMode]);
+
+  const storageBounds = useMemo(() => {
+    if (viewMode !== "storage") {
+      return null;
+    }
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    const includeRect = (left: number, top: number, width: number, height: number): void => {
+      minX = Math.min(minX, left);
+      minY = Math.min(minY, top);
+      maxX = Math.max(maxX, left + width);
+      maxY = Math.max(maxY, top + height);
+    };
+
+    for (const hallId of hallIds) {
+      const placement = hallLayout.positions[hallId];
+      if (!placement) {
+        continue;
+      }
+      const topLeft = resolvePlacementTopLeft(placement);
+      includeRect(topLeft.left, topLeft.top, placement.width, placement.height);
+    }
+
+    if (hallLayout.core) {
+      includeRect(
+        hallLayout.core.left,
+        hallLayout.core.top,
+        hallLayout.core.width,
+        hallLayout.core.height,
+      );
+    }
+
+    if (
+      !Number.isFinite(minX) ||
+      !Number.isFinite(minY) ||
+      !Number.isFinite(maxX) ||
+      !Number.isFinite(maxY)
+    ) {
+      return null;
+    }
+
+    return { left: minX, top: minY, right: maxX, bottom: maxY };
+  }, [hallIds, hallLayout, viewMode]);
+
+  useEffect(() => {
+    if (didInitialFit.current || !storageBounds) {
+      return;
+    }
+    onFitViewportToBounds(storageBounds, 24);
+    didInitialFit.current = true;
+  }, [onFitViewportToBounds, storageBounds]);
 
   const expandedMisPanels = useMemo<ExpandedMisPanel[]>(() => {
     return expandedMisTargets
