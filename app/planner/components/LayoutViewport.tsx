@@ -162,7 +162,60 @@ type WorldBounds = {
   bottom: number;
 };
 
+type SectionVisualTheme = {
+  areaClassName: string;
+  labelClassName: string;
+  indexChipClassName: string;
+  titleClassName: string;
+  slotTintClassName: string;
+};
+
 const VISIBILITY_OVERSCAN = 80;
+const SECTION_DIVIDER_CLASS_NAME =
+  "bg-[rgba(104,84,58,0.62)] shadow-[0_0_0_1px_rgba(255,243,221,0.68)]";
+
+const SECTION_VISUAL_THEMES: SectionVisualTheme[] = [
+  {
+    areaClassName:
+      "border-[rgba(157,114,56,0.26)] bg-[linear-gradient(180deg,rgba(255,229,185,0.28)_0%,rgba(255,247,230,0.05)_100%)]",
+    labelClassName:
+      "border-[rgba(151,104,48,0.42)] bg-[rgba(255,244,221,0.96)] text-[#5f4423] shadow-[0_1px_3px_rgba(95,68,35,0.2)]",
+    indexChipClassName:
+      "border-[rgba(151,104,48,0.52)] bg-[rgba(229,185,120,0.35)] text-[#5a3d1d]",
+    titleClassName: "text-[#5a3d1d]",
+    slotTintClassName: "bg-[rgba(227,166,76,0.22)]",
+  },
+  {
+    areaClassName:
+      "border-[rgba(43,115,106,0.26)] bg-[linear-gradient(180deg,rgba(188,244,226,0.26)_0%,rgba(234,251,244,0.05)_100%)]",
+    labelClassName:
+      "border-[rgba(33,121,109,0.42)] bg-[rgba(233,253,246,0.95)] text-[#1e5a53] shadow-[0_1px_3px_rgba(31,86,79,0.2)]",
+    indexChipClassName:
+      "border-[rgba(33,121,109,0.52)] bg-[rgba(129,225,196,0.34)] text-[#1a5149]",
+    titleClassName: "text-[#1d564f]",
+    slotTintClassName: "bg-[rgba(82,189,158,0.2)]",
+  },
+  {
+    areaClassName:
+      "border-[rgba(52,92,148,0.26)] bg-[linear-gradient(180deg,rgba(196,221,255,0.24)_0%,rgba(240,247,255,0.05)_100%)]",
+    labelClassName:
+      "border-[rgba(58,99,159,0.42)] bg-[rgba(236,244,255,0.95)] text-[#274878] shadow-[0_1px_3px_rgba(39,72,120,0.2)]",
+    indexChipClassName:
+      "border-[rgba(58,99,159,0.52)] bg-[rgba(156,192,241,0.34)] text-[#203f6a]",
+    titleClassName: "text-[#234472]",
+    slotTintClassName: "bg-[rgba(115,156,222,0.2)]",
+  },
+  {
+    areaClassName:
+      "border-[rgba(93,111,57,0.24)] bg-[linear-gradient(180deg,rgba(214,236,182,0.22)_0%,rgba(246,251,236,0.05)_100%)]",
+    labelClassName:
+      "border-[rgba(95,129,60,0.42)] bg-[rgba(245,252,232,0.95)] text-[#41592a] shadow-[0_1px_3px_rgba(65,89,42,0.18)]",
+    indexChipClassName:
+      "border-[rgba(95,129,60,0.5)] bg-[rgba(184,220,136,0.32)] text-[#385024]",
+    titleClassName: "text-[#3e5628]",
+    slotTintClassName: "bg-[rgba(156,196,96,0.18)]",
+  },
+];
 
 function defaultHallLabel(hallId: HallId): string {
   return `Hall ${hallId}`;
@@ -174,6 +227,10 @@ function expandedMisKey(target: ExpandedMisTarget): string {
 
 function sectionNameKey(hallId: HallId, sectionIndex: number): string {
   return `${hallId}:${sectionIndex}`;
+}
+
+function resolveSectionVisualTheme(sectionIndex: number): SectionVisualTheme {
+  return SECTION_VISUAL_THEMES[sectionIndex % SECTION_VISUAL_THEMES.length];
 }
 
 function misPreviewLayout(cardWidth: number, cardHeight: number): { columns: number; maxItems: number } {
@@ -809,7 +866,7 @@ export function LayoutViewport({
     });
   }, []);
 
-  function renderSlot(slotId: string): ReactNode {
+  function renderSlot(slotId: string, slotTintClassName?: string): ReactNode {
     const assignedItemId = slotAssignments[slotId];
     const assignedItem = assignedItemId ? itemById.get(assignedItemId) : undefined;
     const isDraggedSource = draggedSourceSlotIds.has(slotId);
@@ -921,6 +978,11 @@ export function LayoutViewport({
             : "Drop item here"
         }
       >
+        {slotTintClassName ? (
+          <span
+            className={`pointer-events-none absolute inset-0 z-0 rounded-[0.35rem] ${slotTintClassName}`}
+          />
+        ) : null}
         {showAssignedItem && assignedItem ? (
           <Image
             src={assignedItem.texturePath}
@@ -1007,13 +1069,14 @@ export function LayoutViewport({
         }
         const first = sectionSlices[0];
         const last = sectionSlices[sectionSlices.length - 1];
+        const sectionMainSize = last.mainStart + last.mainSize - first.mainStart;
+        const start = mapMainStart(first.mainStart, sectionMainSize);
         return {
           sectionIndex,
           name: sectionDisplayName(hallId, sectionIndex),
-          start: mapMainStart(first.mainStart, last.mainStart + last.mainSize - first.mainStart),
-          end:
-            mapMainStart(first.mainStart, last.mainStart + last.mainSize - first.mainStart) +
-            (last.mainStart + last.mainSize - first.mainStart),
+          start,
+          end: start + sectionMainSize,
+          size: sectionMainSize,
           rawStart: first.mainStart,
         };
       })
@@ -1023,6 +1086,7 @@ export function LayoutViewport({
           name: string;
           start: number;
           end: number;
+          size: number;
           rawStart: number;
         } =>
           entry !== null,
@@ -1374,6 +1438,7 @@ export function LayoutViewport({
 
         for (let row = 0; row < sideConfig.rowsPerSlice; row += 1) {
           const slotKey = nonMisSlotId(hallId, slice.globalSlice, side, row);
+          const sectionTheme = resolveSectionVisualTheme(slice.sectionIndex);
           const visualRow = reverseCrossAxisForDirection
             ? sideConfig.rowsPerSlice - 1 - row
             : row;
@@ -1387,7 +1452,7 @@ export function LayoutViewport({
             }
             slots.push(
               <div key={slotKey} className="absolute" style={{ left: x, top: y }}>
-                {renderSlot(slotKey)}
+                {renderSlot(slotKey, sectionTheme.slotTintClassName)}
               </div>,
             );
           } else {
@@ -1399,7 +1464,7 @@ export function LayoutViewport({
             }
             slots.push(
               <div key={slotKey} className="absolute" style={{ left: x, top: y }}>
-                {renderSlot(slotKey)}
+                {renderSlot(slotKey, sectionTheme.slotTintClassName)}
               </div>,
             );
           }
@@ -1421,6 +1486,7 @@ export function LayoutViewport({
           />
         )}
         {sectionRanges.length > 0 ? sectionRanges.map((section, index) => {
+          const theme = resolveSectionVisualTheme(section.sectionIndex);
           const center = section.start + (section.end - section.start) / 2;
           const boundary =
             index > 0
@@ -1428,24 +1494,39 @@ export function LayoutViewport({
                 ? mainSpan - (section.rawStart - SLOT_GAP / 2)
                 : section.rawStart - SLOT_GAP / 2
               : null;
+          const sectionSpan = Math.max(10, section.size - 3);
           if (orientation === "horizontal") {
             return (
               <div key={`${hallId}:section:${index}`} className="pointer-events-none absolute inset-0">
+                <div
+                  className={`absolute rounded-[0.65rem] border ${theme.areaClassName}`}
+                  style={{
+                    left: section.start + 1.5,
+                    top: 1.5,
+                    width: sectionSpan,
+                    height: Math.max(8, hallHeight - 3),
+                  }}
+                />
                 {boundary !== null ? (
                   <div
-                    className="absolute w-px bg-[rgba(64,50,27,0.35)]"
-                    style={{ left: boundary, top: 0, height: hallHeight }}
+                    className={`absolute w-[2px] rounded-full ${SECTION_DIVIDER_CLASS_NAME}`}
+                    style={{ left: boundary - 1, top: 1, height: Math.max(6, hallHeight - 2) }}
                   />
                 ) : null}
                 <div
-                  className="pointer-events-auto absolute -translate-x-1/2 rounded-[0.3rem] border border-[rgba(64,50,27,0.26)] bg-[rgba(255,246,227,0.9)] px-[0.2rem] py-[0.04rem] text-[0.5rem] font-bold tracking-[0.03em] text-[rgba(72,56,33,0.8)]"
+                  className={`pointer-events-auto absolute flex -translate-x-1/2 items-center gap-[0.12rem] rounded-[0.32rem] border px-[0.22rem] py-[0.06rem] text-[0.5rem] font-bold tracking-[0.03em] ${theme.labelClassName}`}
                   style={{ left: center, top: maxLeftDepth + 2 }}
                   data-no-pan
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={(event) => event.stopPropagation()}
                 >
                   <span
-                    className="inline-block min-w-[2.1rem] whitespace-nowrap rounded-[0.2rem] px-[0.1rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none"
+                    className={`inline-grid h-[0.78rem] min-w-[0.78rem] place-items-center rounded-[0.2rem] border text-[0.45rem] leading-none ${theme.indexChipClassName}`}
+                  >
+                    {section.sectionIndex + 1}
+                  </span>
+                  <span
+                    className={`inline-block min-w-[2.1rem] whitespace-nowrap rounded-[0.2rem] px-[0.1rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none ${theme.titleClassName}`}
                     contentEditable
                     suppressContentEditableWarning
                     role="textbox"
@@ -1469,21 +1550,35 @@ export function LayoutViewport({
           }
           return (
             <div key={`${hallId}:section:${index}`} className="pointer-events-none absolute inset-0">
+              <div
+                className={`absolute rounded-[0.65rem] border ${theme.areaClassName}`}
+                style={{
+                  left: 1.5,
+                  top: section.start + 1.5,
+                  width: Math.max(8, hallWidth - 3),
+                  height: sectionSpan,
+                }}
+              />
               {boundary !== null ? (
                 <div
-                  className="absolute h-px bg-[rgba(64,50,27,0.35)]"
-                  style={{ left: 0, top: boundary, width: hallWidth }}
+                  className={`absolute h-[2px] rounded-full ${SECTION_DIVIDER_CLASS_NAME}`}
+                  style={{ left: 1, top: boundary - 1, width: Math.max(6, hallWidth - 2) }}
                 />
               ) : null}
               <div
-                className="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 -rotate-90 rounded-[0.3rem] border border-[rgba(64,50,27,0.26)] bg-[rgba(255,246,227,0.9)] px-[0.2rem] py-[0.04rem] text-[0.5rem] font-bold tracking-[0.03em] text-[rgba(72,56,33,0.8)]"
+                className={`pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 -rotate-90 items-center gap-[0.12rem] rounded-[0.32rem] border px-[0.22rem] py-[0.06rem] text-[0.5rem] font-bold tracking-[0.03em] ${theme.labelClassName}`}
                 style={{ left: aisleCenterX, top: center }}
                 data-no-pan
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => event.stopPropagation()}
               >
                 <span
-                  className="inline-block min-w-[2.1rem] whitespace-nowrap rounded-[0.2rem] px-[0.1rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none"
+                  className={`inline-grid h-[0.78rem] min-w-[0.78rem] place-items-center rounded-[0.2rem] border text-[0.45rem] leading-none ${theme.indexChipClassName}`}
+                >
+                  {section.sectionIndex + 1}
+                </span>
+                <span
+                  className={`inline-block min-w-[2.1rem] whitespace-nowrap rounded-[0.2rem] px-[0.1rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none ${theme.titleClassName}`}
                   contentEditable
                   suppressContentEditableWarning
                   role="textbox"
