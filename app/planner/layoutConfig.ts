@@ -535,10 +535,21 @@ export function resolveStorageLayout(
     for (const [direction, hallIds] of byDirection.entries()) {
         const anchor = directionAnchor(direction);
         const orientation = directionOrientation(direction);
-        const corePerpendicularSpan =
-            direction === "north" || direction === "south"
-                ? definition.core.width
-                : definition.core.height;
+        const isNorthSouth = direction === "north" || direction === "south";
+        const placementGap = 12;
+        const hallPerpendicularSpans = hallIds.map((hallId) => {
+            const size = getHallSize(hallConfigs[hallId], orientation);
+            return isNorthSouth ? size.width : size.height;
+        });
+        const totalPerpendicularSpan =
+            hallPerpendicularSpans.reduce((sum, span) => sum + span, 0) +
+            Math.max(0, hallPerpendicularSpans.length - 1) * placementGap;
+        let cursor = -totalPerpendicularSpan / 2;
+        const offsets = hallPerpendicularSpans.map((span) => {
+            const centerOffset = cursor + span / 2;
+            cursor += span + placementGap;
+            return centerOffset;
+        });
 
         for (const [index, hallId] of hallIds.entries()) {
             const size = getHallSize(hallConfigs[hallId], orientation);
@@ -546,18 +557,9 @@ export function resolveStorageLayout(
                 anchorCoordinate(coreLeft, definition.core.width, anchor.x) + anchor.offsetX;
             const baseY =
                 anchorCoordinateY(coreTop, definition.core.height, anchor.y) + anchor.offsetY;
-            const offset =
-                hallIds.length <= 1
-                    ? 0
-                    : (() => {
-                        // Spread hall centers across the full core span for this direction.
-                        // Keep a shared lane center regardless of hall thickness so opposite
-                        // directions remain aligned.
-                        const t = index / (hallIds.length - 1);
-                        return -corePerpendicularSpan / 2 + t * corePerpendicularSpan;
-                    })();
-            const offsetX = direction === "north" || direction === "south" ? offset : 0;
-            const offsetY = direction === "east" || direction === "west" ? offset : 0;
+            const offset = offsets[index] ?? 0;
+            const offsetX = isNorthSouth ? offset : 0;
+            const offsetY = isNorthSouth ? 0 : offset;
 
             positions[hallId] = {
                 left: baseX + offsetX,

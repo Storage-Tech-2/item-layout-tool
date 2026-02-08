@@ -661,6 +661,33 @@ export function LayoutViewport({
     };
   }, [center, hallConfigs, hallIds, storageLayoutPreset, viewMode]);
 
+  const controlLaneByHall = useMemo<Record<HallId, number>>(() => {
+    const grouped = new Map<HallDirection, Array<{ hallId: HallId; axis: number }>>();
+    for (const hallId of hallIds) {
+      const direction = hallLayout.directions[hallId];
+      const placement = hallLayout.positions[hallId];
+      if (!direction || !placement) {
+        continue;
+      }
+      const topLeft = resolvePlacementTopLeft(placement);
+      const axis = direction === "north" || direction === "south" ? topLeft.left : topLeft.top;
+      if (!grouped.has(direction)) {
+        grouped.set(direction, []);
+      }
+      grouped.get(direction)!.push({ hallId, axis });
+    }
+
+    const lanes: Record<HallId, number> = {};
+    for (const group of grouped.values()) {
+      group
+        .sort((a, b) => a.axis - b.axis)
+        .forEach((entry, index) => {
+          lanes[entry.hallId] = index;
+        });
+    }
+    return lanes;
+  }, [hallIds, hallLayout.directions, hallLayout.positions]);
+
   const storageBounds = useMemo(() => {
     if (viewMode !== "storage") {
       return null;
@@ -782,21 +809,18 @@ export function LayoutViewport({
       <button
         key={slotId}
         type="button"
-        className={`relative grid h-8.5 w-8.5 cursor-pointer place-items-center overflow-hidden rounded-[0.45rem] border p-0 transition hover:-translate-y-px ${
-          isSelected
-            ? "hover:shadow-[0_0_0_2px_rgba(37,99,235,0.55)]"
-            : "hover:shadow-[0_3px_8px_rgba(57,47,30,0.22)]"
-        } ${
-          assignedItem
+        className={`relative grid h-8.5 w-8.5 cursor-pointer place-items-center overflow-hidden rounded-[0.45rem] border p-0 transition hover:-translate-y-px ${isSelected
+          ? "hover:shadow-[0_0_0_2px_rgba(37,99,235,0.55)]"
+          : "hover:shadow-[0_3px_8px_rgba(57,47,30,0.22)]"
+          } ${assignedItem
             ? "border-[rgba(40,102,110,0.62)] bg-[linear-gradient(145deg,rgba(237,253,249,0.95)_0%,rgba(205,235,226,0.95)_100%)]"
             : "border-[rgba(108,89,62,0.35)] bg-[linear-gradient(145deg,rgba(245,233,216,0.95)_0%,rgba(231,212,184,0.95)_100%)]"
-        } ${
-          isDropTarget
+          } ${isDropTarget
             ? isSwapPreview
               ? "border-[rgba(194,65,12,0.92)] shadow-[0_0_0_2px_rgba(251,146,60,0.45)]"
               : "border-[rgba(22,132,120,0.92)] shadow-[0_0_0_2px_rgba(85,204,178,0.38)]"
             : ""
-        } ${isSelected ? "shadow-[0_0_0_2px_rgba(37,99,235,0.55)]" : ""}`}
+          } ${isSelected ? "shadow-[0_0_0_2px_rgba(37,99,235,0.55)]" : ""}`}
         draggable={Boolean(assignedItem)}
         onPointerDown={(event) => {
           if (event.shiftKey) {
@@ -880,15 +904,14 @@ export function LayoutViewport({
         ) : null}
         {showPreviewItem ? (
           <div
-            className={`pointer-events-none absolute inset-0 z-1 ${
-              isSwapPreview
-                ? showAssignedItem
-                  ? "bg-[rgba(251,146,60,0.2)]"
-                  : "bg-[rgba(251,146,60,0.32)]"
-                : showAssignedItem
-                  ? "bg-[rgba(45,212,191,0.2)]"
-                  : "bg-[rgba(45,212,191,0.3)]"
-            }`}
+            className={`pointer-events-none absolute inset-0 z-1 ${isSwapPreview
+              ? showAssignedItem
+                ? "bg-[rgba(251,146,60,0.2)]"
+                : "bg-[rgba(251,146,60,0.32)]"
+              : showAssignedItem
+                ? "bg-[rgba(45,212,191,0.2)]"
+                : "bg-[rgba(45,212,191,0.3)]"
+              }`}
           />
         ) : null}
         {showPreviewItem && previewItem ? (
@@ -897,9 +920,8 @@ export function LayoutViewport({
             alt={previewItem.id}
             width={22}
             height={22}
-            className={`pointer-events-none absolute inset-0 z-2 m-auto ${
-              showAssignedItem ? "opacity-40" : "opacity-[0.72]"
-            }`}
+            className={`pointer-events-none absolute inset-0 z-2 m-auto ${showAssignedItem ? "opacity-40" : "opacity-[0.72]"
+              }`}
             style={{ imageRendering: "pixelated" }}
             draggable={false}
             unoptimized
@@ -1032,9 +1054,9 @@ export function LayoutViewport({
                 const assigned = slotAssignments[slotId];
                 return assigned
                   ? {
-                      itemId: assigned,
-                      previewKind: null,
-                    }
+                    itemId: assigned,
+                    previewKind: null,
+                  }
                   : undefined;
               })
               .filter(
@@ -1130,34 +1152,33 @@ export function LayoutViewport({
                     {previewEntries
                       .slice(0, previewLayout.maxItems)
                       .map((entry, previewIndex) => {
-                      const item = itemById.get(entry.itemId);
-                      if (!item) {
-                        return null;
-                      }
-                      return (
-                        <div
-                          key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${entry.itemId}-${previewIndex}`}
-                          className={`grid h-4 w-4 place-items-center overflow-hidden rounded-[0.2rem] border ${
-                            entry.previewKind === "swap"
+                        const item = itemById.get(entry.itemId);
+                        if (!item) {
+                          return null;
+                        }
+                        return (
+                          <div
+                            key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${entry.itemId}-${previewIndex}`}
+                            className={`grid h-4 w-4 place-items-center overflow-hidden rounded-[0.2rem] border ${entry.previewKind === "swap"
                               ? "border-[rgba(194,65,12,0.55)] bg-[rgba(255,233,213,0.92)]"
                               : entry.previewKind === "place"
                                 ? "border-[rgba(22,132,120,0.55)] bg-[rgba(203,246,236,0.92)]"
                                 : "border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
-                          }`}
-                        >
-                          <Image
-                            src={item.texturePath}
-                            alt={item.id}
-                            width={14}
-                            height={14}
-                            className={entry.previewKind ? "opacity-[0.72]" : ""}
-                            style={{ imageRendering: "pixelated" }}
-                            draggable={false}
-                            unoptimized
-                          />
-                        </div>
-                      );
-                    })}
+                              }`}
+                          >
+                            <Image
+                              src={item.texturePath}
+                              alt={item.id}
+                              width={14}
+                              height={14}
+                              className={entry.previewKind ? "opacity-[0.72]" : ""}
+                              style={{ imageRendering: "pixelated" }}
+                              draggable={false}
+                              unoptimized
+                            />
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>,
               );
@@ -1219,34 +1240,33 @@ export function LayoutViewport({
                     {previewEntries
                       .slice(0, previewLayout.maxItems)
                       .map((entry, previewIndex) => {
-                      const item = itemById.get(entry.itemId);
-                      if (!item) {
-                        return null;
-                      }
-                      return (
-                        <div
-                          key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${entry.itemId}-${previewIndex}`}
-                          className={`grid h-4 w-4 place-items-center overflow-hidden rounded-[0.2rem] border ${
-                            entry.previewKind === "swap"
+                        const item = itemById.get(entry.itemId);
+                        if (!item) {
+                          return null;
+                        }
+                        return (
+                          <div
+                            key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${entry.itemId}-${previewIndex}`}
+                            className={`grid h-4 w-4 place-items-center overflow-hidden rounded-[0.2rem] border ${entry.previewKind === "swap"
                               ? "border-[rgba(194,65,12,0.55)] bg-[rgba(255,233,213,0.92)]"
                               : entry.previewKind === "place"
                                 ? "border-[rgba(22,132,120,0.55)] bg-[rgba(203,246,236,0.92)]"
                                 : "border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
-                          }`}
-                        >
-                          <Image
-                            src={item.texturePath}
-                            alt={item.id}
-                            width={14}
-                            height={14}
-                            className={entry.previewKind ? "opacity-[0.72]" : ""}
-                            style={{ imageRendering: "pixelated" }}
-                            draggable={false}
-                            unoptimized
-                          />
-                        </div>
-                      );
-                    })}
+                              }`}
+                          >
+                            <Image
+                              src={item.texturePath}
+                              alt={item.id}
+                              width={14}
+                              height={14}
+                              className={entry.previewKind ? "opacity-[0.72]" : ""}
+                              style={{ imageRendering: "pixelated" }}
+                              draggable={false}
+                              unoptimized
+                            />
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>,
               );
@@ -1492,7 +1512,7 @@ export function LayoutViewport({
 
       <div className="absolute left-4 top-4 z-20 grid gap-[0.45rem]" data-no-pan>
         <div className="grid gap-[0.28rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem] text-[0.68rem] text-[#4f4639]">
-      
+
           <div className="font-semibold text-[#3a332b]">
             Total Types: {layoutSummary.totalTypes}
           </div>
@@ -1537,11 +1557,10 @@ export function LayoutViewport({
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
-                  viewMode === "storage"
-                    ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                    : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
-                }`}
+                className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${viewMode === "storage"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+                  }`}
                 onClick={() => {
                   if (viewMode === "storage") {
                     return;
@@ -1554,11 +1573,10 @@ export function LayoutViewport({
               </button>
               <button
                 type="button"
-                className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${
-                  viewMode === "flat"
-                    ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                    : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
-                }`}
+                className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${viewMode === "flat"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+                  }`}
                 onClick={() => {
                   if (viewMode === "flat") {
                     return;
@@ -1581,23 +1599,23 @@ export function LayoutViewport({
         <div
           className="w-fit justify-self-end flex items-center gap-[0.45rem] rounded-full border border-[rgba(134,105,67,0.35)] bg-[rgba(255,250,239,0.92)] px-[0.45rem] py-1"
         >
-        <button
-          type="button"
-          className="h-[1.6rem] w-[1.6rem] cursor-pointer rounded-full border border-[rgba(132,101,64,0.5)] bg-white text-[1rem] leading-none text-[#2b2b2b]"
-          onClick={() => onAdjustZoom(0.2)}
-        >
-          +
-        </button>
-        <span className="min-w-[2.8rem] text-center text-[0.76rem] font-bold text-[#6d6256]">
-          {Math.round(zoom * 100)}%
-        </span>
-        <button
-          type="button"
-          className="h-[1.6rem] w-[1.6rem] cursor-pointer rounded-full border border-[rgba(132,101,64,0.5)] bg-white text-[1rem] leading-none text-[#2b2b2b]"
-          onClick={() => onAdjustZoom(-0.2)}
-        >
-          -
-        </button>
+          <button
+            type="button"
+            className="h-[1.6rem] w-[1.6rem] cursor-pointer rounded-full border border-[rgba(132,101,64,0.5)] bg-white text-[1rem] leading-none text-[#2b2b2b]"
+            onClick={() => onAdjustZoom(0.2)}
+          >
+            +
+          </button>
+          <span className="min-w-[2.8rem] text-center text-[0.76rem] font-bold text-[#6d6256]">
+            {Math.round(zoom * 100)}%
+          </span>
+          <button
+            type="button"
+            className="h-[1.6rem] w-[1.6rem] cursor-pointer rounded-full border border-[rgba(132,101,64,0.5)] bg-white text-[1rem] leading-none text-[#2b2b2b]"
+            onClick={() => onAdjustZoom(-0.2)}
+          >
+            -
+          </button>
         </div>
       </div>
 
@@ -1727,19 +1745,55 @@ export function LayoutViewport({
               return null;
             }
             const controlAnchorStyle = (() => {
+              const controlLane = controlLaneByHall[hallId] ?? 0;
+              const useEndAnchor = viewMode === "storage" && controlLane > 0;
               if (viewMode === "flat") {
                 return { left: "-0.36rem", top: "50%", transform: "translate(-100%, -50%)" };
               }
+
               switch (layoutDirection) {
                 case "south":
-                  return { left: "50%", bottom: "-0.36rem", transform: "translate(-50%, 100%)" };
+                  return {
+                    left: "50%",
+                    bottom: `-0.36rem`,
+                    transform: "translate(-50%, 100%)",
+                  };
                 case "north":
-                  return { left: "50%", top: "-0.36rem", transform: "translate(-50%, -100%)" };
+                  return {
+                    left: "50%",
+                    top: `-0.36rem`,
+                    transform: "translate(-50%, -100%)",
+                  };
                 case "east":
-                  return { right: "0", top: "-0.36rem", transform: "translate(0, -100%)" };
+                  if (useEndAnchor) {
+                    return {
+                      right: "0",
+                      bottom: `-0.36rem`,
+                      transform: "translate(0, 100%)",
+                    };
+                  }
+
+                  return {
+                    right: "0",
+                    top: `-0.36rem`,
+                    transform: "translate(0, -100%)",
+                  };
                 case "west":
                 default:
-                  return { left: "0", top: "-0.36rem", transform: "translate(0, -100%)" };
+
+                  if (useEndAnchor) {
+                    return {
+                      left: "0",
+                      bottom: `-0.36rem`,
+                      transform: "translate(0, 100%)",
+                    };
+                  }
+
+                  return {
+                    left: "0",
+                    top: `-0.36rem`,
+                    transform: "translate(0, -100%)",
+                  };
               }
             })();
 
@@ -1777,25 +1831,25 @@ export function LayoutViewport({
                 >
                   <div className="grid gap-[0.16rem] rounded-[0.55rem] border border-[rgba(132,100,63,0.4)] bg-[rgba(255,244,223,0.96)] px-[0.32rem] py-[0.2rem] text-[#5f4c33]">
                     <div className="flex items-center gap-[0.2rem]">
-                    <span
-                      className="cursor-text rounded-[0.2rem] px-[0.08rem] text-[0.62rem] font-bold uppercase tracking-[0.04em] hover:text-[#2d6a4f] focus:bg-white focus:text-[#2d6a4f] focus:outline-none"
-                      contentEditable
-                      suppressContentEditableWarning
-                      role="textbox"
-                      tabIndex={0}
-                      onBlur={(event) =>
-                        updateHallName(hallId, event.currentTarget.textContent ?? "")
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          event.currentTarget.blur();
+                      <span
+                        className="cursor-text rounded-[0.2rem] px-[0.08rem] text-[0.62rem] font-bold uppercase tracking-[0.04em] hover:text-[#2d6a4f] focus:bg-white focus:text-[#2d6a4f] focus:outline-none"
+                        contentEditable
+                        suppressContentEditableWarning
+                        role="textbox"
+                        tabIndex={0}
+                        onBlur={(event) =>
+                          updateHallName(hallId, event.currentTarget.textContent ?? "")
                         }
-                      }}
-                      title="Click to rename hall"
-                    >
-                      {hallDisplayName(hallId)}
-                    </span>
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            event.currentTarget.blur();
+                          }
+                        }}
+                        title="Click to rename hall"
+                      >
+                        {hallDisplayName(hallId)}
+                      </span>
                       <button
                         type="button"
                         className="rounded-[0.32rem] border border-[rgba(66,127,90,0.45)] bg-[rgba(233,255,243,0.9)] px-[0.2rem] py-[0.08rem] text-[0.56rem] font-semibold text-[#2f5b43]"
