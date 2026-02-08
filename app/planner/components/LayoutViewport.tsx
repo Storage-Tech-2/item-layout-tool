@@ -908,8 +908,8 @@ export function LayoutViewport({
       : null;
     const anchorStyle = indicatorAnchorStyle(primaryDirection);
 
-    const indicatorSize = 24;
-    const start = { x: 12, y: 12 };
+    const indicatorSize = 26;
+    const start = { x: 13, y: 13 };
     const primaryVector = directionVector(primaryDirection);
     const first = {
       x: start.x + primaryVector.x * 5,
@@ -917,9 +917,14 @@ export function LayoutViewport({
     };
 
     if (hint.style === "hall-jump") {
-      const end = {
+      const circleCenter = {
         x: first.x + primaryVector.x * 4,
         y: first.y + primaryVector.y * 4,
+      };
+      const circleRadius = 2.6;
+      const end = {
+        x: circleCenter.x - primaryVector.x * (circleRadius + 1.4),
+        y: circleCenter.y - primaryVector.y * (circleRadius + 1.4),
       };
       return (
         <span className="pointer-events-none absolute z-6" style={anchorStyle}>
@@ -940,9 +945,9 @@ export function LayoutViewport({
               strokeLinejoin="round"
             />
             <circle
-              cx={end.x}
-              cy={end.y}
-              r="2.6"
+              cx={circleCenter.x}
+              cy={circleCenter.y}
+              r={circleRadius}
               fill="none"
               stroke="rgba(146,64,14,0.95)"
               strokeWidth="1.4"
