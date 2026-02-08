@@ -172,13 +172,12 @@ export function buildCursorMovementHint(
 }
 
 export function buildPopupCursorHint(
-  hint: CursorMovementHint | null,
-  slotId: string,
+ fromSlotId: string,
+  toSlotId: string,
+  fillDirection: FillDirection,
+  mode: CursorHintMode,
   popupColumnsBySlotId: Map<string, number>,
 ): CursorMovementHint | null {
-  if (!hint) {
-    return hint;
-  }
   const columns = popupColumnsBySlotId.get(slotId);
   if (!columns || columns <= 1) {
     return hint;
