@@ -183,7 +183,7 @@ const SECTION_VISUAL_THEMES: SectionVisualTheme[] = [
     indexChipClassName:
       "border-[rgba(151,104,48,0.52)] bg-[rgba(229,185,120,0.35)] text-[#5a3d1d]",
     titleClassName: "text-[#5a3d1d]",
-    slotTintClassName: "bg-[rgba(227,166,76,0.22)]",
+    slotTintClassName: "bg-[rgba(199,169,122,0.18)]",
   },
   {
     areaClassName:
