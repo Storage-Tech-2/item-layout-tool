@@ -177,9 +177,14 @@ export function PlannerApp() {
         if (isCancelled) {
           return;
         }
-        if (draft) {
+        if (draft && draft.history.entries.length > 0) {
           setPendingAutosaveRestore(draft);
         } else {
+          if (draft) {
+            void clearPlannerAutosaveDraft().catch(() => {
+              // Ignore clear failures and continue without prompting.
+            });
+          }
           setIsAutosaveRestoreResolved(true);
         }
       } catch {
@@ -208,6 +213,9 @@ export function PlannerApp() {
 
     const historyState = getHistoryState();
     if (!historyState) {
+      return;
+    }
+    if (historyState.entries.length === 0) {
       return;
     }
 
