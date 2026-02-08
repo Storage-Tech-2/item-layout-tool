@@ -1413,9 +1413,7 @@ export function LayoutViewport({
 
       <div className="absolute left-4 top-4 z-20 grid gap-[0.45rem]" data-no-pan>
         <div className="grid gap-[0.28rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem] text-[0.68rem] text-[#4f4639]">
-          <div className="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-[#5e513f]">
-            Layout Summary
-          </div>
+      
           <div className="font-semibold text-[#3a332b]">
             Total Types: {layoutSummary.totalTypes}
           </div>

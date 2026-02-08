@@ -135,9 +135,11 @@ export function ItemLibraryPanel({
       cursor += heights[index] + (index < heights.length - 1 ? sectionGap : 0);
     }
     const totalHeight = cursor;
+    const maxScrollTop = Math.max(0, totalHeight - Math.max(0, listHeight));
+    const safeScrollTop = Math.min(Math.max(0, scrollTop), maxScrollTop);
 
-    const minY = Math.max(0, scrollTop - listOverscan);
-    const maxY = scrollTop + Math.max(0, listHeight) + listOverscan;
+    const minY = Math.max(0, safeScrollTop - listOverscan);
+    const maxY = safeScrollTop + Math.max(0, listHeight) + listOverscan;
 
     let startIndex = 0;
     while (
@@ -145,6 +147,9 @@ export function ItemLibraryPanel({
       offsets[startIndex] + heights[startIndex] < minY
     ) {
       startIndex += 1;
+    }
+    if (startIndex >= heights.length) {
+      startIndex = heights.length - 1;
     }
 
     let endIndex = startIndex;
