@@ -3,7 +3,7 @@ import type { HallConfig, HallId, HallOrientation, HallSideConfig } from "./type
 import { getHallSize } from "./utils";
 
 export type HallDirection = "north" | "east" | "south" | "west";
-export type StorageLayoutPreset = "cross" | "h" | "hcross";
+export type StorageLayoutPreset = "cross" | "h" | "hcross" | "octa";
 
 export type HallCore = {
     name: string;
@@ -184,8 +184,8 @@ const HCROSS_LAYOUT: StorageLayoutDefinition = {
     core: {
         name: "Core",
         shape: "rectangle",
-        width: Math.max(Math.round(CORE_SIZE * 0.5), 92),
-        height: Math.max(Math.round(CORE_SIZE * 2), 320),
+        width: Math.max(Math.round(CORE_SIZE * 0.8), 92),
+        height: Math.max(Math.round(CORE_SIZE * 1.6), 320),
         halls: [
             {
                 id: 1,
@@ -263,10 +263,120 @@ const HCROSS_LAYOUT: StorageLayoutDefinition = {
     },
 };
 
+const OCTA_LAYOUT: StorageLayoutDefinition = {
+    core: {
+        name: "Core",
+        shape: "rectangle",
+        width: CORE_SIZE * 1.5,
+        height: CORE_SIZE * 1.5,
+        halls: [
+            {
+                id: 1,
+                name: "North Hall 1",
+                direction: "north",
+                sections: [
+                    {
+                        slices: 32,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+            {
+                id: 2,
+                name: "North Hall 2",
+                direction: "north",
+                sections: [
+                    {
+                        slices: 32,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+             {
+                id: 3,
+                name: "South Hall 1",
+                direction: "south",
+                sections: [
+                    {
+                        slices: 32,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+            {
+                id: 4,
+                name: "South Hall 2",
+                direction: "south",
+                sections: [
+                    {
+                        slices: 32,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+             {
+                id: 5,
+                name: "East Hall 1",
+                direction: "east",
+                sections: [
+                    {
+                        slices: 32,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+            {
+                id: 6,
+                name: "East Hall 2",
+                direction: "east",
+                sections: [
+                    {
+                        slices: 32,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+             {
+                id: 7,
+                name: "West Hall 1",
+                direction: "west",
+                sections: [
+                    {
+                        slices: 32,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+            {
+                id: 8,
+                name: "West Hall 2",
+                direction: "west",
+                sections: [
+                    {
+                        slices: 32,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+           
+        ],
+    },
+};
+
+
 const STORAGE_LAYOUTS: Record<StorageLayoutPreset, StorageLayoutDefinition> = {
     cross: CROSS_LAYOUT,
     h: H_LAYOUT,
     hcross: HCROSS_LAYOUT,
+    octa: OCTA_LAYOUT,
 };
 
 export function getLayoutHallName(

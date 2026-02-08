@@ -1526,6 +1526,7 @@ export function LayoutViewport({
             <option value="cross">Cross Layout</option>
             <option value="h">H Layout</option>
             <option value="hcross">H-Cross Layout</option>
+            <option value="octa">Octa Layout</option>
           </select>
         </div>
       </div>
