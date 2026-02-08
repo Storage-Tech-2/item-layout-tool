@@ -40,6 +40,7 @@ import type {
   PreviewPlacement,
 } from "../types";
 import { getHallSize, misSlotId, nonMisSlotId, resolveHallSlices, toTitle } from "../utils";
+import { buildPopupCursorHint } from "../lib/cursorHints";
 
 type LayoutViewportProps = {
   storageLayoutPreset: StorageLayoutPreset;
@@ -52,6 +53,7 @@ type LayoutViewportProps = {
   misNames: Record<string, string>;
   cursorSlotId: string | null;
   cursorMovementHint: CursorMovementHint | null;
+  popupCursorMovementHint: CursorMovementHint | null;
   viewportRef: RefObject<HTMLDivElement | null>;
   zoom: number;
   pan: { x: number; y: number };
@@ -245,112 +247,6 @@ function misPreviewLayout(cardWidth: number, cardHeight: number): { columns: num
   return { columns, maxItems: columns * rows };
 }
 
-type ParsedMisSlotId = {
-  hallId: HallId;
-  slice: number;
-  side: 0 | 1;
-  misUnit: number;
-  index: number;
-};
-
-function parseMisSlotIdValue(slotId: string): ParsedMisSlotId | null {
-  const parts = slotId.split(":");
-  if (parts.length !== 6 || parts[1] !== "m") {
-    return null;
-  }
-  const hallId = Number(parts[0]);
-  const slice = Number(parts[2]);
-  const side = Number(parts[3]);
-  const misUnit = Number(parts[4]);
-  const index = Number(parts[5]);
-  if (
-    !Number.isFinite(hallId) ||
-    !Number.isFinite(slice) ||
-    (side !== 0 && side !== 1) ||
-    !Number.isFinite(misUnit) ||
-    !Number.isFinite(index)
-  ) {
-    return null;
-  }
-  return { hallId, slice, side, misUnit, index };
-}
-
-function buildPopupCursorHint(
-  hint: CursorMovementHint | null,
-  slotId: string,
-  popupColumnsBySlotId: Map<string, number>,
-): CursorMovementHint | null {
-  if (!hint || hint.style !== "straight") {
-    return hint;
-  }
-  const columns = popupColumnsBySlotId.get(slotId);
-  if (!columns || columns <= 1) {
-    return hint;
-  }
-  const fromMeta = parseMisSlotIdValue(hint.fromSlotId);
-  const toMeta = parseMisSlotIdValue(hint.toSlotId);
-  if (!fromMeta || !toMeta) {
-    return hint;
-  }
-  const sameMisUnit =
-    fromMeta.hallId === toMeta.hallId &&
-    fromMeta.slice === toMeta.slice &&
-    fromMeta.side === toMeta.side &&
-    fromMeta.misUnit === toMeta.misUnit;
-  if (!sameMisUnit || toMeta.index <= fromMeta.index) {
-    return hint;
-  }
-  const fromRow = Math.floor(fromMeta.index / columns);
-  const toRow = Math.floor(toMeta.index / columns);
-  if (toRow === fromRow) {
-    return hint;
-  }
-  return {
-    ...hint,
-    style: "turn",
-    direction: "down",
-    turnToDirection: "left",
-  };
-}
-
-function buildCollapsedMisCardCursorHint(hint: CursorMovementHint | null): CursorMovementHint | null {
-  if (!hint) {
-    return hint;
-  }
-  const fromMeta = parseMisSlotIdValue(hint.fromSlotId);
-  const toMeta = parseMisSlotIdValue(hint.toSlotId);
-  if (!fromMeta || !toMeta) {
-    return hint;
-  }
-
-  const sameTrack =
-    fromMeta.hallId === toMeta.hallId &&
-    fromMeta.side === toMeta.side;
-  if (!sameTrack) {
-    return hint;
-  }
-
-  if (toMeta.slice === fromMeta.slice) {
-    if (toMeta.misUnit >= fromMeta.misUnit) {
-      return {
-        ...hint,
-        style: "straight",
-        direction: "right",
-        turnToDirection: undefined,
-      };
-    }
-    return {
-      ...hint,
-      style: "straight",
-      direction: "left",
-      turnToDirection: undefined,
-    };
-  }
-
-  // Crossing slices/groups should keep a turn hint.
-  return hint;
-}
-
 function sideDepthPx(side: HallSideConfig): number {
   if (side.type === "mis") {
     return side.misUnitsPerSlice * 112 + Math.max(0, side.misUnitsPerSlice - 1) * SLOT_GAP;
@@ -515,6 +411,7 @@ export function LayoutViewport({
   misNames,
   cursorSlotId,
   cursorMovementHint,
+  popupCursorMovementHint,
   viewportRef,
   zoom,
   pan,
@@ -1002,9 +899,10 @@ export function LayoutViewport({
     const showAssignedItem = Boolean(assignedItem) && !showPreviewItem && !isDraggedSource;
     const isSelected = selectedSlotIds.has(slotId) && Boolean(assignedItem);
     const isCursorSlot = cursorSlotId === slotId;
+    const baseMovementHint = useHallDirectionMapping ? cursorMovementHint : popupCursorMovementHint;
     const slotMovementHint =
-      isCursorSlot && cursorMovementHint?.fromSlotId === slotId
-        ? cursorMovementHint
+      isCursorSlot && baseMovementHint?.fromSlotId === slotId
+        ? baseMovementHint
         : null;
     const displayMovementHint = useHallDirectionMapping
       ? slotMovementHint
@@ -1348,7 +1246,7 @@ export function LayoutViewport({
               : "";
             const misCardMovementHint =
               cursorMovementHint && unitSlotIds.includes(cursorMovementHint.fromSlotId)
-                ? buildCollapsedMisCardCursorHint(cursorMovementHint)
+                ? cursorMovementHint
                 : null;
 
             if (orientation === "horizontal") {

@@ -2,12 +2,14 @@ import { type DragEvent, useMemo, useState } from "react";
 import { DRAG_DATA_KEY } from "../constants";
 import { retainValidAssignments } from "../lib/layoutAssignments";
 import { buildSlotCenters } from "../lib/layoutGeometry";
+import { buildCursorMovementHint, parseMisSlotIdValue } from "../lib/cursorHints";
 import {
   arePreviewsEqual,
   buildPlacements,
   buildSwapPlacements,
   getIncomingEntries,
 } from "../lib/placementEngine";
+import type { CursorMovementHint } from "../components/layoutViewport/types";
 import type {
   CatalogItem,
   DragPayload,
@@ -29,13 +31,8 @@ type UseLayoutAssignmentsResult = {
   activeSlotAssignments: Record<string, string>;
   usedItemIds: Set<string>;
   cursorSlotId: string | null;
-  cursorMovementHint: {
-    fromSlotId: string;
-    toSlotId: string;
-    style: "straight" | "turn" | "hall-jump";
-    direction: "right" | "left" | "up" | "down";
-    turnToDirection?: "right" | "left" | "up" | "down";
-  } | null;
+  cursorMovementHint: CursorMovementHint | null;
+  popupCursorMovementHint: CursorMovementHint | null;
   selectedSlotIdSet: Set<string>;
   draggedSourceSlotIdSet: Set<string>;
   dragPreviews: PreviewPlacement[];
@@ -75,16 +72,6 @@ type ParsedMisUnit = {
   slice: number;
   side: number;
   misUnit: number;
-};
-
-type ParsedSlotMeta = {
-  hallId: HallId;
-  kind: "g" | "m";
-  slice: number;
-  side: 0 | 1;
-  row?: number;
-  misUnit?: number;
-  index?: number;
 };
 
 export function useLayoutAssignments({
@@ -160,74 +147,16 @@ export function useLayoutAssignments({
   );
 
   function parseMisUnit(slotId: string): ParsedMisUnit | null {
-    const parts = slotId.split(":");
-    if (parts.length < 6 || parts[1] !== "m") {
+    const parsed = parseMisSlotIdValue(slotId);
+    if (!parsed) {
       return null;
     }
-    const hallId = Number(parts[0]);
-    const slice = Number(parts[2]);
-    const side = Number(parts[3]);
-    const misUnit = Number(parts[4]);
-    if (
-      !Number.isFinite(hallId) ||
-      !Number.isFinite(slice) ||
-      !Number.isFinite(side) ||
-      !Number.isFinite(misUnit)
-    ) {
-      return null;
-    }
-    return { hallId, slice, side, misUnit };
-  }
-
-  function parseSlotMeta(slotId: string): ParsedSlotMeta | null {
-    const parts = slotId.split(":");
-    if (parts.length < 5) {
-      return null;
-    }
-
-    const hallId = Number(parts[0]);
-    const kind = parts[1];
-    const slice = Number(parts[2]);
-    const side = Number(parts[3]) as 0 | 1;
-    if (
-      !Number.isFinite(hallId) ||
-      !Number.isFinite(slice) ||
-      (side !== 0 && side !== 1)
-    ) {
-      return null;
-    }
-
-    if (kind === "g" && parts.length >= 5) {
-      const row = Number(parts[4]);
-      if (!Number.isFinite(row)) {
-        return null;
-      }
-      return {
-        hallId,
-        kind: "g",
-        slice,
-        side,
-        row,
-      };
-    }
-
-    if (kind === "m" && parts.length >= 6) {
-      const misUnit = Number(parts[4]);
-      const index = Number(parts[5]);
-      if (!Number.isFinite(misUnit) || !Number.isFinite(index)) {
-        return null;
-      }
-      return {
-        hallId,
-        kind: "m",
-        slice,
-        side,
-        misUnit,
-        index,
-      };
-    }
-
-    return null;
+    return {
+      hallId: parsed.hallId,
+      slice: parsed.slice,
+      side: parsed.side,
+      misUnit: parsed.misUnit,
+    };
   }
 
   function isSameMisUnit(a: ParsedMisUnit, b: ParsedMisUnit): boolean {
@@ -332,13 +261,7 @@ export function useLayoutAssignments({
     return findFirstEmptySlotFrom(cursorSlotId, assignments) ?? orderedSlotIds[0] ?? null;
   }
 
-  function resolveCursorMovementHint(): {
-    fromSlotId: string;
-    toSlotId: string;
-    style: "straight" | "turn" | "hall-jump";
-    direction: "right" | "left" | "up" | "down";
-    turnToDirection?: "right" | "left" | "up" | "down";
-  } | null {
+  function resolveCursorMovementHint(mode: "layout" | "popup"): CursorMovementHint | null {
     const anchorSlotId = findFirstEmptySlotFrom(cursorSlotId, activeSlotAssignments);
     if (!anchorSlotId) {
       return null;
@@ -353,96 +276,11 @@ export function useLayoutAssignments({
       return null;
     }
 
-    const fromMeta = parseSlotMeta(anchorSlotId);
-    const toMeta = parseSlotMeta(nextSlotId);
-    if (!fromMeta || !toMeta) {
-      return {
-        fromSlotId: anchorSlotId,
-        toSlotId: nextSlotId,
-        style: "straight",
-        direction: "right",
-      };
-    }
-
-    if (fromMeta.hallId !== toMeta.hallId) {
-      return {
-        fromSlotId: anchorSlotId,
-        toSlotId: nextSlotId,
-        style: "hall-jump",
-        // Preserve "forward" flow when transitioning between halls.
-        direction: "right",
-      };
-    }
-
-    if (fromMeta.side !== toMeta.side) {
-      return {
-        fromSlotId: anchorSlotId,
-        toSlotId: nextSlotId,
-        style: "turn",
-        // Match cross-row turn semantics: vertical leg first, then forward leg.
-        direction: toMeta.side > fromMeta.side ? "down" : "up",
-        turnToDirection: toMeta.slice >= fromMeta.slice ? "right" : "left",
-      };
-    }
-
-    if (fromMeta.kind === "g" && toMeta.kind === "g") {
-      if (fillDirection === "row") {
-        if (fromMeta.row !== toMeta.row) {
-          return {
-            fromSlotId: anchorSlotId,
-            toSlotId: nextSlotId,
-            style: "turn",
-            direction: (toMeta.row ?? 0) >= (fromMeta.row ?? 0) ? "down" : "up",
-            turnToDirection: toMeta.slice >= fromMeta.slice ? "right" : "left",
-          };
-        }
-        return {
-          fromSlotId: anchorSlotId,
-          toSlotId: nextSlotId,
-          style: "straight",
-          direction: toMeta.slice >= fromMeta.slice ? "right" : "left",
-        };
-      }
-
-      if (fromMeta.slice !== toMeta.slice) {
-        return {
-          fromSlotId: anchorSlotId,
-          toSlotId: nextSlotId,
-          style: "turn",
-          direction: toMeta.slice >= fromMeta.slice ? "right" : "left",
-          turnToDirection: (toMeta.row ?? 0) >= (fromMeta.row ?? 0) ? "down" : "up",
-        };
-      }
-      return {
-        fromSlotId: anchorSlotId,
-        toSlotId: nextSlotId,
-        style: "straight",
-        direction: (toMeta.row ?? 0) >= (fromMeta.row ?? 0) ? "down" : "up",
-      };
-    }
-
-    if (fromMeta.kind === "m" && toMeta.kind === "m") {
-      const wrappedWithinMis =
-        (toMeta.misUnit ?? 0) !== (fromMeta.misUnit ?? 0) ||
-        (toMeta.index ?? 0) < (fromMeta.index ?? 0);
-      return {
-        fromSlotId: anchorSlotId,
-        toSlotId: nextSlotId,
-        style: wrappedWithinMis ? "turn" : "straight",
-        direction: wrappedWithinMis ? "down" : "right",
-        turnToDirection: wrappedWithinMis ? "right" : undefined,
-      };
-    }
-
-    return {
-      fromSlotId: anchorSlotId,
-      toSlotId: nextSlotId,
-      style: "turn",
-      direction: "right",
-    };
+    return buildCursorMovementHint(anchorSlotId, nextSlotId, fillDirection, mode);
   }
 
-  const cursorMovementHint = resolveCursorMovementHint();
+  const cursorMovementHint = resolveCursorMovementHint("layout");
+  const popupCursorMovementHint = resolveCursorMovementHint("popup");
 
   function placeLibraryItemAtCursor(itemId: string): boolean {
     if (!itemById.has(itemId)) {
@@ -1070,6 +908,7 @@ export function useLayoutAssignments({
     usedItemIds,
     cursorSlotId,
     cursorMovementHint,
+    popupCursorMovementHint,
     selectedSlotIdSet,
     draggedSourceSlotIdSet,
     dragPreviews,

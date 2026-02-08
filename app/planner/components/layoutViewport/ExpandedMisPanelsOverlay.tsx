@@ -72,7 +72,7 @@ export function ExpandedMisPanelsOverlay({
         return (
           <div
             key={`${panel.hallId}:${panel.slice}:${panel.side}:${panel.misUnit}`}
-            className={`w-[min(30vw,360px)] overflow-hidden rounded-[0.85rem] border shadow-[0_12px_34px_rgba(38,48,33,0.28)] max-[980px]:w-[78vw] ${frameClass}`}
+            className={`w-[min(30vw,370px)] overflow-hidden rounded-[0.85rem] border shadow-[0_12px_34px_rgba(38,48,33,0.28)] max-[980px]:w-[78vw] ${frameClass}`}
             data-mis-panel
           >
             <header
@@ -122,7 +122,7 @@ export function ExpandedMisPanelsOverlay({
                 Close
               </button>
             </header>
-            <div className="max-h-[64vh] overflow-auto p-3">
+            <div className="max-h-[64vh] overflow-auto p-4">
               <div
                 className="grid content-start gap-1"
                 style={{
