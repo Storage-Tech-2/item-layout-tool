@@ -1,5 +1,5 @@
 import { HALL_ORDER, SLOT_GAP, SLOT_SIZE, STAGE_SIZE } from "../constants";
-import { resolveStorageLayout } from "../layoutConfig";
+import { directionOrientation, resolveStorageLayout } from "../layoutConfig";
 import type { HallConfig, HallId, SlotPoint } from "../types";
 import { resolveHallSlices } from "../utils";
 
@@ -34,7 +34,7 @@ export function buildSlotCenters(
 
   for (const hallId of HALL_ORDER) {
     const config = hallConfigs[hallId];
-    const orientation = resolvedLayout.orientations[hallId];
+    const orientation = directionOrientation(resolvedLayout.directions[hallId]);
     const hallTopLeft = (() => {
       const placement = resolvedLayout.positions[hallId];
       const match = /translate\(([-\d.]+)%\s*,\s*([-\d.]+)%\)/.exec(placement.transform);

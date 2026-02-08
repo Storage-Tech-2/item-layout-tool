@@ -11,13 +11,18 @@ import {
   useState,
 } from "react";
 import {
-  HALL_LABELS,
   HALL_ORDER,
   SLOT_GAP,
   SLOT_SIZE,
   STAGE_SIZE,
 } from "../constants";
-import { resolveStorageLayout, type StorageLayoutPreset } from "../layoutConfig";
+import {
+  directionOrientation,
+  directionReverseSlices,
+  resolveStorageLayout,
+  type HallDirection,
+  type StorageLayoutPreset,
+} from "../layoutConfig";
 import type { HallSideKey } from "../hooks/useHallConfigs";
 import type {
   CatalogItem,
@@ -119,8 +124,7 @@ const FLAT_VIEW_HALL_GAP = 56;
 
 type HallLayoutState = {
   positions: Record<HallId, HallPlacement>;
-  orientations: Record<HallId, "horizontal" | "vertical">;
-  reverseSlices: Record<HallId, boolean>;
+  directions: Record<HallId, HallDirection>;
   core: { left: number; top: number; width: number; height: number; label: string } | null;
 };
 
@@ -136,6 +140,19 @@ type ExpandedMisPanel = ExpandedMisTarget & {
   columns: number;
   capacity: number;
 };
+
+function defaultHallLabel(hallId: HallId): string {
+  switch (hallId) {
+    case "north":
+      return "North Hall";
+    case "east":
+      return "East Hall";
+    case "south":
+      return "South Hall";
+    case "west":
+      return "West Hall";
+  }
+}
 
 function expandedMisKey(target: ExpandedMisTarget): string {
   return `${target.hallId}:${target.slice}:${target.side}:${target.misUnit}`;
@@ -283,10 +300,10 @@ export function LayoutViewport({
   const [storageLayoutPreset, setStorageLayoutPreset] = useState<StorageLayoutPreset>("cross");
   const [expandedMisTargets, setExpandedMisTargets] = useState<ExpandedMisTarget[]>([]);
   const [hallNames, setHallNames] = useState<Record<HallId, string>>({
-    north: HALL_LABELS.north,
-    east: HALL_LABELS.east,
-    south: HALL_LABELS.south,
-    west: HALL_LABELS.west,
+    north: defaultHallLabel("north"),
+    east: defaultHallLabel("east"),
+    south: defaultHallLabel("south"),
+    west: defaultHallLabel("west"),
   });
 
   const viewportBackgroundStyle = useMemo(
@@ -368,7 +385,7 @@ export function LayoutViewport({
     const trimmed = rawName.trim();
     setHallNames((current) => ({
       ...current,
-      [hallId]: trimmed.length > 0 ? trimmed : HALL_LABELS[hallId],
+      [hallId]: trimmed.length > 0 ? trimmed : defaultHallLabel(hallId),
     }));
   }, []);
 
@@ -452,17 +469,11 @@ export function LayoutViewport({
 
       return {
         positions,
-        orientations: {
-          north: "horizontal",
-          east: "horizontal",
-          south: "horizontal",
-          west: "horizontal",
-        },
-        reverseSlices: {
-          north: false,
-          east: false,
-          south: false,
-          west: false,
+        directions: {
+          north: "north",
+          east: "east",
+          south: "south",
+          west: "west",
         },
         core: null,
       };
@@ -470,8 +481,7 @@ export function LayoutViewport({
     const resolved = resolveStorageLayout(storageLayoutPreset, hallConfigs, center);
     return {
       positions: resolved.positions,
-      orientations: resolved.orientations,
-      reverseSlices: resolved.reverseSlices,
+      directions: resolved.directions,
       core: resolved.core,
     };
   }, [center, hallConfigs, storageLayoutPreset, viewMode]);
@@ -660,11 +670,12 @@ export function LayoutViewport({
     hallId: HallId,
     config: HallConfig,
     orientation: "horizontal" | "vertical",
+    reverseSlices: boolean,
     hallWidth: number,
     hallHeight: number,
   ): ReactNode {
     const slices = resolveHallSlices(config);
-    const visualSlices = getVisualSliceOrder(slices.length, hallLayout.reverseSlices[hallId]).map(
+    const visualSlices = getVisualSliceOrder(slices.length, reverseSlices).map(
       (index) => slices[index],
     );
 
@@ -1248,24 +1259,38 @@ export function LayoutViewport({
 
           {HALL_ORDER.map((hallId) => {
             const hall = hallConfigs[hallId];
-            const orientation = hallLayout.orientations[hallId];
+            const orientation =
+              viewMode === "flat"
+                ? "horizontal"
+                : directionOrientation(hallLayout.directions[hallId]);
+            const reverseSlices =
+              viewMode === "flat"
+                ? false
+                : directionReverseSlices(hallLayout.directions[hallId]);
             const placement = hallLayout.positions[hallId];
-            const controlAnchorStyle =
-              viewMode === "flat" || storageLayoutPreset === "h"
-                ? { left: "0", top: "-0.36rem", transform: "translate(0, -100%)" }
-                : hallId === "north"
-                ? { left: "50%", top: "-0.36rem", transform: "translate(-50%, -100%)" }
-                : hallId === "south"
-                  ? { left: "50%", bottom: "-0.36rem", transform: "translate(-50%, 100%)" }
-                  : hallId === "east"
-                    ? { right: "0", top: "-0.36rem", transform: "translate(0, -100%)" }
-                    : { left: "0", top: "-0.36rem", transform: "translate(0, -100%)" };
+            const layoutDirection = hallLayout.directions[hallId];
+            const controlAnchorStyle = (() => {
+              if (viewMode === "flat") {
+                return { left: "0", top: "-0.36rem", transform: "translate(0, -100%)" };
+              }
+              switch (layoutDirection) {
+                case "south":
+                  return { left: "50%", bottom: "-0.36rem", transform: "translate(-50%, 100%)" };
+                case "north":
+                  return { left: "50%", top: "-0.36rem", transform: "translate(-50%, -100%)" };
+                case "east":
+                  return { right: "0", top: "-0.36rem", transform: "translate(0, -100%)" };
+                case "west":
+                default:
+                  return { left: "0", top: "-0.36rem", transform: "translate(0, -100%)" };
+              }
+            })();
 
             const hallFirstSlot =
               (() => {
                 const firstSlice = getVisualSliceOrder(
                   resolveHallSlices(hall).length,
-                  hallLayout.reverseSlices[hallId],
+                  reverseSlices,
                 )[0] ?? 0;
                 const firstSection = hall.sections[0];
                 const sideType = firstSection?.sideLeft.type ?? "bulk";
@@ -1369,7 +1394,14 @@ export function LayoutViewport({
                   </div>
                 </div>
 
-                {renderHallContent(hallId, hall, orientation, placement.width, placement.height)}
+                {renderHallContent(
+                  hallId,
+                  hall,
+                  orientation,
+                  reverseSlices,
+                  placement.width,
+                  placement.height,
+                )}
               </section>
             );
           })}

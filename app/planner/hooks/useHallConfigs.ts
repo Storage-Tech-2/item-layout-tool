@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DEFAULT_HALLS, HALL_TYPE_DEFAULTS } from "../constants";
+import { buildInitialHallConfigs } from "../layoutConfig";
 import type {
   HallConfig,
   HallId,
@@ -41,6 +41,32 @@ type UseHallConfigsResult = {
   addHallSection: (hallId: HallId) => void;
   removeHallSection: (hallId: HallId, sectionIndex: number) => void;
 };
+
+function hallTypeDefaults(type: HallType): HallSideConfig {
+  switch (type) {
+    case "bulk":
+      return {
+        type: "bulk",
+        rowsPerSlice: 1,
+        misSlotsPerSlice: 54,
+        misUnitsPerSlice: 1,
+      };
+    case "chest":
+      return {
+        type: "chest",
+        rowsPerSlice: 4,
+        misSlotsPerSlice: 54,
+        misUnitsPerSlice: 1,
+      };
+    case "mis":
+      return {
+        type: "mis",
+        rowsPerSlice: 4,
+        misSlotsPerSlice: 54,
+        misUnitsPerSlice: 1,
+      };
+  }
+}
 
 function cloneSections(config: HallConfig): HallSectionConfig[] {
   return config.sections.map((section) => ({
@@ -86,7 +112,9 @@ function updateSection(
 }
 
 export function useHallConfigs(): UseHallConfigsResult {
-  const [hallConfigs, setHallConfigs] = useState<Record<HallId, HallConfig>>(DEFAULT_HALLS);
+  const [hallConfigs, setHallConfigs] = useState<Record<HallId, HallConfig>>(() =>
+    buildInitialHallConfigs("cross"),
+  );
 
   function setSectionSlices(hallId: HallId, sectionIndex: number, rawValue: string): void {
     const slices = clamp(Number(rawValue) || 1, 1, 200);
@@ -107,7 +135,7 @@ export function useHallConfigs(): UseHallConfigsResult {
     setHallConfigs((current) =>
       updateSection(current, hallId, sectionIndex, (section) => {
         const currentSide = sideAt(section, side);
-        const defaults = HALL_TYPE_DEFAULTS[type];
+        const defaults = hallTypeDefaults(type);
         const nextSide: HallSideConfig = {
           ...currentSide,
           ...defaults,
@@ -180,8 +208,8 @@ export function useHallConfigs(): UseHallConfigsResult {
       }
       const template = hall.sections[hall.sections.length - 1] ?? {
         slices: 8,
-        sideLeft: { ...HALL_TYPE_DEFAULTS.bulk },
-        sideRight: { ...HALL_TYPE_DEFAULTS.bulk },
+        sideLeft: hallTypeDefaults("bulk"),
+        sideRight: hallTypeDefaults("bulk"),
       };
       const nextSection: HallSectionConfig = {
         slices: template.slices,

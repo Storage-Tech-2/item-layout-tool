@@ -1,5 +1,5 @@
-import { CORE_SIZE, HALL_GAP, HALL_LABELS, HALL_ORDER } from "./constants";
-import type { HallConfig, HallId, HallOrientation } from "./types";
+import { CORE_SIZE, HALL_GAP, HALL_ORDER } from "./constants";
+import type { HallConfig, HallId, HallOrientation, HallSideConfig } from "./types";
 import { getHallSize } from "./utils";
 
 export type HallDirection = "north" | "east" | "south" | "west";
@@ -31,7 +31,6 @@ export type HallSide = {
     type: "bulk" | "chest" | "mis";
     rowsPerSlice: number;
     misSlotsPerSlice?: number;
-    misUnitsPerSlice?: number;
 };
 
 type HallAnchor = {
@@ -55,9 +54,21 @@ export type ResolvedStorageLayout = {
         label: string;
     };
     positions: Record<HallId, { left: number; top: number; transform: string; width: number; height: number }>;
-    orientations: Record<HallId, HallOrientation>;
-    reverseSlices: Record<HallId, boolean>;
+    directions: Record<HallId, HallDirection>;
 };
+
+function defaultHallName(hallId: HallId): string {
+    switch (hallId) {
+        case "north":
+            return "North Hall";
+        case "east":
+            return "East Hall";
+        case "south":
+            return "South Hall";
+        case "west":
+            return "West Hall";
+    }
+}
 
 const CROSS_LAYOUT: StorageLayoutDefinition = {
     core: {
@@ -66,10 +77,58 @@ const CROSS_LAYOUT: StorageLayoutDefinition = {
         width: CORE_SIZE,
         height: CORE_SIZE,
         halls: [
-            { id: 1, name: HALL_LABELS.north, direction: "north", sections: [] },
-            { id: 2, name: HALL_LABELS.east, direction: "east", sections: [] },
-            { id: 3, name: HALL_LABELS.south, direction: "south", sections: [] },
-            { id: 4, name: HALL_LABELS.west, direction: "west", sections: [] },
+            {
+                id: 1,
+                name: defaultHallName("north"),
+                direction: "north",
+                sections: [
+                    {
+                        name: "North",
+                        slices: 8,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+            {
+                id: 2,
+                name: defaultHallName("east"),
+                direction: "east",
+                sections: [
+                    {
+                        name: "East",
+                        slices: 16,
+                        sideLeft: { type: "chest", rowsPerSlice: 4 },
+                        sideRight: { type: "chest", rowsPerSlice: 4 },
+                    },
+                ],
+            },
+            {
+                id: 3,
+                name: defaultHallName("south"),
+                direction: "south",
+                sections: [
+                    {
+                        name: "South",
+                        slices: 4,
+                        sideLeft: { type: "mis", rowsPerSlice: 1, misSlotsPerSlice: 54 },
+                        sideRight: { type: "mis", rowsPerSlice: 1, misSlotsPerSlice: 54 },
+                    },
+                ],
+            },
+            {
+                id: 4,
+                name: defaultHallName("west"),
+                direction: "west",
+                sections: [
+                    {
+                        name: "West",
+                        slices: 16,
+                        sideLeft: { type: "chest", rowsPerSlice: 4 },
+                        sideRight: { type: "chest", rowsPerSlice: 4 },
+                    },
+                ],
+            },
         ],
     },
 };
@@ -81,10 +140,58 @@ const H_LAYOUT: StorageLayoutDefinition = {
         width: Math.max(Math.round(CORE_SIZE * 2.1), 320),
         height: Math.max(Math.round(CORE_SIZE * 0.5), 92),
         halls: [
-            { id: 1, name: HALL_LABELS.north, direction: "north", sections: [] },
-            { id: 2, name: HALL_LABELS.east, direction: "north", sections: [] },
-            { id: 3, name: HALL_LABELS.south, direction: "south", sections: [] },
-            { id: 4, name: HALL_LABELS.west, direction: "south", sections: [] },
+            {
+                id: 1,
+                name: defaultHallName("north"),
+                direction: "north",
+                sections: [
+                    {
+                        name: "North",
+                        slices: 8,
+                        sideLeft: { type: "bulk", rowsPerSlice: 2 },
+                        sideRight: { type: "bulk", rowsPerSlice: 2 },
+                    },
+                ],
+            },
+            {
+                id: 2,
+                name: defaultHallName("east"),
+                direction: "north",
+                sections: [
+                    {
+                        name: "East",
+                        slices: 16,
+                        sideLeft: { type: "chest", rowsPerSlice: 4 },
+                        sideRight: { type: "chest", rowsPerSlice: 4 },
+                    },
+                ],
+            },
+            {
+                id: 3,
+                name: defaultHallName("south"),
+                direction: "south",
+                sections: [
+                    {
+                        name: "South",
+                        slices: 4,
+                        sideLeft: { type: "mis", rowsPerSlice: 1, misSlotsPerSlice: 54 },
+                        sideRight: { type: "mis", rowsPerSlice: 1, misSlotsPerSlice: 54 },
+                    },
+                ],
+            },
+            {
+                id: 4,
+                name: defaultHallName("west"),
+                direction: "south",
+                sections: [
+                    {
+                        name: "West",
+                        slices: 16,
+                        sideLeft: { type: "chest", rowsPerSlice: 4 },
+                        sideRight: { type: "chest", rowsPerSlice: 4 },
+                    },
+                ],
+            },
         ],
     },
 };
@@ -93,6 +200,43 @@ const STORAGE_LAYOUTS: Record<StorageLayoutPreset, StorageLayoutDefinition> = {
     cross: CROSS_LAYOUT,
     h: H_LAYOUT,
 };
+
+function normalizeSide(side: HallSide | HallSideConfig | undefined): HallSideConfig {
+    if (!side) {
+        return {
+            type: "bulk",
+            rowsPerSlice: 1,
+            misSlotsPerSlice: 54,
+            misUnitsPerSlice: 1,
+        };
+    }
+    return {
+        type: side.type,
+        rowsPerSlice: side.rowsPerSlice,
+        misSlotsPerSlice: side.misSlotsPerSlice ?? 54,
+        misUnitsPerSlice: side.rowsPerSlice ?? 1,
+    };
+}
+
+export function buildInitialHallConfigs(
+    preset: StorageLayoutPreset = "cross",
+): Record<HallId, HallConfig> {
+    const definition = STORAGE_LAYOUTS[preset];
+    const result = {} as Record<HallId, HallConfig>;
+    for (const hallId of HALL_ORDER) {
+        const layoutHall = definition.core.halls[HALL_ORDER.indexOf(hallId)];
+        const sections = layoutHall?.sections ?? [];
+        result[hallId] = {
+            name: layoutHall?.name,
+            sections: sections.map((section) => ({
+                slices: Math.max(1, section.slices),
+                sideLeft: normalizeSide(section.sideLeft),
+                sideRight: normalizeSide(section.sideRight),
+            })),
+        };
+    }
+    return result;
+}
 
 function toHallConfig(
     layoutHall: Hall | undefined,
@@ -141,7 +285,7 @@ function anchorCoordinateY(start: number, span: number, anchor: "top" | "center"
     return start + span / 2;
 }
 
-function directionOrientation(direction: HallDirection): HallOrientation {
+export function directionOrientation(direction: HallDirection): HallOrientation {
     return direction === "north" || direction === "south" ? "vertical" : "horizontal";
 }
 
@@ -182,7 +326,7 @@ function directionAnchor(direction: HallDirection): HallAnchor {
     }
 }
 
-function directionReverseSlices(direction: HallDirection): boolean {
+export function directionReverseSlices(direction: HallDirection): boolean {
     return direction === "north" || direction === "west";
 }
 
@@ -205,19 +349,12 @@ export function resolveStorageLayout(
         south: { left: 0, top: 0, transform: "", width: 0, height: 0 },
         west: { left: 0, top: 0, transform: "", width: 0, height: 0 },
     };
-    const orientations: ResolvedStorageLayout["orientations"] = {
-        north: "vertical",
-        east: "horizontal",
-        south: "vertical",
-        west: "horizontal",
+    const directions: ResolvedStorageLayout["directions"] = {
+        north: definition.core.halls[0]?.direction ?? "north",
+        east: definition.core.halls[1]?.direction ?? "east",
+        south: definition.core.halls[2]?.direction ?? "south",
+        west: definition.core.halls[3]?.direction ?? "west",
     };
-    const reverseSlices: ResolvedStorageLayout["reverseSlices"] = {
-        north: false,
-        east: false,
-        south: false,
-        west: false,
-    };
-
     const byDirection = new Map<HallDirection, HallId[]>();
     const effectiveHallConfigs: Record<HallId, HallConfig> = {
         north: hallConfigs.north,
@@ -262,8 +399,7 @@ export function resolveStorageLayout(
                 width: size.width,
                 height: size.height,
             };
-            orientations[hallId] = orientation;
-            reverseSlices[hallId] = directionReverseSlices(direction);
+            directions[hallId] = direction;
         }
     }
 
@@ -276,7 +412,6 @@ export function resolveStorageLayout(
             label: definition.core.name,
         },
         positions,
-        orientations,
-        reverseSlices,
+        directions,
     };
 }
