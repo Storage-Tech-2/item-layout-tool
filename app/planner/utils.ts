@@ -17,6 +17,7 @@ import type {
   HallConfig,
   HallId,
   HallOrientation,
+  HallSideConfig,
 } from "./types";
 
 export function clamp(value: number, min: number, max: number): number {
@@ -154,37 +155,83 @@ export function nonMisSlotId(
 export function misSlotId(
   hallId: HallId,
   slice: number,
+  side: 0 | 1,
   misUnit: number,
   index: number,
 ): string {
-  return `${hallId}:m:${slice}:${misUnit}:${index}`;
+  return `${hallId}:m:${slice}:${side}:${misUnit}:${index}`;
+}
+
+export type HallSliceDescriptor = {
+  globalSlice: number;
+  sectionIndex: number;
+  sectionSlice: number;
+  mainStart: number;
+  mainSize: number;
+  sideLeft: HallSideConfig;
+  sideRight: HallSideConfig;
+};
+
+function sideDepthPx(side: HallSideConfig): number {
+  if (side.type === "mis") {
+    return side.misUnitsPerSlice * MIS_CROSS + Math.max(0, side.misUnitsPerSlice - 1) * SLOT_GAP;
+  }
+  return side.rowsPerSlice * SLOT_SIZE + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
+}
+
+function sliceMainSize(left: HallSideConfig, right: HallSideConfig): number {
+  const leftMain = left.type === "mis" ? MIS_SLICE_MAIN : SLOT_SIZE;
+  const rightMain = right.type === "mis" ? MIS_SLICE_MAIN : SLOT_SIZE;
+  return Math.max(leftMain, rightMain);
+}
+
+export function resolveHallSlices(config: HallConfig): HallSliceDescriptor[] {
+  const slices: HallSliceDescriptor[] = [];
+  let mainCursor = 0;
+  let globalSlice = 0;
+
+  for (const [sectionIndex, section] of config.sections.entries()) {
+    for (let sectionSlice = 0; sectionSlice < section.slices; sectionSlice += 1) {
+      const mainSize = sliceMainSize(section.sideLeft, section.sideRight);
+      slices.push({
+        globalSlice,
+        sectionIndex,
+        sectionSlice,
+        mainStart: mainCursor,
+        mainSize,
+        sideLeft: section.sideLeft,
+        sideRight: section.sideRight,
+      });
+      mainCursor += mainSize + SLOT_GAP;
+      globalSlice += 1;
+    }
+  }
+
+  return slices;
 }
 
 export function getHallSize(
   config: HallConfig,
   orientation: HallOrientation,
 ): { width: number; height: number } {
-  if (config.type === "mis") {
-    const main =
-      config.slices * MIS_SLICE_MAIN + Math.max(0, config.slices - 1) * SLOT_GAP;
-    const cross =
-      config.misUnitsPerSlice * MIS_CROSS +
-      Math.max(0, config.misUnitsPerSlice - 1) * SLOT_GAP;
-    if (orientation === "horizontal") {
-      return { width: main, height: cross };
-    }
-    return { width: cross, height: main };
-  }
+  const slices = resolveHallSlices(config);
+  const main =
+    slices.length === 0
+      ? SLOT_SIZE
+      : slices[slices.length - 1].mainStart + slices[slices.length - 1].mainSize;
 
-  const main = config.slices * SLOT_SIZE + Math.max(0, config.slices - 1) * SLOT_GAP;
-  const depth =
-    config.rowsPerSide * SLOT_SIZE + Math.max(0, config.rowsPerSide - 1) * SLOT_GAP;
+  let maxLeftDepth = 0;
+  let maxRightDepth = 0;
+  for (const slice of slices) {
+    maxLeftDepth = Math.max(maxLeftDepth, sideDepthPx(slice.sideLeft));
+    maxRightDepth = Math.max(maxRightDepth, sideDepthPx(slice.sideRight));
+  }
+  const cross = maxLeftDepth + AISLE_GAP + maxRightDepth;
 
   if (orientation === "horizontal") {
-    return { width: main, height: depth * 2 + AISLE_GAP };
+    return { width: main, height: cross };
   }
-
-  return { width: depth * 2 + AISLE_GAP, height: main };
+  return { width: cross, height: main };
 }
 
 export function buildOrderedSlotIds(configs: Record<HallId, HallConfig>): string[] {
@@ -192,22 +239,21 @@ export function buildOrderedSlotIds(configs: Record<HallId, HallConfig>): string
 
   for (const hallId of HALL_ORDER) {
     const hall = configs[hallId];
-
-    if (hall.type === "mis") {
-      for (let slice = 0; slice < hall.slices; slice += 1) {
-        for (let misUnit = 0; misUnit < hall.misUnitsPerSlice; misUnit += 1) {
-          for (let index = 0; index < hall.misSlotsPerSlice; index += 1) {
-            ordered.push(misSlotId(hallId, slice, misUnit, index));
-          }
-        }
-      }
-      continue;
-    }
+    const slices = resolveHallSlices(hall);
 
     for (const side of [0, 1] as const) {
-      for (let row = 0; row < hall.rowsPerSide; row += 1) {
-        for (let slice = 0; slice < hall.slices; slice += 1) {
-          ordered.push(nonMisSlotId(hallId, slice, side, row));
+      for (const slice of slices) {
+        const sideConfig = side === 0 ? slice.sideLeft : slice.sideRight;
+        if (sideConfig.type === "mis") {
+          for (let misUnit = 0; misUnit < sideConfig.misUnitsPerSlice; misUnit += 1) {
+            for (let index = 0; index < sideConfig.misSlotsPerSlice; index += 1) {
+              ordered.push(misSlotId(hallId, slice.globalSlice, side, misUnit, index));
+            }
+          }
+          continue;
+        }
+        for (let row = 0; row < sideConfig.rowsPerSlice; row += 1) {
+          ordered.push(nonMisSlotId(hallId, slice.globalSlice, side, row));
         }
       }
     }

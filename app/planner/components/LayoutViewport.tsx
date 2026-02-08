@@ -11,23 +11,23 @@ import {
   useState,
 } from "react";
 import {
-  CORE_SIZE,
-  HALL_GAP,
   HALL_LABELS,
-  HALL_ORIENTATION,
   HALL_ORDER,
   SLOT_GAP,
   SLOT_SIZE,
   STAGE_SIZE,
 } from "../constants";
+import { resolveStorageLayout, type StorageLayoutPreset } from "../layoutConfig";
+import type { HallSideKey } from "../hooks/useHallConfigs";
 import type {
   CatalogItem,
   HallConfig,
   HallId,
+  HallSideConfig,
   HallType,
   PreviewPlacement,
 } from "../types";
-import { getHallSize, misSlotId, nonMisSlotId, toTitle } from "../utils";
+import { getHallSize, misSlotId, nonMisSlotId, resolveHallSlices, toTitle } from "../utils";
 
 type LayoutViewportProps = {
   hallConfigs: Record<HallId, HallConfig>;
@@ -44,11 +44,33 @@ type LayoutViewportProps = {
   onSlotDragOver: (event: DragEvent<HTMLElement>, slotId: string) => void;
   onSlotDrop: (event: DragEvent<HTMLElement>, slotId: string) => void;
   onViewportDropFallback: (event: DragEvent<HTMLElement>) => void;
-  onHallTypeChange: (hallId: HallId, type: HallType) => void;
-  onHallSlicesChange: (hallId: HallId, value: string) => void;
-  onHallRowsChange: (hallId: HallId, value: string) => void;
-  onHallMisCapacityChange: (hallId: HallId, value: string) => void;
-  onHallMisUnitsChange: (hallId: HallId, value: string) => void;
+  onSectionSlicesChange: (hallId: HallId, sectionIndex: number, value: string) => void;
+  onSectionSideTypeChange: (
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    type: HallType,
+  ) => void;
+  onSectionSideRowsChange: (
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    value: string,
+  ) => void;
+  onSectionSideMisCapacityChange: (
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    value: string,
+  ) => void;
+  onSectionSideMisUnitsChange: (
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    value: string,
+  ) => void;
+  onAddSection: (hallId: HallId) => void;
+  onRemoveSection: (hallId: HallId, sectionIndex: number) => void;
   onSlotItemDragStart: (
     event: DragEvent<HTMLElement>,
     slotId: string,
@@ -75,22 +97,7 @@ type DeferredNumberInputProps = {
   onCommit: (value: string) => void;
 };
 
-type ExpandedMisTarget = {
-  hallId: HallId;
-  slice: number;
-  misUnit: number;
-};
-
-type ExpandedMisEntry = {
-  target: ExpandedMisTarget;
-  config: HallConfig;
-  slotIds: string[];
-  columns: number;
-  colorIndex: number;
-};
-
 type LayoutViewMode = "storage" | "flat";
-type StorageLayoutPreset = "cross" | "h";
 
 type HallPlacement = {
   left: number;
@@ -113,38 +120,43 @@ const FLAT_VIEW_HALL_GAP = 56;
 type HallLayoutState = {
   positions: Record<HallId, HallPlacement>;
   orientations: Record<HallId, "horizontal" | "vertical">;
+  reverseSlices: Record<HallId, boolean>;
   core: { left: number; top: number; width: number; height: number; label: string } | null;
 };
 
-function toExpandedMisKey(target: ExpandedMisTarget): string {
-  return `${target.hallId}:${target.slice}:${target.misUnit}`;
+type ExpandedMisTarget = {
+  hallId: HallId;
+  slice: number;
+  side: 0 | 1;
+  misUnit: number;
+};
+
+type ExpandedMisPanel = ExpandedMisTarget & {
+  slotIds: string[];
+  columns: number;
+  capacity: number;
+};
+
+function expandedMisKey(target: ExpandedMisTarget): string {
+  return `${target.hallId}:${target.slice}:${target.side}:${target.misUnit}`;
 }
 
-const MIS_OPEN_CARD_CLASSES = [
-  "border-[rgba(24,120,92,0.88)] bg-[linear-gradient(180deg,rgba(228,248,241,0.98)_0%,rgba(202,232,220,0.98)_100%)] shadow-[0_0_0_2px_rgba(16,185,129,0.33)]",
-  "border-[rgba(176,93,26,0.88)] bg-[linear-gradient(180deg,rgba(255,245,222,0.98)_0%,rgba(247,226,178,0.98)_100%)] shadow-[0_0_0_2px_rgba(245,158,11,0.32)]",
-] as const;
-
-const MIS_OPEN_PANEL_CLASSES = [
-  "border-[rgba(58,90,74,0.55)] bg-[linear-gradient(180deg,rgba(244,250,240,0.97)_0%,rgba(223,236,216,0.97)_100%)]",
-  "border-[rgba(139,88,31,0.55)] bg-[linear-gradient(180deg,rgba(255,248,233,0.97)_0%,rgba(245,229,198,0.97)_100%)]",
-] as const;
-
 function getVisualSliceOrder(
-  hallId: HallId,
   slices: number,
-  viewMode: LayoutViewMode,
-  storageLayoutPreset: StorageLayoutPreset,
+  reverseSlices: boolean,
 ): number[] {
   const order = Array.from({ length: slices }, (_, index) => index);
-  if (
-    viewMode === "storage" &&
-    storageLayoutPreset === "cross" &&
-    (hallId === "north" || hallId === "west")
-  ) {
+  if (reverseSlices) {
     order.reverse();
   }
   return order;
+}
+
+function sideDepthPx(side: HallSideConfig): number {
+  if (side.type === "mis") {
+    return side.misUnitsPerSlice * 112 + Math.max(0, side.misUnitsPerSlice - 1) * SLOT_GAP;
+  }
+  return side.rowsPerSlice * SLOT_SIZE + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
 }
 
 function emptyHallPlacements(): Record<HallId, HallPlacement> {
@@ -154,16 +166,6 @@ function emptyHallPlacements(): Record<HallId, HallPlacement> {
     south: { left: 0, top: 0, transform: "", width: 0, height: 0 },
     west: { left: 0, top: 0, transform: "", width: 0, height: 0 },
   };
-}
-
-function storageOrientationForHall(
-  storageLayoutPreset: StorageLayoutPreset,
-  hallId: HallId,
-): "horizontal" | "vertical" {
-  if (storageLayoutPreset === "h") {
-    return "vertical";
-  }
-  return HALL_ORIENTATION[hallId];
 }
 
 function buildFlatLayoutMetrics(
@@ -235,11 +237,13 @@ export function LayoutViewport({
   onSlotDragOver,
   onSlotDrop,
   onViewportDropFallback,
-  onHallTypeChange,
-  onHallSlicesChange,
-  onHallRowsChange,
-  onHallMisCapacityChange,
-  onHallMisUnitsChange,
+  onSectionSlicesChange,
+  onSectionSideTypeChange,
+  onSectionSideRowsChange,
+  onSectionSideMisCapacityChange,
+  onSectionSideMisUnitsChange,
+  onAddSection,
+  onRemoveSection,
   onSlotItemDragStart,
   onSlotGroupDragStart,
   onAnyDragEnd,
@@ -275,9 +279,9 @@ export function LayoutViewport({
     width: number;
     height: number;
   } | null>(null);
-  const [expandedMisSlices, setExpandedMisSlices] = useState<ExpandedMisTarget[]>([]);
   const [viewMode, setViewMode] = useState<LayoutViewMode>("storage");
   const [storageLayoutPreset, setStorageLayoutPreset] = useState<StorageLayoutPreset>("cross");
+  const [expandedMisTargets, setExpandedMisTargets] = useState<ExpandedMisTarget[]>([]);
   const [hallNames, setHallNames] = useState<Record<HallId, string>>({
     north: HALL_LABELS.north,
     east: HALL_LABELS.east,
@@ -360,43 +364,6 @@ export function LayoutViewport({
     };
   }, [viewportRef]);
 
-  const validExpandedMisSlices = useMemo(() => {
-    const deduped = new Map<string, ExpandedMisTarget>();
-    for (const target of expandedMisSlices) {
-      deduped.set(toExpandedMisKey(target), target);
-    }
-
-    const validTargets: ExpandedMisTarget[] = [];
-    for (const target of deduped.values()) {
-      const config = hallConfigs[target.hallId];
-      if (
-        config.type !== "mis" ||
-        target.slice >= config.slices ||
-        target.misUnit >= config.misUnitsPerSlice
-      ) {
-        continue;
-      }
-      validTargets.push(target);
-    }
-
-    return validTargets.slice(-2);
-  }, [expandedMisSlices, hallConfigs]);
-
-  const toggleExpandedMisSlice = useCallback((target: ExpandedMisTarget): void => {
-    const targetKey = toExpandedMisKey(target);
-    setExpandedMisSlices((current) => {
-      const existingIndex = current.findIndex(
-        (entry) => toExpandedMisKey(entry) === targetKey,
-      );
-      if (existingIndex !== -1) {
-        return current.filter((entry) => toExpandedMisKey(entry) !== targetKey);
-      }
-
-      const next = [...current, target];
-      return next.slice(-2);
-    });
-  }, []);
-
   const updateHallName = useCallback((hallId: HallId, rawName: string): void => {
     const trimmed = rawName.trim();
     setHallNames((current) => ({
@@ -404,6 +371,62 @@ export function LayoutViewport({
       [hallId]: trimmed.length > 0 ? trimmed : HALL_LABELS[hallId],
     }));
   }, []);
+
+  function renderSideEditor(
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    label: string,
+    sideConfig: HallSideConfig,
+  ): ReactNode {
+    return (
+      <div className="flex items-center gap-[0.12rem] rounded-[0.35rem] border border-[rgba(124,96,61,0.35)] bg-[rgba(255,255,255,0.85)] px-[0.18rem] py-[0.1rem]">
+        <span className="text-[0.58rem] font-bold text-[#5f4c33]">{label}</span>
+        <select
+          className="rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.06rem] text-[0.58rem] font-semibold text-[#2b251f]"
+          value={sideConfig.type}
+          onChange={(event) =>
+            onSectionSideTypeChange(hallId, sectionIndex, side, event.target.value as HallType)
+          }
+        >
+          <option value="bulk">Bulk</option>
+          <option value="chest">Chest</option>
+          <option value="mis">MIS</option>
+        </select>
+        {sideConfig.type === "mis" ? (
+          <>
+            <span className="text-[0.54rem] font-semibold">C</span>
+            <DeferredNumberInput
+              className="w-[2.8rem] rounded-[0.25rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
+              min={1}
+              max={200}
+              value={sideConfig.misSlotsPerSlice}
+              onCommit={(value) => onSectionSideMisCapacityChange(hallId, sectionIndex, side, value)}
+            />
+            <span className="text-[0.54rem] font-semibold">U</span>
+            <DeferredNumberInput
+              className="w-[2.2rem] rounded-[0.25rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
+              min={1}
+              max={8}
+              value={sideConfig.misUnitsPerSlice}
+              onCommit={(value) => onSectionSideMisUnitsChange(hallId, sectionIndex, side, value)}
+            />
+          </>
+        ) : (
+          <>
+            <span className="text-[0.54rem] font-semibold">R</span>
+            <DeferredNumberInput
+              className="w-[2.2rem] rounded-[0.25rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
+              min={1}
+              max={9}
+              value={sideConfig.rowsPerSlice}
+              onCommit={(value) => onSectionSideRowsChange(hallId, sectionIndex, side, value)}
+            />
+          </>
+        )}
+      </div>
+    );
+  }
 
   const hallLayout = useMemo<HallLayoutState>(() => {
     if (viewMode === "flat") {
@@ -435,152 +458,72 @@ export function LayoutViewport({
           south: "horizontal",
           west: "horizontal",
         },
+        reverseSlices: {
+          north: false,
+          east: false,
+          south: false,
+          west: false,
+        },
         core: null,
       };
     }
-
-    const positions = emptyHallPlacements();
-    const dimensions = new Map<
-      HallId,
-      { width: number; height: number; orientation: "horizontal" | "vertical" }
-    >();
-    for (const hallId of HALL_ORDER) {
-      const orientation = storageOrientationForHall(storageLayoutPreset, hallId);
-      const size = getHallSize(hallConfigs[hallId], orientation);
-      dimensions.set(hallId, { width: size.width, height: size.height, orientation });
-    }
-
-    if (storageLayoutPreset === "h") {
-      const coreWidth = Math.max(Math.round(CORE_SIZE * 2.1), 320);
-      const coreHeight = Math.max(Math.round(CORE_SIZE * 0.5), 92);
-      const coreLeft = center - coreWidth / 2;
-      const coreTop = center - coreHeight / 2;
-      const leftAnchor = coreLeft - HALL_GAP;
-      const rightAnchor = coreLeft + coreWidth + HALL_GAP;
-      const topAnchor = coreTop - HALL_GAP;
-      const bottomAnchor = coreTop + coreHeight + HALL_GAP;
-
-      const north = dimensions.get("north");
-      const south = dimensions.get("south");
-      const east = dimensions.get("east");
-      const west = dimensions.get("west");
-      if (!north || !south || !east || !west) {
-        return {
-          positions,
-          orientations: {
-            north: "vertical",
-            east: "vertical",
-            south: "vertical",
-            west: "vertical",
-          },
-          core: null,
-        };
-      }
-
-      positions.north = {
-        left: leftAnchor,
-        top: topAnchor,
-        transform: "translate(-100%, -100%)",
-        width: north.width,
-        height: north.height,
-      };
-      positions.south = {
-        left: leftAnchor,
-        top: bottomAnchor,
-        transform: "translate(-100%, 0)",
-        width: south.width,
-        height: south.height,
-      };
-      positions.east = {
-        left: rightAnchor,
-        top: topAnchor,
-        transform: "translate(0, -100%)",
-        width: east.width,
-        height: east.height,
-      };
-      positions.west = {
-        left: rightAnchor,
-        top: bottomAnchor,
-        transform: "translate(0, 0)",
-        width: west.width,
-        height: west.height,
-      };
-
-      return {
-        positions,
-        orientations: {
-          north: "vertical",
-          east: "vertical",
-          south: "vertical",
-          west: "vertical",
-        },
-        core: {
-          left: coreLeft,
-          top: coreTop,
-          width: coreWidth,
-          height: coreHeight,
-          label: "Main Core",
-        },
-      };
-    }
-
-    for (const hallId of HALL_ORDER) {
-      const hall = dimensions.get(hallId);
-      if (!hall) {
-        continue;
-      }
-      if (hallId === "north") {
-        positions[hallId] = {
-          left: center,
-          top: center - CORE_SIZE / 2 - HALL_GAP,
-          transform: "translate(-50%, -100%)",
-          width: hall.width,
-          height: hall.height,
-        };
-      } else if (hallId === "south") {
-        positions[hallId] = {
-          left: center,
-          top: center + CORE_SIZE / 2 + HALL_GAP,
-          transform: "translate(-50%, 0%)",
-          width: hall.width,
-          height: hall.height,
-        };
-      } else if (hallId === "east") {
-        positions[hallId] = {
-          left: center + CORE_SIZE / 2 + HALL_GAP,
-          top: center,
-          transform: "translate(0%, -50%)",
-          width: hall.width,
-          height: hall.height,
-        };
-      } else {
-        positions[hallId] = {
-          left: center - CORE_SIZE / 2 - HALL_GAP,
-          top: center,
-          transform: "translate(-100%, -50%)",
-          width: hall.width,
-          height: hall.height,
-        };
-      }
-    }
-
+    const resolved = resolveStorageLayout(storageLayoutPreset, hallConfigs, center);
     return {
-      positions,
-      orientations: {
-        north: HALL_ORIENTATION.north,
-        east: HALL_ORIENTATION.east,
-        south: HALL_ORIENTATION.south,
-        west: HALL_ORIENTATION.west,
-      },
-      core: {
-        left: center - CORE_SIZE / 2,
-        top: center - CORE_SIZE / 2,
-        width: CORE_SIZE,
-        height: CORE_SIZE,
-        label: "Core",
-      },
+      positions: resolved.positions,
+      orientations: resolved.orientations,
+      reverseSlices: resolved.reverseSlices,
+      core: resolved.core,
     };
   }, [center, hallConfigs, storageLayoutPreset, viewMode]);
+
+  const expandedMisPanels = useMemo<ExpandedMisPanel[]>(() => {
+    return expandedMisTargets
+      .map((target) => {
+        const hall = hallConfigs[target.hallId];
+        if (!hall) {
+          return null;
+        }
+        const slice = resolveHallSlices(hall).find((entry) => entry.globalSlice === target.slice);
+        if (!slice) {
+          return null;
+        }
+        const sideConfig = target.side === 0 ? slice.sideLeft : slice.sideRight;
+        if (sideConfig.type !== "mis" || target.misUnit >= sideConfig.misUnitsPerSlice) {
+          return null;
+        }
+        const slotIds = Array.from(
+          { length: sideConfig.misSlotsPerSlice },
+          (_, index) => misSlotId(target.hallId, target.slice, target.side, target.misUnit, index),
+        );
+        const columns =
+          sideConfig.misSlotsPerSlice % 9 === 0
+            ? 9
+            : Math.min(12, Math.max(6, Math.ceil(Math.sqrt(sideConfig.misSlotsPerSlice))));
+        return {
+          ...target,
+          slotIds,
+          columns,
+          capacity: sideConfig.misSlotsPerSlice,
+        };
+      })
+      .filter((panel): panel is ExpandedMisPanel => panel !== null);
+  }, [expandedMisTargets, hallConfigs]);
+
+  const toggleExpandedMis = useCallback((target: ExpandedMisTarget): void => {
+    const targetKey = expandedMisKey(target);
+    setExpandedMisTargets((current) => {
+      const existingIndex = current.findIndex(
+        (entry) => expandedMisKey(entry) === targetKey,
+      );
+      if (existingIndex >= 0) {
+        return current.filter((_, index) => index !== existingIndex);
+      }
+      if (current.length < 2) {
+        return [...current, target];
+      }
+      return [current[1], target];
+    });
+  }, []);
 
   function renderSlot(slotId: string): ReactNode {
     const assignedItemId = slotAssignments[slotId];
@@ -713,248 +656,242 @@ export function LayoutViewport({
     );
   }
 
-  function renderNonMisHall(
+  function renderHallContent(
     hallId: HallId,
     config: HallConfig,
     orientation: "horizontal" | "vertical",
+    hallWidth: number,
+    hallHeight: number,
   ): ReactNode {
-    const sideDepth = config.rowsPerSide;
-    const mainSlices = config.slices;
-    const sliceOrder = getVisualSliceOrder(
-      hallId,
-      mainSlices,
-      viewMode,
-      storageLayoutPreset,
+    const slices = resolveHallSlices(config);
+    const visualSlices = getVisualSliceOrder(slices.length, hallLayout.reverseSlices[hallId]).map(
+      (index) => slices[index],
     );
 
-    if (orientation === "horizontal") {
-      return (
-        <>
-          <div
-            className="absolute left-0 top-0 grid"
-            style={{
-              gridTemplateColumns: `repeat(${mainSlices}, ${SLOT_SIZE}px)`,
-              gridTemplateRows: `repeat(${sideDepth}, ${SLOT_SIZE}px)`,
-              gap: `${SLOT_GAP}px`,
-            }}
-          >
-            {Array.from({ length: sideDepth }, (_, row) =>
-              sliceOrder.map((slice) =>
-                renderSlot(nonMisSlotId(hallId, slice, 0, row)),
-              ),
-            )}
-          </div>
+    let maxLeftDepth = 0;
+    let maxRightDepth = 0;
+    for (const slice of slices) {
+      maxLeftDepth = Math.max(maxLeftDepth, sideDepthPx(slice.sideLeft));
+      maxRightDepth = Math.max(maxRightDepth, sideDepthPx(slice.sideRight));
+    }
 
-          <div
-            className="absolute bottom-0 left-0 grid"
-            style={{
-              gridTemplateColumns: `repeat(${mainSlices}, ${SLOT_SIZE}px)`,
-              gridTemplateRows: `repeat(${sideDepth}, ${SLOT_SIZE}px)`,
-              gap: `${SLOT_GAP}px`,
-            }}
-          >
-            {Array.from({ length: sideDepth }, (_, row) =>
-              sliceOrder.map((slice) =>
-                renderSlot(nonMisSlotId(hallId, slice, 1, row)),
-              ),
-            )}
-          </div>
+    const slots: ReactNode[] = [];
+    for (const slice of visualSlices) {
+      for (const side of [0, 1] as const) {
+        const sideConfig = side === 0 ? slice.sideLeft : slice.sideRight;
+        const sideDepth = sideDepthPx(sideConfig);
 
-          <div className="absolute left-0 right-0 top-1/2 h-[18px] -translate-y-1/2 rounded-[99px] bg-[linear-gradient(180deg,rgba(45,119,127,0.18)_0%,rgba(45,119,127,0.08)_100%)]" />
-        </>
-      );
+        if (sideConfig.type === "mis") {
+          Array.from({ length: sideConfig.misUnitsPerSlice }, (_, misUnit) => {
+            const unitSlotIds = Array.from(
+              { length: sideConfig.misSlotsPerSlice },
+              (_, index) => misSlotId(hallId, slice.globalSlice, side, misUnit, index),
+            );
+            const assignedIds = unitSlotIds
+              .map((slotId) => slotAssignments[slotId])
+              .filter((itemId): itemId is string => Boolean(itemId));
+            const previewIds = assignedIds.slice(0, 6);
+            const hasAssigned = assignedIds.length > 0;
+            const firstSlot = unitSlotIds[0];
+            const expandedIndex = expandedMisTargets.findIndex(
+              (entry) =>
+                entry.hallId === hallId &&
+                entry.slice === slice.globalSlice &&
+                entry.side === side &&
+                entry.misUnit === misUnit,
+            );
+            const misCardSurfaceClass =
+              expandedIndex === 0
+                ? "border-[rgba(18,125,87,0.95)] bg-[linear-gradient(180deg,rgba(209,247,229,0.98)_0%,rgba(180,237,213,0.98)_100%)]"
+                : expandedIndex === 1
+                  ? "border-[rgba(50,91,168,0.95)] bg-[linear-gradient(180deg,rgba(220,235,255,0.98)_0%,rgba(193,218,250,0.98)_100%)]"
+                  : "border-[rgba(73,97,78,0.45)] bg-[linear-gradient(180deg,rgba(244,250,240,0.95)_0%,rgba(221,235,212,0.95)_100%)]";
+
+            if (orientation === "horizontal") {
+              const unitCrossSize = 112;
+              const baseTop = side === 0 ? 0 : hallHeight - sideDepth;
+              const x = slice.mainStart + 2;
+              const y = baseTop + misUnit * (unitCrossSize + SLOT_GAP) + 2;
+              const cardWidth = Math.max(52, slice.mainSize - 4);
+              const cardHeight = Math.max(42, unitCrossSize - 4);
+              slots.push(
+                <div
+                  key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
+                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.1rem] rounded-[0.45rem] border p-[0.2rem] ${misCardSurfaceClass}`}
+                  style={{ left: x, top: y, width: cardWidth, height: cardHeight }}
+                  data-no-pan
+                  data-mis-card
+                  draggable={hasAssigned}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onDragStart={(event) => {
+                    if (event.shiftKey || !hasAssigned) {
+                      event.preventDefault();
+                      return;
+                    }
+                    event.stopPropagation();
+                    onSlotGroupDragStart(event, unitSlotIds, firstSlot);
+                  }}
+                  onDragEnd={onAnyDragEnd}
+                  onDragOver={(event) => onSlotDragOver(event, firstSlot)}
+                  onDrop={(event) => onSlotDrop(event, firstSlot)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    toggleExpandedMis({
+                      hallId,
+                      slice: slice.globalSlice,
+                      side,
+                      misUnit,
+                    });
+                  }}
+                >
+                  <div className="text-[0.53rem] font-bold uppercase tracking-[0.03em] text-[#355039]">
+                    MIS {misUnit + 1}
+                  </div>
+                  <div className="text-[0.52rem] font-semibold text-[#33524f]">
+                    {assignedIds.length}/{sideConfig.misSlotsPerSlice}
+                  </div>
+                  <div className="grid content-start grid-cols-3 gap-[2px]">
+                    {previewIds.map((itemId) => {
+                      const item = itemById.get(itemId);
+                      if (!item) {
+                        return null;
+                      }
+                      return (
+                        <div
+                          key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${itemId}`}
+                          className="grid aspect-square place-items-center overflow-hidden rounded-[0.2rem] border border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
+                        >
+                          <Image
+                            src={item.texturePath}
+                            alt={item.id}
+                            width={14}
+                            height={14}
+                            style={{ imageRendering: "pixelated" }}
+                            draggable={false}
+                            unoptimized
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>,
+              );
+            } else {
+              const unitCrossSize = 112;
+              const baseLeft = side === 0 ? 0 : hallWidth - sideDepth;
+              const x = baseLeft + misUnit * (unitCrossSize + SLOT_GAP) + 2;
+              const y = slice.mainStart + 2;
+              const cardWidth = Math.max(42, unitCrossSize - 4);
+              const cardHeight = Math.max(52, slice.mainSize - 4);
+              slots.push(
+                <div
+                  key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
+                  className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.1rem] rounded-[0.45rem] border p-[0.2rem] ${misCardSurfaceClass}`}
+                  style={{ left: x, top: y, width: cardWidth, height: cardHeight }}
+                  data-no-pan
+                  data-mis-card
+                  draggable={hasAssigned}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onDragStart={(event) => {
+                    if (event.shiftKey || !hasAssigned) {
+                      event.preventDefault();
+                      return;
+                    }
+                    event.stopPropagation();
+                    onSlotGroupDragStart(event, unitSlotIds, firstSlot);
+                  }}
+                  onDragEnd={onAnyDragEnd}
+                  onDragOver={(event) => onSlotDragOver(event, firstSlot)}
+                  onDrop={(event) => onSlotDrop(event, firstSlot)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    toggleExpandedMis({
+                      hallId,
+                      slice: slice.globalSlice,
+                      side,
+                      misUnit,
+                    });
+                  }}
+                >
+                  <div className="text-[0.53rem] font-bold uppercase tracking-[0.03em] text-[#355039]">
+                    MIS {misUnit + 1}
+                  </div>
+                  <div className="text-[0.52rem] font-semibold text-[#33524f]">
+                    {assignedIds.length}/{sideConfig.misSlotsPerSlice}
+                  </div>
+                  <div className="grid content-start grid-cols-3 gap-[2px]">
+                    {previewIds.map((itemId) => {
+                      const item = itemById.get(itemId);
+                      if (!item) {
+                        return null;
+                      }
+                      return (
+                        <div
+                          key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${itemId}`}
+                          className="grid aspect-square place-items-center overflow-hidden rounded-[0.2rem] border border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
+                        >
+                          <Image
+                            src={item.texturePath}
+                            alt={item.id}
+                            width={14}
+                            height={14}
+                            style={{ imageRendering: "pixelated" }}
+                            draggable={false}
+                            unoptimized
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>,
+              );
+            }
+          });
+          continue;
+        }
+
+        for (let row = 0; row < sideConfig.rowsPerSlice; row += 1) {
+          const slotKey = nonMisSlotId(hallId, slice.globalSlice, side, row);
+          if (orientation === "horizontal") {
+            const baseTop = side === 0 ? 0 : hallHeight - sideDepth;
+            const x = slice.mainStart + (slice.mainSize - SLOT_SIZE) / 2;
+            const y = baseTop + row * (SLOT_SIZE + SLOT_GAP);
+            slots.push(
+              <div key={slotKey} className="absolute" style={{ left: x, top: y }}>
+                {renderSlot(slotKey)}
+              </div>,
+            );
+          } else {
+            const baseLeft = side === 0 ? 0 : hallWidth - sideDepth;
+            const x = baseLeft + row * (SLOT_SIZE + SLOT_GAP);
+            const y = slice.mainStart + (slice.mainSize - SLOT_SIZE) / 2;
+            slots.push(
+              <div key={slotKey} className="absolute" style={{ left: x, top: y }}>
+                {renderSlot(slotKey)}
+              </div>,
+            );
+          }
+        }
+      }
     }
 
     return (
       <>
-        <div
-          className="absolute left-0 top-0 grid"
-          style={{
-            gridTemplateColumns: `repeat(${sideDepth}, ${SLOT_SIZE}px)`,
-            gridTemplateRows: `repeat(${mainSlices}, ${SLOT_SIZE}px)`,
-            gap: `${SLOT_GAP}px`,
-          }}
-        >
-          {sliceOrder.map((slice) =>
-            Array.from({ length: sideDepth }, (_, row) =>
-              renderSlot(nonMisSlotId(hallId, slice, 0, row)),
-            ),
-          )}
-        </div>
-
-        <div
-          className="absolute right-0 top-0 grid"
-          style={{
-            gridTemplateColumns: `repeat(${sideDepth}, ${SLOT_SIZE}px)`,
-            gridTemplateRows: `repeat(${mainSlices}, ${SLOT_SIZE}px)`,
-            gap: `${SLOT_GAP}px`,
-          }}
-        >
-          {sliceOrder.map((slice) =>
-            Array.from({ length: sideDepth }, (_, row) =>
-              renderSlot(nonMisSlotId(hallId, slice, 1, row)),
-            ),
-          )}
-        </div>
-
-        <div className="absolute bottom-0 left-1/2 top-0 w-[18px] -translate-x-1/2 rounded-[99px] bg-[linear-gradient(180deg,rgba(45,119,127,0.18)_0%,rgba(45,119,127,0.08)_100%)]" />
+        {orientation === "horizontal" ? (
+          <div
+            className="absolute left-0 right-0 rounded-[99px] bg-[linear-gradient(180deg,rgba(45,119,127,0.18)_0%,rgba(45,119,127,0.08)_100%)]"
+            style={{ top: maxLeftDepth, height: Math.max(8, hallHeight - maxLeftDepth - maxRightDepth) }}
+          />
+        ) : (
+          <div
+            className="absolute top-0 bottom-0 rounded-[99px] bg-[linear-gradient(180deg,rgba(45,119,127,0.18)_0%,rgba(45,119,127,0.08)_100%)]"
+            style={{ left: maxLeftDepth, width: Math.max(8, hallWidth - maxLeftDepth - maxRightDepth) }}
+          />
+        )}
+        {slots}
       </>
     );
   }
-
-  function renderMisHall(
-    hallId: HallId,
-    config: HallConfig,
-    orientation: "horizontal" | "vertical",
-  ): ReactNode {
-    const directionClass =
-      orientation === "horizontal" ? "flex-row" : "flex-col";
-    const sliceOrder = getVisualSliceOrder(
-      hallId,
-      config.slices,
-      viewMode,
-      storageLayoutPreset,
-    );
-
-    return (
-      <div className={`absolute inset-0 flex gap-1 ${directionClass}`}>
-        {sliceOrder.map((slice) => {
-          return (
-            <div
-              key={`${hallId}-mis-${slice}`}
-              className="grid min-w-0 flex-1 gap-1"
-              style={{
-                gridTemplateRows:
-                  orientation === "horizontal"
-                    ? `repeat(${config.misUnitsPerSlice}, minmax(0, 1fr))`
-                    : "none",
-                gridTemplateColumns:
-                  orientation === "vertical"
-                    ? `repeat(${config.misUnitsPerSlice}, minmax(0, 1fr))`
-                    : "none",
-              }}
-            >
-              {Array.from({ length: config.misUnitsPerSlice }, (_, misUnit) => {
-                const slotIds = Array.from(
-                  { length: config.misSlotsPerSlice },
-                  (_, index) => misSlotId(hallId, slice, misUnit, index),
-                );
-                const openIndex = validExpandedMisSlices.findIndex(
-                  (entry) =>
-                    entry.hallId === hallId &&
-                    entry.slice === slice &&
-                    entry.misUnit === misUnit,
-                );
-
-                const assignedItemIds = slotIds
-                  .map((slotId) => slotAssignments[slotId])
-                  .filter((itemId): itemId is string => Boolean(itemId));
-                const hasAssignedItems = assignedItemIds.length > 0;
-
-                const previewIds = assignedItemIds.slice(0, 6);
-                const firstSlot = slotIds[0];
-
-                return (
-                  <div
-                    key={`${hallId}-mis-${slice}-${misUnit}`}
-                    className={`grid min-w-0 grid-rows-[auto_auto_1fr] gap-[0.22rem] rounded-[0.65rem] border p-[0.32rem] ${
-                      openIndex === -1
-                        ? "border-[rgba(73,97,78,0.45)] bg-[linear-gradient(180deg,rgba(244,250,240,0.95)_0%,rgba(221,235,212,0.95)_100%)]"
-                        : MIS_OPEN_CARD_CLASSES[openIndex % MIS_OPEN_CARD_CLASSES.length]
-                    }`}
-                    draggable={hasAssignedItems}
-                    onDragStart={(event) => {
-                      if (event.shiftKey || !hasAssignedItems) {
-                        event.preventDefault();
-                        return;
-                      }
-
-                      event.stopPropagation();
-                      onSlotGroupDragStart(event, slotIds, firstSlot);
-                    }}
-                    onDragEnd={onAnyDragEnd}
-                    onDragOver={(event) => onSlotDragOver(event, firstSlot)}
-                    onDrop={(event) => onSlotDrop(event, firstSlot)}
-                    onClick={(event) => {
-                      if (event.shiftKey) {
-                        event.preventDefault();
-                        return;
-                      }
-
-                      event.stopPropagation();
-                      toggleExpandedMisSlice({ hallId, slice, misUnit });
-                    }}
-                    title={`Slice ${slice + 1} • MIS ${misUnit + 1} • ${assignedItemIds.length}/${config.misSlotsPerSlice}`}
-                    data-slot
-                  >
-                    <div className="text-[0.6rem] font-bold uppercase tracking-[0.04em] text-[#355039]">
-                      Slice {slice + 1} • MIS {misUnit + 1}
-                    </div>
-                    <div className="text-[0.65rem] font-bold text-[#33524f]">
-                      {assignedItemIds.length}/{config.misSlotsPerSlice}
-                    </div>
-                    <div className="grid content-start grid-cols-3 gap-[2px]">
-                      {previewIds.map((itemId) => {
-                        const item = itemById.get(itemId);
-                        if (!item) {
-                          return null;
-                        }
-
-                        return (
-                          <div
-                            key={`${hallId}-mis-${slice}-${misUnit}-${itemId}`}
-                            className="grid aspect-square place-items-center overflow-hidden rounded-[0.25rem] border border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
-                          >
-                            <Image
-                              src={item.texturePath}
-                              alt={item.id}
-                              width={16}
-                              height={16}
-                              style={{ imageRendering: "pixelated" }}
-                              draggable={false}
-                              unoptimized
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  const expandedMisEntries = useMemo<ExpandedMisEntry[]>(() => {
-    const entries: ExpandedMisEntry[] = [];
-    for (const [colorIndex, target] of validExpandedMisSlices.entries()) {
-      const config = hallConfigs[target.hallId];
-      if (config.type !== "mis") {
-        continue;
-      }
-
-      const slotIds = Array.from(
-        { length: config.misSlotsPerSlice },
-        (_, index) => misSlotId(target.hallId, target.slice, target.misUnit, index),
-      );
-      const columns =
-        config.misSlotsPerSlice % 9 === 0
-          ? 9
-          : Math.min(12, Math.max(6, Math.ceil(Math.sqrt(config.misSlotsPerSlice))));
-
-      entries.push({
-        target,
-        config,
-        slotIds,
-        columns,
-        colorIndex,
-      });
-    }
-    return entries;
-  }, [hallConfigs, validExpandedMisSlices]);
 
   return (
     <div
@@ -968,11 +905,19 @@ export function LayoutViewport({
         }
       }}
       onClick={(event) => {
+        const target = event.target as HTMLElement;
+        const clickedStorageBackground =
+          viewMode === "storage" &&
+          !target.closest("[data-mis-panel]") &&
+          !target.closest("[data-mis-card]") &&
+          !target.closest("[data-no-pan]");
+        if (clickedStorageBackground) {
+          setExpandedMisTargets([]);
+        }
+
         if (event.shiftKey || selectedSlotIds.size === 0) {
           return;
         }
-
-        const target = event.target as HTMLElement;
         if (target.closest("[data-slot-id]")) {
           return;
         }
@@ -1194,53 +1139,64 @@ export function LayoutViewport({
         </button>
       </div>
 
-      {expandedMisEntries.length > 0 ? (
+      {expandedMisPanels.length > 0 ? (
         <div
-          className="absolute left-1/2 top-5 z-30 flex max-w-[92vw] -translate-x-1/2 gap-3 max-[980px]:grid max-[980px]:w-[92vw]"
+          className="absolute left-1/2 top-5 z-30 flex max-w-[96vw] -translate-x-1/2 items-start gap-3"
           data-no-pan
           onClick={(event) => event.stopPropagation()}
         >
-          {expandedMisEntries.map((entry) => {
-            const palette = MIS_OPEN_PANEL_CLASSES[entry.colorIndex % MIS_OPEN_PANEL_CLASSES.length];
-            const targetKey = toExpandedMisKey(entry.target);
+          {expandedMisPanels.map((panel, index) => {
+            const isPrimary = index === 0;
+            const frameClass = isPrimary
+              ? "border-[rgba(58,90,74,0.55)] bg-[linear-gradient(180deg,rgba(244,250,240,0.97)_0%,rgba(223,236,216,0.97)_100%)]"
+              : "border-[rgba(64,78,112,0.55)] bg-[linear-gradient(180deg,rgba(240,246,255,0.97)_0%,rgba(217,228,246,0.97)_100%)]";
+            const headerClass = isPrimary
+              ? "border-[rgba(63,88,72,0.28)] text-[#2e5042]"
+              : "border-[rgba(64,82,108,0.28)] text-[#2d4464]";
+            const subTextClass = isPrimary ? "text-[#3e6455]" : "text-[#45608a]";
+            const closeClass = isPrimary
+              ? "border-[rgba(82,104,88,0.45)] bg-[rgba(253,255,252,0.92)] text-[#2f4b3f]"
+              : "border-[rgba(86,100,130,0.45)] bg-[rgba(252,254,255,0.92)] text-[#334d70]";
+            const panelKey = expandedMisKey(panel);
             return (
-              <section
-                key={targetKey}
-                className={`w-[min(38vw,400px)] overflow-hidden rounded-[0.85rem] border shadow-[0_12px_34px_rgba(38,48,33,0.28)] max-[980px]:w-full ${palette}`}
+              <div
+                key={panelKey}
+                className={`w-[min(30vw,360px)] overflow-hidden rounded-[0.85rem] border shadow-[0_12px_34px_rgba(38,48,33,0.28)] max-[980px]:w-[78vw] ${frameClass}`}
+                data-mis-panel
               >
                 <header
-                  className="flex items-center justify-between border-b border-[rgba(63,88,72,0.28)] px-3 py-2"
-                  draggable={entry.slotIds.some((slotId) => Boolean(slotAssignments[slotId]))}
+                  className={`flex items-center justify-between border-b px-3 py-2 ${headerClass}`}
+                  draggable={panel.slotIds.some((slotId) => Boolean(slotAssignments[slotId]))}
                   onDragStart={(event) => {
                     if (event.shiftKey) {
                       event.preventDefault();
                       return;
                     }
-
-                    onSlotGroupDragStart(event, entry.slotIds, entry.slotIds[0]);
+                    onSlotGroupDragStart(event, panel.slotIds, panel.slotIds[0]);
                   }}
                   onDragEnd={onAnyDragEnd}
                 >
-                  <div className="grid gap-[0.08rem] text-[#2e5042]">
+                  <div className="grid gap-[0.08rem]">
                     <div className="text-[0.78rem] font-bold uppercase tracking-[0.05em]">
-                      {hallNames[entry.target.hallId]} MIS Slice {entry.target.slice + 1} • MIS{" "}
-                      {entry.target.misUnit + 1}
+                      {hallNames[panel.hallId]} Slice {panel.slice + 1} •{" "}
+                      {panel.side === 0 ? "Left" : "Right"} MIS {panel.misUnit + 1}
                     </div>
-                    <div className="text-[0.68rem] text-[#3e6455]">
-                      {entry.slotIds.filter((slotId) => Boolean(slotAssignments[slotId])).length}/
-                      {entry.config.misSlotsPerSlice} assigned
+                    <div className={`text-[0.68rem] ${subTextClass}`}>
+                      {panel.slotIds.filter((slotId) => Boolean(slotAssignments[slotId])).length}/
+                      {panel.capacity} assigned
                     </div>
                   </div>
                   <button
                     type="button"
-                    className="rounded-[0.4rem] border border-[rgba(82,104,88,0.45)] bg-[rgba(253,255,252,0.92)] px-[0.5rem] py-[0.2rem] text-[0.72rem] font-semibold text-[#2f4b3f]"
-                    onClick={() => {
-                      setExpandedMisSlices((current) =>
+                    className={`rounded-[0.4rem] border px-[0.5rem] py-[0.2rem] text-[0.72rem] font-semibold ${closeClass}`}
+                    onClick={() =>
+                      setExpandedMisTargets((current) =>
                         current.filter(
-                          (expanded) => toExpandedMisKey(expanded) !== toExpandedMisKey(entry.target),
+                          (entry) =>
+                            expandedMisKey(entry) !== panelKey,
                         ),
-                      );
-                    }}
+                      )
+                    }
                   >
                     Close
                   </button>
@@ -1249,13 +1205,13 @@ export function LayoutViewport({
                   <div
                     className="grid content-start gap-[4px]"
                     style={{
-                      gridTemplateColumns: `repeat(${entry.columns}, ${SLOT_SIZE}px)`,
+                      gridTemplateColumns: `repeat(${panel.columns}, ${SLOT_SIZE}px)`,
                     }}
                   >
-                    {entry.slotIds.map((slotId) => renderSlot(slotId))}
+                    {panel.slotIds.map((slotId) => renderSlot(slotId))}
                   </div>
                 </div>
-              </section>
+              </div>
             );
           })}
         </div>
@@ -1274,6 +1230,7 @@ export function LayoutViewport({
             height: `${STAGE_SIZE}px`,
             transform: `scale(${zoom})`,
           }}
+          data-storage-canvas
         >
           {viewMode === "storage" && hallLayout.core ? (
             <div
@@ -1305,26 +1262,23 @@ export function LayoutViewport({
                     : { left: "0", top: "-0.36rem", transform: "translate(0, -100%)" };
 
             const hallFirstSlot =
-              hall.type === "mis"
-                ? misSlotId(
-                    hallId,
-                    getVisualSliceOrder(hallId, hall.slices, viewMode, storageLayoutPreset)[0] ??
-                      0,
-                    0,
-                    0,
-                  )
-                : nonMisSlotId(
-                    hallId,
-                    getVisualSliceOrder(hallId, hall.slices, viewMode, storageLayoutPreset)[0] ??
-                      0,
-                    0,
-                    0,
-                  );
+              (() => {
+                const firstSlice = getVisualSliceOrder(
+                  resolveHallSlices(hall).length,
+                  hallLayout.reverseSlices[hallId],
+                )[0] ?? 0;
+                const firstSection = hall.sections[0];
+                const sideType = firstSection?.sideLeft.type ?? "bulk";
+                return sideType === "mis"
+                  ? misSlotId(hallId, firstSlice, 0, 0, 0)
+                  : nonMisSlotId(hallId, firstSlice, 0, 0);
+              })();
 
             return (
               <section
                 key={hallId}
                 className="absolute rounded-[0.85rem] border border-[rgba(72,64,52,0.4)] bg-[rgba(255,250,240,0.8)] shadow-[0_5px_15px_rgba(42,34,20,0.12)]"
+                data-hall-section
                 style={{
                   left: `${placement.left}px`,
                   top: `${placement.top}px`,
@@ -1359,7 +1313,8 @@ export function LayoutViewport({
                     event.stopPropagation();
                   }}
                 >
-                  <div className="flex items-center gap-[0.2rem] rounded-[0.55rem] border border-[rgba(132,100,63,0.4)] bg-[rgba(255,244,223,0.96)] px-[0.32rem] py-[0.2rem] text-[#5f4c33]">
+                  <div className="grid gap-[0.16rem] rounded-[0.55rem] border border-[rgba(132,100,63,0.4)] bg-[rgba(255,244,223,0.96)] px-[0.32rem] py-[0.2rem] text-[#5f4c33]">
+                    <div className="flex items-center gap-[0.2rem]">
                     <span
                       className="cursor-text rounded-[0.2rem] px-[0.08rem] text-[0.62rem] font-bold uppercase tracking-[0.04em] hover:text-[#2d6a4f] focus:bg-white focus:text-[#2d6a4f] focus:outline-none"
                       contentEditable
@@ -1379,70 +1334,42 @@ export function LayoutViewport({
                     >
                       {hallNames[hallId]}
                     </span>
-                    <select
-                      className="rounded-[0.35rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.24rem] py-[0.1rem] text-[0.62rem] font-semibold text-[#2b251f]"
-                      value={hall.type}
-                      onChange={(event) =>
-                        onHallTypeChange(hallId, event.target.value as HallType)
-                      }
-                    >
-                      <option value="bulk">Bulk</option>
-                      <option value="chest">Chest</option>
-                      <option value="mis">MIS</option>
-                    </select>
-                    <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
-                      <span>S</span>
-                      <DeferredNumberInput
-                        className="w-[3.1rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
-                        min={1}
-                        max={200}
-                        value={hall.slices}
-                        onCommit={(nextValue) => onHallSlicesChange(hallId, nextValue)}
-                      />
-                    </label>
-                    {hall.type === "mis" ? (
-                      <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
-                        <span>C</span>
+                      <button
+                        type="button"
+                        className="rounded-[0.32rem] border border-[rgba(66,127,90,0.45)] bg-[rgba(233,255,243,0.9)] px-[0.2rem] py-[0.08rem] text-[0.56rem] font-semibold text-[#2f5b43]"
+                        onClick={() => onAddSection(hallId)}
+                      >
+                        + Section
+                      </button>
+                    </div>
+                    {hall.sections.map((section, sectionIndex) => (
+                      <div key={`${hallId}-section-${sectionIndex}`} className="flex items-center gap-[0.16rem]">
+                        <span className="text-[0.56rem] font-semibold">#{sectionIndex + 1}</span>
+                        <span className="text-[0.54rem] font-semibold">S</span>
                         <DeferredNumberInput
-                          className="w-[3.3rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
+                          className="w-[2.7rem] rounded-[0.25rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
                           min={1}
                           max={200}
-                          value={hall.misSlotsPerSlice}
-                          onCommit={(nextValue) =>
-                            onHallMisCapacityChange(hallId, nextValue)
-                          }
+                          value={section.slices}
+                          onCommit={(value) => onSectionSlicesChange(hallId, sectionIndex, value)}
                         />
-                      </label>
-                    ) : (
-                      <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
-                        <span>R</span>
-                        <DeferredNumberInput
-                          className="w-[2.8rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
-                          min={1}
-                          max={9}
-                          value={hall.rowsPerSide}
-                          onCommit={(nextValue) => onHallRowsChange(hallId, nextValue)}
-                        />
-                      </label>
-                    )}
-                    {hall.type === "mis" ? (
-                      <label className="flex items-center gap-[0.12rem] text-[0.6rem] font-semibold">
-                        <span>M</span>
-                        <DeferredNumberInput
-                          className="w-[2.8rem] rounded-[0.3rem] border border-[rgba(124,96,61,0.45)] bg-white px-[0.14rem] py-[0.08rem] text-[0.62rem]"
-                          min={1}
-                          max={8}
-                          value={hall.misUnitsPerSlice}
-                          onCommit={(nextValue) => onHallMisUnitsChange(hallId, nextValue)}
-                        />
-                      </label>
-                    ) : null}
+                        {renderSideEditor(hallId, sectionIndex, "left", "L", section.sideLeft)}
+                        {renderSideEditor(hallId, sectionIndex, "right", "R", section.sideRight)}
+                        {hall.sections.length > 1 ? (
+                          <button
+                            type="button"
+                            className="rounded-[0.28rem] border border-[rgba(153,53,40,0.4)] bg-[rgba(255,237,232,0.95)] px-[0.18rem] py-[0.06rem] text-[0.56rem] font-semibold text-[#7a2318]"
+                            onClick={() => onRemoveSection(hallId, sectionIndex)}
+                          >
+                            x
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {hall.type === "mis"
-                  ? renderMisHall(hallId, hall, orientation)
-                  : renderNonMisHall(hallId, hall, orientation)}
+                {renderHallContent(hallId, hall, orientation, placement.width, placement.height)}
               </section>
             );
           })}

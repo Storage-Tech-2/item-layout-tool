@@ -3,14 +3,7 @@
 import { ItemLibraryPanel } from "./components/ItemLibraryPanel";
 import { LayoutViewport } from "./components/LayoutViewport";
 import { useCatalog } from "./hooks/useCatalog";
-import {
-  nextConfigsForHallMisCapacity,
-  nextConfigsForHallMisUnitsPerSlice,
-  nextConfigsForHallRows,
-  nextConfigsForHallSlices,
-  nextConfigsForHallType,
-  useHallConfigs,
-} from "./hooks/useHallConfigs";
+import { useHallConfigs, type HallSideKey } from "./hooks/useHallConfigs";
 import { useLayoutAssignments } from "./hooks/useLayoutAssignments";
 import { useViewportNavigation } from "./hooks/useViewportNavigation";
 import type { HallId, HallType } from "./types";
@@ -19,11 +12,13 @@ export function PlannerApp() {
   const { catalogItems, isLoadingCatalog, catalogError } = useCatalog();
   const {
     hallConfigs,
-    setHallType,
-    setHallSlices,
-    setHallRowsPerSide,
-    setHallMisCapacity,
-    setHallMisUnitsPerSlice,
+    setSectionSlices,
+    setSectionSideType,
+    setSectionSideRows,
+    setSectionSideMisCapacity,
+    setSectionSideMisUnits,
+    addHallSection,
+    removeHallSection,
   } = useHallConfigs();
   const {
     itemById,
@@ -42,7 +37,6 @@ export function PlannerApp() {
     handleViewportDropFallback,
     handleLibraryDragOver,
     handleLibraryDrop,
-    preserveAssignmentsForConfigChange,
     clearSlot,
     setSelectedSlotIds,
   } = useLayoutAssignments({
@@ -61,34 +55,52 @@ export function PlannerApp() {
     handlePointerEnd,
   } = useViewportNavigation();
 
-  function handleHallTypeChange(hallId: HallId, nextType: HallType): void {
-    const nextConfigs = nextConfigsForHallType(hallConfigs, hallId, nextType);
-    preserveAssignmentsForConfigChange(hallConfigs, nextConfigs);
-    setHallType(hallId, nextType);
+  function handleSectionSlicesChange(hallId: HallId, sectionIndex: number, value: string): void {
+    setSectionSlices(hallId, sectionIndex, value);
   }
 
-  function handleHallSlicesChange(hallId: HallId, value: string): void {
-    const nextConfigs = nextConfigsForHallSlices(hallConfigs, hallId, value);
-    preserveAssignmentsForConfigChange(hallConfigs, nextConfigs);
-    setHallSlices(hallId, value);
+  function handleSectionSideTypeChange(
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    type: HallType,
+  ): void {
+    setSectionSideType(hallId, sectionIndex, side, type);
   }
 
-  function handleHallRowsChange(hallId: HallId, value: string): void {
-    const nextConfigs = nextConfigsForHallRows(hallConfigs, hallId, value);
-    preserveAssignmentsForConfigChange(hallConfigs, nextConfigs);
-    setHallRowsPerSide(hallId, value);
+  function handleSectionSideRowsChange(
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    value: string,
+  ): void {
+    setSectionSideRows(hallId, sectionIndex, side, value);
   }
 
-  function handleHallMisCapacityChange(hallId: HallId, value: string): void {
-    const nextConfigs = nextConfigsForHallMisCapacity(hallConfigs, hallId, value);
-    preserveAssignmentsForConfigChange(hallConfigs, nextConfigs);
-    setHallMisCapacity(hallId, value);
+  function handleSectionSideMisCapacityChange(
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    value: string,
+  ): void {
+    setSectionSideMisCapacity(hallId, sectionIndex, side, value);
   }
 
-  function handleHallMisUnitsPerSliceChange(hallId: HallId, value: string): void {
-    const nextConfigs = nextConfigsForHallMisUnitsPerSlice(hallConfigs, hallId, value);
-    preserveAssignmentsForConfigChange(hallConfigs, nextConfigs);
-    setHallMisUnitsPerSlice(hallId, value);
+  function handleSectionSideMisUnitsChange(
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    value: string,
+  ): void {
+    setSectionSideMisUnits(hallId, sectionIndex, side, value);
+  }
+
+  function handleAddSection(hallId: HallId): void {
+    addHallSection(hallId);
+  }
+
+  function handleRemoveSection(hallId: HallId, sectionIndex: number): void {
+    removeHallSection(hallId, sectionIndex);
   }
 
   return (
@@ -109,11 +121,13 @@ export function PlannerApp() {
           onSlotDragOver={handleSlotDragOver}
           onSlotDrop={handleSlotDrop}
           onViewportDropFallback={handleViewportDropFallback}
-          onHallTypeChange={handleHallTypeChange}
-          onHallSlicesChange={handleHallSlicesChange}
-          onHallRowsChange={handleHallRowsChange}
-          onHallMisCapacityChange={handleHallMisCapacityChange}
-          onHallMisUnitsChange={handleHallMisUnitsPerSliceChange}
+          onSectionSlicesChange={handleSectionSlicesChange}
+          onSectionSideTypeChange={handleSectionSideTypeChange}
+          onSectionSideRowsChange={handleSectionSideRowsChange}
+          onSectionSideMisCapacityChange={handleSectionSideMisCapacityChange}
+          onSectionSideMisUnitsChange={handleSectionSideMisUnitsChange}
+          onAddSection={handleAddSection}
+          onRemoveSection={handleRemoveSection}
           onSlotItemDragStart={beginSlotItemDrag}
           onSlotGroupDragStart={beginSlotGroupDrag}
           onAnyDragEnd={clearDragState}

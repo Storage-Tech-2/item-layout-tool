@@ -1,4 +1,10 @@
-import type { HallConfig, HallId, HallOrientation, HallType } from "./types";
+import type {
+  HallConfig,
+  HallId,
+  HallOrientation,
+  HallSideConfig,
+  HallType,
+} from "./types";
 
 export const HALL_ORDER: HallId[] = ["north", "east", "south", "west"];
 
@@ -18,20 +24,23 @@ export const HALL_ORIENTATION: Record<HallId, HallOrientation> = {
 
 export const HALL_TYPE_DEFAULTS: Record<
   HallType,
-  Pick<HallConfig, "rowsPerSide" | "misSlotsPerSlice" | "misUnitsPerSlice">
+  HallSideConfig
 > = {
   bulk: {
-    rowsPerSide: 1,
+    type: "bulk",
+    rowsPerSlice: 1,
     misSlotsPerSlice: 54,
     misUnitsPerSlice: 1,
   },
   chest: {
-    rowsPerSide: 4,
+    type: "chest",
+    rowsPerSlice: 4,
     misSlotsPerSlice: 54,
     misUnitsPerSlice: 1,
   },
   mis: {
-    rowsPerSide: 4,
+    type: "mis",
+    rowsPerSlice: 4,
     misSlotsPerSlice: 54,
     misUnitsPerSlice: 1,
   },
@@ -39,32 +48,80 @@ export const HALL_TYPE_DEFAULTS: Record<
 
 export const DEFAULT_HALLS: Record<HallId, HallConfig> = {
   north: {
-    type: "bulk",
-    slices: 8,
-    rowsPerSide: 2,
-    misSlotsPerSlice: 54,
-    misUnitsPerSlice: 2,
+    sections: [
+      {
+        slices: 8,
+        sideLeft: {
+          type: "bulk",
+          rowsPerSlice: 2,
+          misSlotsPerSlice: 54,
+          misUnitsPerSlice: 2,
+        },
+        sideRight: {
+          type: "bulk",
+          rowsPerSlice: 2,
+          misSlotsPerSlice: 54,
+          misUnitsPerSlice: 2,
+        },
+      },
+    ],
   },
   east: {
-    type: "chest",
-    slices: 16,
-    rowsPerSide: 4,
-    misSlotsPerSlice: 54,
-    misUnitsPerSlice: 2,
+    sections: [
+      {
+        slices: 16,
+        sideLeft: {
+          type: "chest",
+          rowsPerSlice: 4,
+          misSlotsPerSlice: 54,
+          misUnitsPerSlice: 2,
+        },
+        sideRight: {
+          type: "chest",
+          rowsPerSlice: 4,
+          misSlotsPerSlice: 54,
+          misUnitsPerSlice: 2,
+        },
+      },
+    ],
   },
   south: {
-    type: "mis",
-    slices: 4,
-    rowsPerSide: 4,
-    misSlotsPerSlice: 54,
-    misUnitsPerSlice: 2,
+    sections: [
+      {
+        slices: 4,
+        sideLeft: {
+          type: "mis",
+          rowsPerSlice: 4,
+          misSlotsPerSlice: 54,
+          misUnitsPerSlice: 2,
+        },
+        sideRight: {
+          type: "mis",
+          rowsPerSlice: 4,
+          misSlotsPerSlice: 54,
+          misUnitsPerSlice: 2,
+        },
+      },
+    ],
   },
   west: {
-    type: "chest",
-    slices: 16,
-    rowsPerSide: 4,
-    misSlotsPerSlice: 54,
-    misUnitsPerSlice: 2,
+    sections: [
+      {
+        slices: 16,
+        sideLeft: {
+          type: "chest",
+          rowsPerSlice: 4,
+          misSlotsPerSlice: 54,
+          misUnitsPerSlice: 2,
+        },
+        sideRight: {
+          type: "chest",
+          rowsPerSlice: 4,
+          misSlotsPerSlice: 54,
+          misUnitsPerSlice: 2,
+        },
+      },
+    ],
   },
 };
 

@@ -1,140 +1,109 @@
-import {
-  CORE_SIZE,
-  HALL_GAP,
-  HALL_ORIENTATION,
-  HALL_ORDER,
-  MIS_CROSS,
-  MIS_SLICE_MAIN,
-  SLOT_GAP,
-  SLOT_SIZE,
-  STAGE_SIZE,
-} from "../constants";
+import { HALL_ORDER, SLOT_GAP, SLOT_SIZE, STAGE_SIZE } from "../constants";
+import { resolveStorageLayout } from "../layoutConfig";
 import type { HallConfig, HallId, SlotPoint } from "../types";
-import { getHallSize } from "../utils";
+import { resolveHallSlices } from "../utils";
 
 export function toPointKey(point: SlotPoint): string {
   return `${Math.round(point.x * 1000)}:${Math.round(point.y * 1000)}`;
 }
 
-export function getHallTopLeft(
-  hallId: HallId,
-  hallWidth: number,
-  hallHeight: number,
-): SlotPoint {
-  const center = STAGE_SIZE / 2;
-  if (hallId === "north") {
-    return {
-      x: center - hallWidth / 2,
-      y: center - CORE_SIZE / 2 - HALL_GAP - hallHeight,
-    };
+function sideDepthPx(side: {
+  type: "bulk" | "chest" | "mis";
+  rowsPerSlice: number;
+  misSlotsPerSlice: number;
+  misUnitsPerSlice: number;
+}): number {
+  if (side.type === "mis") {
+    return side.misUnitsPerSlice * 112 + Math.max(0, side.misUnitsPerSlice - 1) * SLOT_GAP;
   }
+  return side.rowsPerSlice * SLOT_SIZE + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
+}
 
-  if (hallId === "south") {
-    return {
-      x: center - hallWidth / 2,
-      y: center + CORE_SIZE / 2 + HALL_GAP,
-    };
-  }
-
-  if (hallId === "east") {
-    return {
-      x: center + CORE_SIZE / 2 + HALL_GAP,
-      y: center - hallHeight / 2,
-    };
-  }
-
-  return {
-    x: center - CORE_SIZE / 2 - HALL_GAP - hallWidth,
-    y: center - hallHeight / 2,
-  };
+function misColumns(slotsPerSlice: number): number {
+  return slotsPerSlice % 9 === 0
+    ? 9
+    : Math.min(12, Math.max(6, Math.ceil(Math.sqrt(slotsPerSlice))));
 }
 
 export function buildSlotCenters(
   hallConfigs: Record<HallId, HallConfig>,
 ): Map<string, SlotPoint> {
   const slotCenters = new Map<string, SlotPoint>();
-  const toVisualSliceIndex = (hallId: HallId, slices: number, slice: number): number => {
-    if (hallId === "north" || hallId === "west") {
-      return slices - 1 - slice;
-    }
-    return slice;
-  };
+  const center = STAGE_SIZE / 2;
+  const resolvedLayout = resolveStorageLayout("cross", hallConfigs, center);
 
   for (const hallId of HALL_ORDER) {
     const config = hallConfigs[hallId];
+    const orientation = resolvedLayout.orientations[hallId];
+    const hallTopLeft = (() => {
+      const placement = resolvedLayout.positions[hallId];
+      const match = /translate\(([-\d.]+)%\s*,\s*([-\d.]+)%\)/.exec(placement.transform);
+      const tx = match ? Number(match[1]) : 0;
+      const ty = match ? Number(match[2]) : 0;
+      const x = placement.left + (tx / 100) * placement.width;
+      const y = placement.top + (ty / 100) * placement.height;
+      return { x, y, width: placement.width, height: placement.height };
+    })();
 
-    const orientation = HALL_ORIENTATION[hallId];
-    const { width, height } = getHallSize(config, orientation);
-    const hallTopLeft = getHallTopLeft(hallId, width, height);
-    if (config.type === "mis") {
-      for (let slice = 0; slice < config.slices; slice += 1) {
-        const visualSlice = toVisualSliceIndex(hallId, config.slices, slice);
-        for (let misUnit = 0; misUnit < config.misUnitsPerSlice; misUnit += 1) {
-          const unitLeft =
-            orientation === "horizontal"
-              ? hallTopLeft.x + visualSlice * (MIS_SLICE_MAIN + SLOT_GAP)
-              : hallTopLeft.x + misUnit * (MIS_CROSS + SLOT_GAP);
-          const unitTop =
-            orientation === "horizontal"
-              ? hallTopLeft.y + misUnit * (MIS_CROSS + SLOT_GAP)
-              : hallTopLeft.y + visualSlice * (MIS_SLICE_MAIN + SLOT_GAP);
-          const unitWidth = orientation === "horizontal" ? MIS_SLICE_MAIN : MIS_CROSS;
-          const unitHeight = orientation === "horizontal" ? MIS_CROSS : MIS_SLICE_MAIN;
-          const columns =
-            config.misSlotsPerSlice % 9 === 0
-              ? 9
-              : Math.min(12, Math.max(6, Math.ceil(Math.sqrt(config.misSlotsPerSlice))));
-          const rows = Math.max(1, Math.ceil(config.misSlotsPerSlice / columns));
-          const cellWidth = unitWidth / columns;
-          const cellHeight = unitHeight / rows;
+    const slices = resolveHallSlices(config);
+    if (slices.length === 0) {
+      continue;
+    }
 
-          for (let index = 0; index < config.misSlotsPerSlice; index += 1) {
-            const column = index % columns;
-            const row = Math.floor(index / columns);
-            slotCenters.set(`${hallId}:m:${slice}:${misUnit}:${index}`, {
-              x: unitLeft + (column + 0.5) * cellWidth,
-              y: unitTop + (row + 0.5) * cellHeight,
-            });
+    let maxLeftDepth = 0;
+    let maxRightDepth = 0;
+    for (const slice of slices) {
+      maxLeftDepth = Math.max(maxLeftDepth, sideDepthPx(slice.sideLeft));
+      maxRightDepth = Math.max(maxRightDepth, sideDepthPx(slice.sideRight));
+    }
+
+    for (const slice of slices) {
+      for (const side of [0, 1] as const) {
+        const sideConfig = side === 0 ? slice.sideLeft : slice.sideRight;
+        const sideDepth = sideDepthPx(sideConfig);
+
+        if (sideConfig.type === "mis") {
+          const unitColumns = misColumns(sideConfig.misSlotsPerSlice);
+          const unitRows = Math.max(1, Math.ceil(sideConfig.misSlotsPerSlice / unitColumns));
+          for (let misUnit = 0; misUnit < sideConfig.misUnitsPerSlice; misUnit += 1) {
+            const unitMain = slice.mainSize;
+            const unitCross = sideDepth / sideConfig.misUnitsPerSlice;
+            const cellMain = unitMain / unitColumns;
+            const cellCross = unitCross / unitRows;
+
+            for (let index = 0; index < sideConfig.misSlotsPerSlice; index += 1) {
+              const column = index % unitColumns;
+              const row = Math.floor(index / unitColumns);
+
+              if (orientation === "horizontal") {
+                const baseY = side === 0 ? hallTopLeft.y : hallTopLeft.y + hallTopLeft.height - sideDepth;
+                const x = hallTopLeft.x + slice.mainStart + (column + 0.5) * cellMain;
+                const y = baseY + misUnit * unitCross + (row + 0.5) * cellCross;
+                slotCenters.set(`${hallId}:m:${slice.globalSlice}:${side}:${misUnit}:${index}`, { x, y });
+              } else {
+                const baseX = side === 0 ? hallTopLeft.x : hallTopLeft.x + hallTopLeft.width - sideDepth;
+                const x = baseX + misUnit * unitCross + (row + 0.5) * cellCross;
+                const y = hallTopLeft.y + slice.mainStart + (column + 0.5) * cellMain;
+                slotCenters.set(`${hallId}:m:${slice.globalSlice}:${side}:${misUnit}:${index}`, { x, y });
+              }
+            }
+          }
+          continue;
+        }
+
+        for (let row = 0; row < sideConfig.rowsPerSlice; row += 1) {
+          if (orientation === "horizontal") {
+            const baseY = side === 0 ? hallTopLeft.y : hallTopLeft.y + hallTopLeft.height - sideDepth;
+            const x = hallTopLeft.x + slice.mainStart + slice.mainSize / 2;
+            const y = baseY + row * (SLOT_SIZE + SLOT_GAP) + SLOT_SIZE / 2;
+            slotCenters.set(`${hallId}:g:${slice.globalSlice}:${side}:${row}`, { x, y });
+          } else {
+            const baseX = side === 0 ? hallTopLeft.x : hallTopLeft.x + hallTopLeft.width - sideDepth;
+            const x = baseX + row * (SLOT_SIZE + SLOT_GAP) + SLOT_SIZE / 2;
+            const y = hallTopLeft.y + slice.mainStart + slice.mainSize / 2;
+            slotCenters.set(`${hallId}:g:${slice.globalSlice}:${side}:${row}`, { x, y });
           }
         }
-      }
-      continue;
-    }
-
-    const step = SLOT_SIZE + SLOT_GAP;
-    const sideDepthPx =
-      config.rowsPerSide * SLOT_SIZE + Math.max(0, config.rowsPerSide - 1) * SLOT_GAP;
-
-    if (orientation === "horizontal") {
-      const topGridTop = hallTopLeft.y;
-      const bottomGridTop = hallTopLeft.y + height - sideDepthPx;
-
-      for (let slice = 0; slice < config.slices; slice += 1) {
-        const visualSlice = toVisualSliceIndex(hallId, config.slices, slice);
-        for (let row = 0; row < config.rowsPerSide; row += 1) {
-          const x = hallTopLeft.x + visualSlice * step + SLOT_SIZE / 2;
-          const topY = topGridTop + row * step + SLOT_SIZE / 2;
-          const bottomY = bottomGridTop + row * step + SLOT_SIZE / 2;
-
-          slotCenters.set(`${hallId}:g:${slice}:0:${row}`, { x, y: topY });
-          slotCenters.set(`${hallId}:g:${slice}:1:${row}`, { x, y: bottomY });
-        }
-      }
-      continue;
-    }
-
-    const leftGridLeft = hallTopLeft.x;
-    const rightGridLeft = hallTopLeft.x + width - sideDepthPx;
-
-    for (let slice = 0; slice < config.slices; slice += 1) {
-      const visualSlice = toVisualSliceIndex(hallId, config.slices, slice);
-      for (let row = 0; row < config.rowsPerSide; row += 1) {
-        const y = hallTopLeft.y + visualSlice * step + SLOT_SIZE / 2;
-        const leftX = leftGridLeft + row * step + SLOT_SIZE / 2;
-        const rightX = rightGridLeft + row * step + SLOT_SIZE / 2;
-
-        slotCenters.set(`${hallId}:g:${slice}:0:${row}`, { x: leftX, y });
-        slotCenters.set(`${hallId}:g:${slice}:1:${row}`, { x: rightX, y });
       }
     }
   }

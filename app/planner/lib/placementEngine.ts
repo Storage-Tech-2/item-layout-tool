@@ -40,6 +40,7 @@ type ParsedMisSlot = {
   kind: "mis";
   hallId: HallId;
   slice: number;
+  side: number;
   misUnit: number;
   index: number;
 };
@@ -62,20 +63,20 @@ function parseIntPart(raw: string): number | null {
 }
 
 function parseSlotId(slotId: string): ParsedSlot | null {
-  const [hallRaw, kindRaw, aRaw, bRaw, cRaw] = slotId.split(":");
+  const parts = slotId.split(":");
+  const [hallRaw, kindRaw] = parts;
   const hallId = parseHallId(hallRaw);
   if (!hallId) {
     return null;
   }
 
-  const a = parseIntPart(aRaw);
-  const b = parseIntPart(bRaw);
-  const c = parseIntPart(cRaw);
-  if (a === null || b === null || c === null) {
-    return null;
-  }
-
   if (kindRaw === "g") {
+    const a = parseIntPart(parts[2]);
+    const b = parseIntPart(parts[3]);
+    const c = parseIntPart(parts[4]);
+    if (a === null || b === null || c === null) {
+      return null;
+    }
     return {
       kind: "grid",
       hallId,
@@ -86,12 +87,20 @@ function parseSlotId(slotId: string): ParsedSlot | null {
   }
 
   if (kindRaw === "m") {
+    const a = parseIntPart(parts[2]);
+    const side = parseIntPart(parts[3]);
+    const misUnit = parseIntPart(parts[4]);
+    const index = parseIntPart(parts[5]);
+    if (a === null || side === null || misUnit === null || index === null) {
+      return null;
+    }
     return {
       kind: "mis",
       hallId,
       slice: a,
-      misUnit: b,
-      index: c,
+      side,
+      misUnit,
+      index,
     };
   }
 
@@ -129,10 +138,14 @@ function projectRepresentationTargetSlotId(
 
   if (origin.kind === "mis" && source.kind === "mis" && anchor.kind === "mis") {
     const targetSlice = anchor.slice + (source.slice - origin.slice);
+    const targetSide = anchor.side + (source.side - origin.side);
     const targetMisUnit = anchor.misUnit + (source.misUnit - origin.misUnit);
     const targetIndex = anchor.index + (source.index - origin.index);
 
-    return `${anchor.hallId}:m:${targetSlice}:${targetMisUnit}:${targetIndex}`;
+    if (targetSide < 0 || targetSide > 1) {
+      return null;
+    }
+    return `${anchor.hallId}:m:${targetSlice}:${targetSide}:${targetMisUnit}:${targetIndex}`;
   }
 
   return null;

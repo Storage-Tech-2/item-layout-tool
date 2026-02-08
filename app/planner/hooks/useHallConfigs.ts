@@ -1,171 +1,231 @@
 import { useState } from "react";
-import {
-  DEFAULT_HALLS,
-  HALL_ORDER,
-  HALL_TYPE_DEFAULTS,
-} from "../constants";
-import type { HallConfig, HallId, HallType } from "../types";
+import { DEFAULT_HALLS, HALL_TYPE_DEFAULTS } from "../constants";
+import type {
+  HallConfig,
+  HallId,
+  HallSectionConfig,
+  HallSideConfig,
+  HallType,
+} from "../types";
 import { clamp } from "../utils";
+
+export type HallSideKey = "left" | "right";
 
 type UseHallConfigsResult = {
   hallConfigs: Record<HallId, HallConfig>;
-  setHallType: (hallId: HallId, nextType: HallType) => void;
-  setHallSlices: (hallId: HallId, rawValue: string) => void;
-  setHallRowsPerSide: (hallId: HallId, rawValue: string) => void;
-  setHallMisCapacity: (hallId: HallId, rawValue: string) => void;
-  setHallMisUnitsPerSlice: (hallId: HallId, rawValue: string) => void;
-  applyHallPreset: (type: HallType) => void;
+  setSectionSlices: (hallId: HallId, sectionIndex: number, rawValue: string) => void;
+  setSectionSideType: (
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    type: HallType,
+  ) => void;
+  setSectionSideRows: (
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    rawValue: string,
+  ) => void;
+  setSectionSideMisCapacity: (
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    rawValue: string,
+  ) => void;
+  setSectionSideMisUnits: (
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    rawValue: string,
+  ) => void;
+  addHallSection: (hallId: HallId) => void;
+  removeHallSection: (hallId: HallId, sectionIndex: number) => void;
 };
 
-export function nextConfigsForHallType(
-  current: Record<HallId, HallConfig>,
-  hallId: HallId,
-  nextType: HallType,
-): Record<HallId, HallConfig> {
-  const previousConfig = current[hallId];
-  const defaults = HALL_TYPE_DEFAULTS[nextType];
-  return {
-    ...current,
-    [hallId]: {
-      ...previousConfig,
-      type: nextType,
-      rowsPerSide: nextType === "mis" ? previousConfig.rowsPerSide : defaults.rowsPerSide,
-      misSlotsPerSlice:
-        nextType === "mis"
-          ? Math.max(1, previousConfig.misSlotsPerSlice)
-          : previousConfig.misSlotsPerSlice,
-      misUnitsPerSlice:
-        nextType === "mis"
-          ? Math.max(1, previousConfig.misUnitsPerSlice)
-          : previousConfig.misUnitsPerSlice,
-    },
-  };
+function cloneSections(config: HallConfig): HallSectionConfig[] {
+  return config.sections.map((section) => ({
+    slices: section.slices,
+    sideLeft: { ...section.sideLeft },
+    sideRight: { ...section.sideRight },
+  }));
 }
 
-export function nextConfigsForHallSlices(
-  current: Record<HallId, HallConfig>,
-  hallId: HallId,
-  rawValue: string,
-): Record<HallId, HallConfig> {
-  const slices = clamp(Number(rawValue) || 1, 1, 200);
-  return {
-    ...current,
-    [hallId]: {
-      ...current[hallId],
-      slices,
-    },
-  };
+function sideAt(section: HallSectionConfig, side: HallSideKey): HallSideConfig {
+  return side === "left" ? section.sideLeft : section.sideRight;
 }
 
-export function nextConfigsForHallRows(
-  current: Record<HallId, HallConfig>,
-  hallId: HallId,
-  rawValue: string,
-): Record<HallId, HallConfig> {
-  const rowsPerSide = clamp(Number(rawValue) || 1, 1, 9);
-  return {
-    ...current,
-    [hallId]: {
-      ...current[hallId],
-      rowsPerSide,
-    },
-  };
+function replaceSide(
+  section: HallSectionConfig,
+  side: HallSideKey,
+  next: HallSideConfig,
+): HallSectionConfig {
+  return side === "left"
+    ? { ...section, sideLeft: next }
+    : { ...section, sideRight: next };
 }
 
-export function nextConfigsForHallMisCapacity(
+function updateSection(
   current: Record<HallId, HallConfig>,
   hallId: HallId,
-  rawValue: string,
+  sectionIndex: number,
+  updater: (section: HallSectionConfig) => HallSectionConfig,
 ): Record<HallId, HallConfig> {
-  const misSlotsPerSlice = clamp(Number(rawValue) || 1, 1, 200);
-  return {
-    ...current,
-    [hallId]: {
-      ...current[hallId],
-      misSlotsPerSlice,
-    },
-  };
-}
-
-export function nextConfigsForHallMisUnitsPerSlice(
-  current: Record<HallId, HallConfig>,
-  hallId: HallId,
-  rawValue: string,
-): Record<HallId, HallConfig> {
-  const misUnitsPerSlice = clamp(Number(rawValue) || 1, 1, 8);
-  return {
-    ...current,
-    [hallId]: {
-      ...current[hallId],
-      misUnitsPerSlice,
-    },
-  };
-}
-
-export function nextConfigsForPreset(
-  current: Record<HallId, HallConfig>,
-  type: HallType,
-): Record<HallId, HallConfig> {
-  const next: Record<HallId, HallConfig> = { ...current };
-  for (const hallId of HALL_ORDER) {
-    next[hallId] = {
-      ...next[hallId],
-      type,
-      rowsPerSide:
-        type === "mis" ? next[hallId].rowsPerSide : HALL_TYPE_DEFAULTS[type].rowsPerSide,
-      misSlotsPerSlice:
-        type === "mis"
-          ? Math.max(1, next[hallId].misSlotsPerSlice)
-          : next[hallId].misSlotsPerSlice,
-      misUnitsPerSlice:
-        type === "mis"
-          ? Math.max(1, next[hallId].misUnitsPerSlice)
-          : next[hallId].misUnitsPerSlice,
-    };
+  const hall = current[hallId];
+  if (!hall || sectionIndex < 0 || sectionIndex >= hall.sections.length) {
+    return current;
   }
-  return next;
+  const sections = cloneSections(hall);
+  sections[sectionIndex] = updater(sections[sectionIndex]);
+  return {
+    ...current,
+    [hallId]: {
+      ...hall,
+      sections,
+    },
+  };
 }
 
 export function useHallConfigs(): UseHallConfigsResult {
-  const [hallConfigs, setHallConfigs] = useState<Record<HallId, HallConfig>>(
-    DEFAULT_HALLS,
-  );
+  const [hallConfigs, setHallConfigs] = useState<Record<HallId, HallConfig>>(DEFAULT_HALLS);
 
-  function setHallType(hallId: HallId, nextType: HallType): void {
-    setHallConfigs((current) => nextConfigsForHallType(current, hallId, nextType));
-  }
-
-  function setHallSlices(hallId: HallId, rawValue: string): void {
-    setHallConfigs((current) => nextConfigsForHallSlices(current, hallId, rawValue));
-  }
-
-  function setHallRowsPerSide(hallId: HallId, rawValue: string): void {
-    setHallConfigs((current) => nextConfigsForHallRows(current, hallId, rawValue));
-  }
-
-  function setHallMisCapacity(hallId: HallId, rawValue: string): void {
+  function setSectionSlices(hallId: HallId, sectionIndex: number, rawValue: string): void {
+    const slices = clamp(Number(rawValue) || 1, 1, 200);
     setHallConfigs((current) =>
-      nextConfigsForHallMisCapacity(current, hallId, rawValue),
+      updateSection(current, hallId, sectionIndex, (section) => ({
+        ...section,
+        slices,
+      })),
     );
   }
 
-  function setHallMisUnitsPerSlice(hallId: HallId, rawValue: string): void {
+  function setSectionSideType(
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    type: HallType,
+  ): void {
     setHallConfigs((current) =>
-      nextConfigsForHallMisUnitsPerSlice(current, hallId, rawValue),
+      updateSection(current, hallId, sectionIndex, (section) => {
+        const currentSide = sideAt(section, side);
+        const defaults = HALL_TYPE_DEFAULTS[type];
+        const nextSide: HallSideConfig = {
+          ...currentSide,
+          ...defaults,
+          type,
+        };
+        return replaceSide(section, side, nextSide);
+      }),
     );
   }
 
-  function applyHallPreset(type: HallType): void {
-    setHallConfigs((current) => nextConfigsForPreset(current, type));
+  function setSectionSideRows(
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    rawValue: string,
+  ): void {
+    const rowsPerSlice = clamp(Number(rawValue) || 1, 1, 9);
+    setHallConfigs((current) =>
+      updateSection(current, hallId, sectionIndex, (section) => {
+        const currentSide = sideAt(section, side);
+        return replaceSide(section, side, {
+          ...currentSide,
+          rowsPerSlice,
+        });
+      }),
+    );
+  }
+
+  function setSectionSideMisCapacity(
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    rawValue: string,
+  ): void {
+    const misSlotsPerSlice = clamp(Number(rawValue) || 1, 1, 200);
+    setHallConfigs((current) =>
+      updateSection(current, hallId, sectionIndex, (section) => {
+        const currentSide = sideAt(section, side);
+        return replaceSide(section, side, {
+          ...currentSide,
+          misSlotsPerSlice,
+        });
+      }),
+    );
+  }
+
+  function setSectionSideMisUnits(
+    hallId: HallId,
+    sectionIndex: number,
+    side: HallSideKey,
+    rawValue: string,
+  ): void {
+    const misUnitsPerSlice = clamp(Number(rawValue) || 1, 1, 8);
+    setHallConfigs((current) =>
+      updateSection(current, hallId, sectionIndex, (section) => {
+        const currentSide = sideAt(section, side);
+        return replaceSide(section, side, {
+          ...currentSide,
+          misUnitsPerSlice,
+        });
+      }),
+    );
+  }
+
+  function addHallSection(hallId: HallId): void {
+    setHallConfigs((current) => {
+      const hall = current[hallId];
+      if (!hall) {
+        return current;
+      }
+      const template = hall.sections[hall.sections.length - 1] ?? {
+        slices: 8,
+        sideLeft: { ...HALL_TYPE_DEFAULTS.bulk },
+        sideRight: { ...HALL_TYPE_DEFAULTS.bulk },
+      };
+      const nextSection: HallSectionConfig = {
+        slices: template.slices,
+        sideLeft: { ...template.sideLeft },
+        sideRight: { ...template.sideRight },
+      };
+      return {
+        ...current,
+        [hallId]: {
+          ...hall,
+          sections: [...cloneSections(hall), nextSection],
+        },
+      };
+    });
+  }
+
+  function removeHallSection(hallId: HallId, sectionIndex: number): void {
+    setHallConfigs((current) => {
+      const hall = current[hallId];
+      if (!hall || hall.sections.length <= 1) {
+        return current;
+      }
+      if (sectionIndex < 0 || sectionIndex >= hall.sections.length) {
+        return current;
+      }
+      const nextSections = cloneSections(hall).filter((_, index) => index !== sectionIndex);
+      return {
+        ...current,
+        [hallId]: {
+          ...hall,
+          sections: nextSections,
+        },
+      };
+    });
   }
 
   return {
     hallConfigs,
-    setHallType,
-    setHallSlices,
-    setHallRowsPerSide,
-    setHallMisCapacity,
-    setHallMisUnitsPerSlice,
-    applyHallPreset,
+    setSectionSlices,
+    setSectionSideType,
+    setSectionSideRows,
+    setSectionSideMisCapacity,
+    setSectionSideMisUnits,
+    addHallSection,
+    removeHallSection,
   };
 }

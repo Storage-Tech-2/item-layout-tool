@@ -4,7 +4,25 @@ export type HallType = "bulk" | "chest" | "mis";
 
 export type HallOrientation = "horizontal" | "vertical";
 
+export type HallSideConfig = {
+  type: HallType;
+  rowsPerSlice: number;
+  misSlotsPerSlice: number;
+  misUnitsPerSlice: number;
+};
+
+export type HallSectionConfig = {
+  slices: number;
+  sideLeft: HallSideConfig;
+  sideRight: HallSideConfig;
+};
+
 export type HallConfig = {
+  name?: string;
+  sections: HallSectionConfig[];
+};
+
+export type LegacyHallConfig = {
   type: HallType;
   slices: number;
   rowsPerSide: number;
