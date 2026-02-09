@@ -2306,7 +2306,9 @@ function shouldIncludeInPlannerCatalog(
   if (
     itemId === "ender_dragon_spawn_egg" ||
     itemId === "wither_spawn_egg" ||
-    itemId === "vault"
+    itemId === "vault" ||
+    itemId === "frogspawn" ||
+    itemId === "player_head"
   ) {
     return false;
   }
