@@ -32,14 +32,13 @@ export function usePlannerLabelNames(): UsePlannerLabelNamesResult {
   }, []);
 
   const handleLayoutNameChange = useCallback((rawName: string) => {
-    const trimmed = rawName.trim();
     setLabelNames((current) => {
-      if (current.layoutName === trimmed) {
+      if (current.layoutName === rawName) {
         return current;
       }
       return {
         ...current,
-        layoutName: trimmed,
+        layoutName: rawName,
       };
     });
   }, []);
