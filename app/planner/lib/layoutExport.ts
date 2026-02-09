@@ -1,6 +1,6 @@
 import { withBasePath } from "../base-path";
-import type { CatalogItem, HallConfig, HallId } from "../types";
-import { buildSlotCenters } from "./layoutGeometry";
+import type { CatalogItem, HallConfig, HallId, HallSideConfig } from "../types";
+import { misSlotId, nonMisSlotId } from "../utils";
 
 export type LayoutExportMode = "containers" | "item_frames" | "blocks_and_frames";
 
@@ -45,16 +45,6 @@ type LayoutLitematicExportResult = {
   option: LayoutExportOption;
 };
 
-type ExportSlotEntry = {
-  slotId: string;
-  itemId: string;
-  isBlock: boolean;
-  x: number;
-  z: number;
-  misGroupKey: string | null;
-  misSlotIndex: number | null;
-};
-
 type NucleationSchematicWrapper = {
   setName?: (name: string) => void;
   setAuthor?: (author: string) => void;
@@ -86,6 +76,12 @@ type NucleationSchematicWrapper = {
   to_litematic?: () => Uint8Array | number[];
 };
 
+type ContainerItem = {
+  id: string;
+  slot: number;
+  count: number;
+};
+
 type NucleationModule = {
   default: () => Promise<unknown>;
   SchematicWrapper: new () => NucleationSchematicWrapper;
@@ -97,8 +93,13 @@ export async function exportLayoutAsLitematic(
   input: LayoutLitematicExportInput,
 ): Promise<LayoutLitematicExportResult> {
   const option = resolveExportOption(input.mode);
-  const slotEntries = buildExportSlotEntries(input.hallConfigs, input.slotAssignments, input.itemById);
-  if (slotEntries.length === 0) {
+  const cells = buildExportCellsForLayout(
+    input.slotAssignments,
+    input.itemById,
+    input.hallConfigs,
+    input.mode,
+  );
+  if (cells.length === 0) {
     throw new Error("No assigned items found to export.");
   }
 
@@ -109,20 +110,7 @@ export async function exportLayoutAsLitematic(
 
   const schematic = new nucleationModule.SchematicWrapper();
   applyMetadata(schematic, input.layoutName, option);
-
-  switch (input.mode) {
-    case "containers":
-      writeContainerLayout(schematic, slotEntries);
-      break;
-    case "item_frames":
-      writeItemFrameLayout(schematic, slotEntries);
-      break;
-    case "blocks_and_frames":
-      writeBlocksAndFramesLayout(schematic, slotEntries);
-      break;
-    default:
-      throw new Error("Unknown litematic export mode.");
-  }
+  writeExportCells(schematic, cells);
 
   const rawBytes = schematic.to_litematic?.();
   if (!rawBytes) {
@@ -196,47 +184,33 @@ function applyMetadata(
   schematic.setModified?.(now);
 }
 
-function writeContainerLayout(
+function writeExportCells(
   schematic: NucleationSchematicWrapper,
-  entries: ExportSlotEntry[],
+  cells: ExportCell[],
 ): void {
-  const nonMisEntries = writeMisAsDoubleChests(schematic, entries);
-  for (const entry of nonMisEntries) {
-    setBlockState(schematic, entry.x, 0, entry.z, "minecraft:barrel[facing=up]");
-
-    if (typeof schematic.addContainerItem !== "function") {
-      throw new Error("Nucleation module is missing addContainerItem(). Rebuild your WASM package.");
+  for (const cell of cells) {
+    if (cell.type === "container") {
+      addContainerBlockWithItems(
+        schematic,
+        cell.blockState,
+        cell.x,
+        0,
+        cell.z,
+        cell.items.map((item) => ({
+          id: item.itemId,
+          slot: item.slot,
+          count: item.count,
+        })),
+      );
+      continue;
     }
-    schematic.addContainerItem("minecraft:barrel", entry.x, 0, entry.z, toMinecraftId(entry.itemId), 0, 1);
-  }
-}
-
-function writeItemFrameLayout(
-  schematic: NucleationSchematicWrapper,
-  entries: ExportSlotEntry[],
-): void {
-  const nonMisEntries = writeMisAsDoubleChests(schematic, entries);
-  for (const entry of nonMisEntries) {
-    placeItemFrameSlot(schematic, entry.x, 0, entry.z, entry.itemId);
-  }
-}
-
-function writeBlocksAndFramesLayout(
-  schematic: NucleationSchematicWrapper,
-  entries: ExportSlotEntry[],
-): void {
-  const nonMisEntries = writeMisAsDoubleChests(schematic, entries);
-  for (const entry of nonMisEntries) {
-    if (entry.isBlock) {
-      try {
-        setBlockState(schematic, entry.x, 0, entry.z, toMinecraftId(entry.itemId));
-        continue;
-      } catch {
-        // Fall back to item-frame export if the block state is not placeable.
-      }
+    if (cell.type === "item_frame") {
+      placeItemFrameSlot(schematic, cell.x, 0, cell.z, cell.itemId);
+      continue;
     }
-
-    placeItemFrameSlot(schematic, entry.x, 0, entry.z, entry.itemId);
+    if (cell.type === "block") {
+      setBlockState(schematic, cell.x, 0, cell.z, cell.blockState);
+    }
   }
 }
 
@@ -247,7 +221,7 @@ function placeItemFrameSlot(
   z: number,
   itemId: string,
 ): void {
-  if (! schematic.addItemFrameEntity) {
+  if (!schematic.addItemFrameEntity) {
     throw new Error("Nucleation module is missing addItemFrameEntity(). Rebuild your WASM package.");
   }
   schematic.addItemFrameEntity(toMinecraftId(itemId), x, y, z, 1, 0, true);
@@ -271,197 +245,513 @@ function setBlockState(
   throw new Error("Nucleation SchematicWrapper is missing block placement APIs.");
 }
 
-function writeMisAsDoubleChests(
+function addContainerBlockWithItems(
   schematic: NucleationSchematicWrapper,
-  entries: ExportSlotEntry[],
-): ExportSlotEntry[] {
-  const misGroups = new Map<string, ExportSlotEntry[]>();
-  const nonMisEntries: ExportSlotEntry[] = [];
-
-  for (const entry of entries) {
-    if (!entry.misGroupKey || entry.misSlotIndex === null) {
-      nonMisEntries.push(entry);
-      continue;
-    }
-    const current = misGroups.get(entry.misGroupKey);
-    if (current) {
-      current.push(entry);
-    } else {
-      misGroups.set(entry.misGroupKey, [entry]);
-    }
-  }
-
-  for (const groupEntries of misGroups.values()) {
-    placeMisGroupAsDoubleChests(schematic, groupEntries);
-  }
-
-  return nonMisEntries;
-}
-
-function placeMisGroupAsDoubleChests(
-  schematic: NucleationSchematicWrapper,
-  entries: ExportSlotEntry[],
+  blockState: string,
+  x: number,
+  y: number,
+  z: number,
+  items: ContainerItem[],
 ): void {
-  if (entries.length === 0) {
-    return;
+  setBlockState(schematic, x, y, z, blockState);
+
+  if (typeof schematic.addBlockEntity !== "function") {
+    throw new Error("Nucleation module is missing addBlockEntity(). Rebuild your WASM package.");
   }
 
-  const anchorX = Math.min(...entries.map((entry) => entry.x));
-  const anchorZ = Math.min(...entries.map((entry) => entry.z));
-  const sorted = [...entries].sort((a, b) => {
-    const aSlot = a.misSlotIndex ?? 0;
-    const bSlot = b.misSlotIndex ?? 0;
-    return aSlot - bSlot;
+  schematic.addBlockEntity(blockStateToBlockId(blockState), x, y, z, {
+    Items: items.map((item) => ({
+      id: toMinecraftId(item.id),
+      Count: item.count,
+      Slot: item.slot,
+    })),
   });
-
-  type ChestItems = Array<{ id: string; slot: number }>;
-  const chestItems = new Map<string, ChestItems>();
-
-  for (const entry of sorted) {
-    const logicalSlot = entry.misSlotIndex ?? 0;
-    const pairIndex = Math.floor(logicalSlot / 54);
-    const pairSlot = logicalSlot % 54;
-    const chestX = anchorX;
-    const chestZ = anchorZ + pairIndex * 2;
-
-    // Double chest (east-west): left at chestX, right at chestX+1
-    setBlockState(
-      schematic,
-      chestX,
-      0,
-      chestZ,
-      "minecraft:chest[facing=north,type=left,waterlogged=false]",
-    );
-    setBlockState(
-      schematic,
-      chestX + 1,
-      0,
-      chestZ,
-      "minecraft:chest[facing=north,type=right,waterlogged=false]",
-    );
-
-    if (pairSlot < 27) {
-      const key = `${chestX},${chestZ}`;
-      const current = chestItems.get(key) ?? [];
-      current.push({ id: toMinecraftId(entry.itemId), slot: pairSlot });
-      chestItems.set(key, current);
-    } else {
-      const key = `${chestX + 1},${chestZ}`;
-      const current = chestItems.get(key) ?? [];
-      current.push({ id: toMinecraftId(entry.itemId), slot: pairSlot - 27 });
-      chestItems.set(key, current);
-    }
-  }
-
-  if (typeof schematic.addBlockEntity === "function") {
-    for (const [key, items] of chestItems.entries()) {
-      const [rawX, rawZ] = key.split(",");
-      const x = Number(rawX);
-      const z = Number(rawZ);
-      schematic.addBlockEntity("minecraft:chest", x, 0, z, {
-        Items: items.map((item) => ({
-          id: item.id,
-          count: 1,
-          Slot: item.slot,
-        })),
-      });
-      console.log(`Placed chest at (${x}, 0, ${z}) with items:`, items);
-    }
-    return;
-  }
-
-  throw new Error(
-    "Nucleation module is missing addBlockEntity()/addContainerItem(). Rebuild your WASM package.",
-  );
 }
 
 function toMinecraftId(itemId: string): string {
   return itemId.includes(":") ? itemId : `minecraft:${itemId}`;
 }
 
-function parseMisSlotMetadata(slotId: string): { groupKey: string; slotIndex: number } | null {
-  const parts = slotId.split(":");
-  // MIS format: hallId:m:slice:side:misUnit:index
-  if (parts.length !== 6 || parts[1] !== "m") {
-    return null;
-  }
-
-  const slotIndex = Number(parts[5]);
-  if (!Number.isInteger(slotIndex) || slotIndex < 0) {
-    return null;
-  }
-
-  return {
-    groupKey: `${parts[0]}:m:${parts[2]}:${parts[3]}:${parts[4]}`,
-    slotIndex,
-  };
+function blockStateToBlockId(blockState: string): string {
+  const trimmed = blockState.trim();
+  const stateStart = trimmed.indexOf("[");
+  const nbtStart = trimmed.indexOf("{");
+  const end = [stateStart, nbtStart]
+    .filter((value) => value >= 0)
+    .reduce((min, value) => Math.min(min, value), trimmed.length);
+  const baseId = trimmed.slice(0, end).trim();
+  return toMinecraftId(baseId);
 }
 
-function buildExportSlotEntries(
-  hallConfigs: Record<HallId, HallConfig>,
+export type ExportCellBase = {
+  type: "block" | "item_frame" | "container";
+  x: number;
+  z: number;
+};
+
+export type BlockExportCell = ExportCellBase & {
+  type: "block";
+  blockState: string;
+};
+
+export type ItemFrameExportCell = ExportCellBase & {
+  type: "item_frame";
+  itemId: string;
+};
+
+export type ContainerExportCell = ExportCellBase & {
+  type: "container";
+  items: { slot: number; itemId: string; count: number }[];
+  blockState: string;
+};
+
+export type ExportCell = BlockExportCell | ItemFrameExportCell | ContainerExportCell;
+
+export function buildExportCellsForLayout(
   slotAssignments: Record<string, string>,
   itemById: Map<string, CatalogItem>,
-): ExportSlotEntry[] {
-  const slotCenters = buildSlotCenters(hallConfigs);
-  const raw: Array<{
-    slotId: string;
-    itemId: string;
-    xKey: number;
-    yKey: number;
-    isBlock: boolean;
-  }> = [];
+  hallConfigs: Record<HallId, HallConfig>,
+  mode: LayoutExportMode = "containers",
+): ExportCell[] {
+  const output: ExportCell[] = [];
 
-  for (const [slotId, itemId] of Object.entries(slotAssignments)) {
-    if (!itemId) {
+  // first, measure each hall
+  const hallDimensions = Object.fromEntries(
+    Object.entries(hallConfigs).map(([hallId, config]) => [
+      hallId,
+      measureHallDimensions(config),
+    ] as const),
+  );
+
+  // calculate overall size for each direction
+  let northSize = -2;
+  let southSize = -2;
+  let westSize = -2;
+  let eastSize = -2;
+
+  for (const [hallId, config] of Object.entries(hallConfigs)) {
+    const dimensions = hallDimensions[hallId];
+    const direction = config.direction;
+    switch (direction) {
+      case "north":
+        northSize += dimensions.totalSize + 2; // add spacing between halls
+        break;
+      case "south":
+        southSize += dimensions.totalSize + 2;
+        break;
+      case "west":
+        westSize += dimensions.totalSize + 2;
+        break;
+      case "east":
+        eastSize += dimensions.totalSize + 2;
+        break;
+    }
+  }
+
+  // Calculate max size for vertical and horizontal
+  const maxVerticalSize = Math.max(northSize, southSize); // remove spacing after last hall
+  const maxHorizontalSize = Math.max(westSize, eastSize);
+
+  const halfVertical = Math.floor(maxVerticalSize / 2);
+  const halfHorizontal = Math.floor(maxHorizontalSize / 2);
+
+  // Calculate starting coordinates for each hall based on its direction and the max sizes
+  const hallCoordinates: Record<HallId, { x: number; z: number }> = {};
+
+  // first start with horizontal halls
+  const westHallsDimensions = Object.entries(hallConfigs)    .filter(([_, config]) => config.direction === "west")
+    .map(([hallId]) => [parseInt(hallId), hallDimensions[hallId]] as const);
+  const eastHallsDimensions = Object.entries(hallConfigs)
+    .filter(([_, config]) => config.direction === "east")
+    .map(([hallId]) => [parseInt(hallId), hallDimensions[hallId]] as const);
+
+  // top is north here
+  const topOffset = Math.max(westHallsDimensions[0]?.[1].rightSize ?? 0, eastHallsDimensions[0]?.[1].leftSize ?? 0);
+  
+  // bottom is south here
+  const bottomOffset = Math.max(westHallsDimensions[westHallsDimensions.length - 1]?.[1].leftSize ?? 0, eastHallsDimensions[eastHallsDimensions.length - 1]?.[1].rightSize ?? 0);
+  
+  // west halls
+  for (let i = 0; i < westHallsDimensions.length; i++) {
+    const [hallId] = westHallsDimensions[i];
+
+    const isNorth = i === 0;
+    hallCoordinates[hallId] = {
+      x: halfHorizontal - maxHorizontalSize + 1, // start from the left edge
+      z: isNorth ? (halfVertical - maxVerticalSize + topOffset + 1) : (halfVertical + bottomOffset + 1), // start from the top edge
+    };
+  }
+
+  // east halls
+  for (let i = 0; i < eastHallsDimensions.length; i++) {
+    const [hallId] = eastHallsDimensions[i];
+    const isNorth = i === 0;
+    hallCoordinates[hallId] = {
+      x: halfHorizontal + 1, // start from the right edge
+      z: isNorth ? (halfVertical - maxVerticalSize + topOffset + 1) : (halfVertical + bottomOffset + 1), // start from the top edge
+    };
+  }
+
+  // vertical halls
+  const northHallsDimensions = Object.entries(hallConfigs)
+    .filter(([_, config]) => config.direction === "north")
+    .map(([hallId]) => [parseInt(hallId), hallDimensions[hallId]] as const);
+  const southHallsDimensions = Object.entries(hallConfigs)
+    .filter(([_, config]) => config.direction === "south")
+    .map(([hallId]) => [parseInt(hallId), hallDimensions[hallId]] as const);
+
+  // left is west here
+  const leftOffset = Math.max(northHallsDimensions[0]?.[1].leftSize ?? 0, southHallsDimensions[0]?.[1].rightSize ?? 0);
+  const rightOffset = Math.max(northHallsDimensions[northHallsDimensions.length - 1]?.[1].rightSize ?? 0, southHallsDimensions[southHallsDimensions.length - 1]?.[1].leftSize ?? 0);
+
+
+  // north halls
+  for (let i = 0; i < northHallsDimensions.length; i++) {
+    const [hallId] = northHallsDimensions[i];
+    const isWest = i === 0;
+    hallCoordinates[hallId] = {
+      x: isWest ? (halfHorizontal - maxHorizontalSize + leftOffset + 1) : (halfHorizontal + rightOffset + 1), // start from the left edge
+      z: halfVertical - maxVerticalSize + 1, // start from the top edge
+    };
+  }
+
+  // south halls
+  for (let i = 0; i < southHallsDimensions.length; i++) {
+    const [hallId] = southHallsDimensions[i];
+    const isWest = i === 0;
+    hallCoordinates[hallId] = {
+      x: isWest ? (halfHorizontal - maxHorizontalSize + leftOffset + 1) : (halfHorizontal + rightOffset + 1), // start from the left edge
+      z: halfVertical + 1, // start from the bottom edge
+    };
+  }
+  
+  // now we have coordinates for each hall, we can place cells relative to those coordinates
+  for (const [hallIdRaw, config] of Object.entries(hallConfigs)) {
+    const hallId = Number(hallIdRaw);
+    const hallCoord = hallCoordinates[hallId];
+    if (!hallCoord) {
       continue;
     }
-    const center = slotCenters.get(slotId);
-    if (!center) {
-      continue;
-    }
-
-    const xKey = Math.round(center.x * 1000);
-    const yKey = Math.round(center.y * 1000);
-    const catalogItem = itemById.get(itemId);
-    const misMetadata = parseMisSlotMetadata(slotId);
-    raw.push({
-      slotId,
-      itemId,
-      xKey,
-      yKey,
-      isBlock: catalogItem?.registration === "block",
-      misGroupKey: misMetadata?.groupKey ?? null,
-      misSlotIndex: misMetadata?.slotIndex ?? null,
+    const hallCells = buildExportCellsForLayoutHall(
+      slotAssignments,
+      itemById,
+      config,
+      hallId,
+      mode,
+    );
+    // first, rotate cells based on hall direction, then translate to hall coordinates
+    const rotatedAndTranslated = hallCells.map((cell) => {
+      let rotatedX = cell.x;
+      let rotatedZ = cell.z;
+      switch (config.direction) {
+        case "north":
+          // -90 deg from east
+          rotatedX = cell.z;
+          rotatedZ = -cell.x;
+          break;
+        case "south":
+          // +90 deg from east
+          rotatedX = -cell.z;
+          rotatedZ = cell.x;
+          break;
+        case "west":
+          // 180 deg from east
+          rotatedX = -cell.x;
+          rotatedZ = -cell.z;
+          break;
+        case "east":
+          // no rotation
+          break;
+      }
+      return {
+        ...cell,
+        x: hallCoord.x + rotatedX,
+        z: hallCoord.z + rotatedZ,
+      };
     });
+
+    // rotate chests as well
+    const rotateDirection = (facing: string, angle: number): string => {
+      const directions = ["north", "east", "south", "west"];
+      const index = directions.indexOf(facing);
+      if (index === -1) {
+        return facing; // unknown direction, return as is
+      }
+      const steps = Math.round(angle / 90) % 4;
+      const newIndex = (index + steps + 4) % 4;
+      return directions[newIndex];
+    };
+
+    rotatedAndTranslated.forEach((cell) => {
+      if (cell.type === "container") {
+        const blockStateParsed = cell.blockState.match(/^minecraft:(\w+)\[facing=(\w+),type=(\w+),waterlogged=(\w+)\]$/);
+        if (blockStateParsed) {
+          const [, blockType, facing, chestType, waterlogged] = blockStateParsed;
+          let newFacing = facing;
+          switch (config.direction) {
+            case "north":
+              newFacing = rotateDirection(facing, -90);
+              break;
+            case "south":
+              newFacing = rotateDirection(facing, 90);
+              break;
+            case "west":
+              newFacing = rotateDirection(facing, 180);
+              break;
+            case "east":
+              // no rotation
+              break;
+          }
+          cell.blockState = `minecraft:${blockType}[facing=${newFacing},type=${chestType},waterlogged=${waterlogged}]`;
+        }
+      }
+    });
+    output.push(...rotatedAndTranslated);
   }
 
-  if (raw.length === 0) {
-    return [];
+  return output;
+}
+
+export function measureHallDimensions(hallConfig: HallConfig): { leftSize: number; rightSize: number, totalSize: number, totalSlices: number } {
+  let leftSize = 0;
+  let rightSize = 0;
+  let totalSlices = 0;
+  for (const section of hallConfig.sections) {
+    if (section.sideLeft.type === "mis") {
+      const widthRemainder = section.slices % section.sideLeft.misWidth;
+      leftSize = Math.max(leftSize, section.sideLeft.rowsPerSlice * (widthRemainder < 2 ? 2 : 1));
+    }
+    if (section.sideRight.type === "mis") {
+      const widthRemainder = section.slices % section.sideRight.misWidth;
+      rightSize = Math.max(rightSize, section.sideRight.rowsPerSlice * (widthRemainder < 2 ? 2 : 1));
+    }
+
+    totalSlices += section.slices + 1; // add 1 for spacing between sections
   }
 
-  // Build the coordinate grid from all planner slots (not only assigned ones)
-  // so empty user gaps remain empty in the exported schematic.
-  const allSlotCenters = Array.from(slotCenters.values());
-  const xKeys = Array.from(new Set(allSlotCenters.map((center) => Math.round(center.x * 1000)))).sort(
-    (a, b) => a - b,
-  );
-  const yKeys = Array.from(new Set(allSlotCenters.map((center) => Math.round(center.y * 1000)))).sort(
-    (a, b) => a - b,
-  );
-  const xIndex = new Map(xKeys.map((value, index) => [value, index]));
-  const yIndex = new Map(yKeys.map((value, index) => [value, index]));
+  totalSlices -= 1; // remove spacing after last section
 
-  const spacing = 1;
+  return {
+    leftSize,
+    rightSize,
+    totalSize: leftSize + rightSize + 1, // add 1 for aisle
+    totalSlices,
+  }
+}
 
-  return raw
-    .map((entry) => ({
-      slotId: entry.slotId,
-      itemId: entry.itemId,
-      isBlock: entry.isBlock,
-      x: (xIndex.get(entry.xKey) ?? 0) * spacing,
-      z: (yIndex.get(entry.yKey) ?? 0) * spacing,
-      misGroupKey: entry.misGroupKey,
-      misSlotIndex: entry.misSlotIndex,
-    }))
-    .sort((a, b) => (a.z === b.z ? a.x - b.x : a.z - b.z));
+export function buildExportCellsForLayoutHall(
+  slotAssignments: Record<string, string>,
+  itemById: Map<string, CatalogItem>,
+  config: HallConfig,
+  hallId: HallId,
+  mode: LayoutExportMode = "containers",
+): ExportCell[] {
+  const output: ExportCell[] = [];
+
+  // we assume we are going to the EAST (positive X)
+  // 
+  // 0,0 is the middle-left side of the hall, where the aisle is
+
+  let sectionStartX = 0;
+  let globalSliceStart = 0;
+  for (let sectionIndex = 0; sectionIndex < config.sections.length; sectionIndex++) {
+    const section = config.sections[sectionIndex];
+    const sliceCount = section.slices;
+
+    const sideLeft = section.sideLeft;
+    const sideRight = section.sideRight;
+
+    applySideToExportCells(
+      output,
+      slotAssignments,
+      itemById,
+      hallId,
+      sideLeft,
+      sectionStartX,
+      globalSliceStart,
+      sliceCount,
+      "left",
+      mode,
+    );
+
+    applySideToExportCells(
+      output,
+      slotAssignments,
+      itemById,
+      hallId,
+      sideRight,
+      sectionStartX,
+      globalSliceStart,
+      sliceCount,
+      "right",
+      mode,
+    );
+
+    sectionStartX += sliceCount + 1; // add 1 block of spacing between sections
+    globalSliceStart += sliceCount;
+  }
+  return output;
+}
+
+export function applySideToExportCells(
+  output: ExportCell[],
+  slotAssignments: Record<string, string>,
+  itemById: Map<string, CatalogItem>,
+  hallId: HallId,
+  sideConfig: HallSideConfig,
+  sectionStartX: number,
+  globalSliceStart: number,
+  numSlices: number,
+  side: "left" | "right",
+  mode: LayoutExportMode = "containers",
+): void {
+  const rows = sideConfig.rowsPerSlice;
+  if (sideConfig.type === "mis") {
+    const slotsPerSlice = sideConfig.misSlotsPerSlice;
+    const misWidth = sideConfig.misWidth;
+    
+    // divide up slices by mis width
+    const sliceGroups = Math.ceil(numSlices / misWidth);
+    for (let misGroup = 0; misGroup < sliceGroups; misGroup++) {
+      const groupStartSlice = misGroup * misWidth;
+      const groupEndSlice = Math.min(groupStartSlice + misWidth, numSlices);
+      const canDoubleChestFit = groupEndSlice - groupStartSlice >= 2;
+      const misSlice = globalSliceStart + groupStartSlice;
+      for (let row = 0; row < rows; row++) {
+
+        const items = [];
+        let greatestSlotIndex = -1;
+        for (let slot = 0; slot < slotsPerSlice; slot++) {
+          const key = misSlotId(hallId, misSlice, side === "left" ? 0 : 1, row, slot);
+          const itemId = slotAssignments[key];
+          if (itemId) {
+            items.push({ slot, itemId, count: 1 });
+            greatestSlotIndex = slot;
+          }
+        }
+
+        if (items.length === 0) {
+          continue;
+        }
+
+        const posX = sectionStartX + groupStartSlice;
+        // north is negative Z
+        const posZ = (side === "left" ?-1 : 1) * (row * (canDoubleChestFit ? 1 : 2) + 1);
+
+        // check if we can use single chest or double chest
+        if (greatestSlotIndex <= 26) { // single chest is possible
+          output.push({
+            type: "container",
+            x: posX,
+            z: posZ,
+            blockState: `minecraft:chest[facing=${side === "left" ? "south" : "north"},type=single,waterlogged=false]`,
+            items,
+          });
+        } else {
+          // double chest
+          const firstItems = items.filter(item => item.slot < 27).map(item => ({ ...item }));
+          const secondItems = items.filter(item => item.slot >= 27).map(item => ({ ...item, slot: item.slot - 27 }));
+
+          // first items is in right block
+
+          if (canDoubleChestFit) {
+            // place double chest facing the right way
+            output.push({
+              type: "container",
+              x: posX,
+              z: posZ,
+              blockState: `minecraft:chest[facing=${side === "left" ? "south" : "north"},type=${side === "left" ? "right" : "left"},waterlogged=false]`,
+              items: side === "left" ? firstItems : secondItems,
+            });
+            output.push({
+              type: "container",
+              x: posX + 1,
+              z: posZ,
+              blockState: `minecraft:chest[facing=${side === "left" ? "south" : "north"},type=${side === "left" ? "left" : "right"},waterlogged=false]`,
+              items: side === "left" ? secondItems : firstItems,
+            });
+          } else {
+            // place facing west
+            const offset = side === "left" ? -1 : 0;
+            output.push({
+              type: "container",
+              x: posX,
+              z: posZ + offset,
+              blockState: `minecraft:chest[facing=west,type=right,waterlogged=false]`,
+              items: firstItems,
+            });
+            output.push({
+              type: "container",
+              x: posX,
+              z: posZ + 1 + offset,
+              blockState: `minecraft:chest[facing=west,type=left,waterlogged=false]`,
+              items: secondItems,
+            });
+          }
+        }
+      }
+    }
+
+    
+  } else if (sideConfig.type === "bulk" || sideConfig.type === "chest") {
+    for (let slice = 0; slice < numSlices; slice++) {
+      const globalSlice = globalSliceStart + slice;
+      for (let row = 0; row < rows; row++) {
+        const posX = sectionStartX + slice;
+        const posZ = (side === "left" ? -1 : 1) * (row + 1);
+        const key = nonMisSlotId(hallId, globalSlice, side === "left" ? 0 : 1, row);
+        const itemId = slotAssignments[key];
+        if (!itemId) {
+          continue;
+        }
+
+        if (mode === "containers") {
+          if (sideConfig.type === "chest") {
+            output.push({
+              type: "container",
+              x: posX,
+              z: posZ,
+              blockState: `minecraft:chest[facing=${side === "left" ? "south" : "north"},type=single,waterlogged=false]`,
+              items: [{ slot: 0, itemId, count: 1 }],
+            });
+          } else {
+            output.push({
+              type: "container",
+              x: posX,
+              z: posZ,
+              blockState: `minecraft:barrel[facing=up]`,
+              items: [{ slot: 0, itemId, count: 1 }],
+            });
+          }
+        } else if (mode === "item_frames") {
+          output.push({
+            type: "item_frame",
+            x: posX,
+            z: posZ,
+            itemId,
+          });
+        } else if (mode === "blocks_and_frames") {
+          const catalogItem = itemById.get(itemId);
+          if (catalogItem?.registration === "block") {
+            output.push({
+              type: "block",
+              x: posX,
+              z: posZ,
+              blockState: toMinecraftId(itemId),
+            });
+          } else {
+            output.push({
+              type: "item_frame",
+              x: posX,
+              z: posZ,
+              itemId,
+            });
+          }
+        } else {
+          throw new Error("Unknown export mode");
+        }
+      }
+    }
+  }
+
 }
