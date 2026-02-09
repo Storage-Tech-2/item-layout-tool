@@ -3,6 +3,7 @@ import type { CatalogItem, HallConfig, HallId, HallSideConfig } from "../types";
 import { misSlotId, nonMisSlotId } from "../utils";
 
 export type LayoutExportMode = "containers" | "item_frames" | "blocks_and_frames";
+export type LayoutViewMode = "storage" | "flat";
 
 export type LayoutExportOption = {
   mode: LayoutExportMode;
@@ -38,6 +39,7 @@ type LayoutLitematicExportInput = {
   hallConfigs: Record<HallId, HallConfig>;
   slotAssignments: Record<string, string>;
   itemById: Map<string, CatalogItem>;
+  layoutViewMode?: LayoutViewMode;
 };
 
 type LayoutLitematicExportResult = {
@@ -98,6 +100,7 @@ export async function exportLayoutAsLitematic(
     input.itemById,
     input.hallConfigs,
     input.mode,
+    input.layoutViewMode ?? "storage",
   );
   if (cells.length === 0) {
     throw new Error("No assigned items found to export.");
@@ -312,7 +315,12 @@ export function buildExportCellsForLayout(
   itemById: Map<string, CatalogItem>,
   hallConfigs: Record<HallId, HallConfig>,
   mode: LayoutExportMode = "containers",
+  viewMode: LayoutViewMode = "storage",
 ): ExportCell[] {
+  if (viewMode === "flat") {
+    return buildExportCellsForFlatLayout(slotAssignments, itemById, hallConfigs, mode);
+  }
+
   const output: ExportCell[] = [];
 
   // first, measure each hall
@@ -520,6 +528,65 @@ export function buildExportCellsForLayout(
       }
     });
     output.push(...rotatedAndTranslated);
+  }
+
+  return output;
+}
+
+function buildExportCellsForFlatLayout(
+  slotAssignments: Record<string, string>,
+  itemById: Map<string, CatalogItem>,
+  hallConfigs: Record<HallId, HallConfig>,
+  mode: LayoutExportMode,
+): ExportCell[] {
+  const output: ExportCell[] = [];
+  const hallIds = Object.keys(hallConfigs)
+    .map((key) => Number(key))
+    .sort((a, b) => a - b);
+
+  const HALL_GAP = 2;
+  let cursorZ = 0;
+
+  for (const hallId of hallIds) {
+    const config = hallConfigs[hallId];
+    if (!config) {
+      continue;
+    }
+
+    const hallCells = buildExportCellsForLayoutHall(
+      slotAssignments,
+      itemById,
+      config,
+      hallId,
+      mode,
+    );
+    if (hallCells.length === 0) {
+      continue;
+    }
+
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let minZ = Number.POSITIVE_INFINITY;
+    let maxZ = Number.NEGATIVE_INFINITY;
+    for (const cell of hallCells) {
+      minX = Math.min(minX, cell.x);
+      maxX = Math.max(maxX, cell.x);
+      minZ = Math.min(minZ, cell.z);
+      maxZ = Math.max(maxZ, cell.z);
+    }
+
+    const offsetX = -minX;
+    const offsetZ = cursorZ - minZ;
+    for (const cell of hallCells) {
+      output.push({
+        ...cell,
+        x: cell.x + offsetX,
+        z: cell.z + offsetZ,
+      });
+    }
+
+    const hallHeight = maxZ - minZ + 1;
+    cursorZ += hallHeight + HALL_GAP;
   }
 
   return output;

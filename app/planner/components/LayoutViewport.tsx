@@ -131,6 +131,7 @@ type LayoutViewportProps = {
   dragPreviewPlacements: PreviewPlacement[];
   selectedSlotIds: Set<string>;
   onSelectionChange: (slotIds: string[]) => void;
+  onViewModeChange?: (mode: LayoutViewMode) => void;
 };
 
 type LayoutViewMode = "storage" | "flat";
@@ -460,6 +461,7 @@ export function LayoutViewport({
   dragPreviewPlacements,
   selectedSlotIds,
   onSelectionChange,
+  onViewModeChange,
 }: LayoutViewportProps) {
   const didInitialFit = useRef(false);
   const panLayerRef = useRef<HTMLDivElement | null>(null);
@@ -573,6 +575,10 @@ export function LayoutViewport({
   const [viewMode, setViewMode] = useState<LayoutViewMode>("storage");
   const [expandedMisTargets, setExpandedMisTargets] = useState<ExpandedMisTarget[]>([]);
   const hallIds = useMemo(() => Object.keys(hallConfigs).map((key) => Number(key)), [hallConfigs]);
+
+  useEffect(() => {
+    onViewModeChange?.(viewMode);
+  }, [onViewModeChange, viewMode]);
 
   const visibleWorldBounds = useMemo<WorldBounds | null>(() => {
     if (zoom <= 0 || viewportSize.width <= 0 || viewportSize.height <= 0) {

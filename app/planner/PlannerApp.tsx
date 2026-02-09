@@ -158,6 +158,7 @@ export function PlannerApp() {
   const [isAutosaveRestoreResolved, setIsAutosaveRestoreResolved] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isExportingLayout, setIsExportingLayout] = useState(false);
+  const [layoutViewMode, setLayoutViewMode] = useState<"storage" | "flat">("storage");
   const openFileInputRef = useRef<HTMLInputElement | null>(null);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
   const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -537,10 +538,15 @@ export function PlannerApp() {
         hallConfigs,
         slotAssignments: activeSlotAssignments,
         itemById,
+        layoutViewMode,
       });
 
       const now = new Date().toISOString().replace(/[:]/g, "-");
-      const layoutFileName = toFilenameSegment(labelNames.layoutName);
+      const resolvedLayoutName =
+        labelNames.layoutName.trim().length > 0 ? labelNames.layoutName : "Untitled Layout";
+      const layoutFileName = toFilenameSegment(resolvedLayoutName);
+      const viewFileName = layoutViewMode === "flat" ? "flat" : "storage";
+      const exportTypeFileName = exported.option.fileSuffix;
       const exportBuffer = exported.bytes.buffer.slice(
         exported.bytes.byteOffset,
         exported.bytes.byteOffset + exported.bytes.byteLength,
@@ -551,7 +557,7 @@ export function PlannerApp() {
       const downloadUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = downloadUrl;
-      anchor.download = `${layoutFileName}-${exported.option.fileSuffix}-${now}.litematic`;
+      anchor.download = `${layoutFileName}-${viewFileName}-${exportTypeFileName}-${now}.litematic`;
       anchor.click();
       URL.revokeObjectURL(downloadUrl);
     } catch (error: unknown) {
@@ -738,6 +744,7 @@ export function PlannerApp() {
             dragPreviewPlacements={dragPreviews}
             selectedSlotIds={selectedSlotIdSet}
             onSelectionChange={setSelectedSlotIds}
+            onViewModeChange={setLayoutViewMode}
           />
         </section>
 
