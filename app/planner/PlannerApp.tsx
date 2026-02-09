@@ -594,7 +594,7 @@ export function PlannerApp() {
     pendingAutosaveRestore?.snapshot.labelNames.layoutName || "Untitled Layout";
 
   return (
-    <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_15%_12%,#fff8e8_0%,rgba(255,248,232,0)_35%),radial-gradient(circle_at_88%_8%,#e2f1ee_0%,rgba(226,241,238,0)_30%),linear-gradient(180deg,#f9f4ea_0%,#f2eadd_100%)] text-[#1f1a16] dark:bg-[radial-gradient(circle_at_15%_12%,rgba(108,138,184,0.28)_0%,rgba(108,138,184,0)_35%),radial-gradient(circle_at_88%_8%,rgba(91,159,153,0.2)_0%,rgba(91,159,153,0)_30%),linear-gradient(180deg,#121c29_0%,#0c141f_100%)] dark:text-[#e4ecf7] max-[1200px]:h-auto max-[1200px]:overflow-auto">
+    <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_15%_12%,#fff8e8_0%,rgba(255,248,232,0)_35%),radial-gradient(circle_at_88%_8%,#e2f1ee_0%,rgba(226,241,238,0)_30%),linear-gradient(180deg,#f9f4ea_0%,#f2eadd_100%)] text-[#1f1a16] dark:bg-[radial-gradient(circle_at_15%_12%,rgba(108,138,184,0.28)_0%,rgba(108,138,184,0)_35%),radial-gradient(circle_at_88%_8%,rgba(91,159,153,0.2)_0%,rgba(91,159,153,0)_30%),linear-gradient(180deg,#121c29_0%,#0c141f_100%)] dark:text-[#e4ecf7] max-[1200px]:h-auto max-[1200px]:overflow-auto" data-planner-scroll-shell>
       <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-b-[rgba(114,88,46,0.28)] bg-[linear-gradient(180deg,rgba(255,252,245,0.94)_0%,rgba(249,241,226,0.9)_100%)] px-4 py-[0.55rem] dark:border-b-[rgba(119,143,176,0.4)] dark:bg-[linear-gradient(180deg,rgba(27,39,56,0.95)_0%,rgba(16,26,39,0.94)_100%)]">
         <div className="flex items-center gap-[0.45rem]">
           <a

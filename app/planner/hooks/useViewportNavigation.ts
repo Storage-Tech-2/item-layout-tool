@@ -286,6 +286,15 @@ export function useViewportNavigation(): {
     }
 
     const handleNativeWheel = (event: globalThis.WheelEvent): void => {
+      const scrollShell = element.closest<HTMLElement>("[data-planner-scroll-shell]");
+      const shellCanScrollVertically = Boolean(
+        scrollShell && scrollShell.scrollHeight > scrollShell.clientHeight + 1,
+      );
+      const isZoomIntent = event.ctrlKey || event.metaKey;
+      if (shellCanScrollVertically && !isZoomIntent) {
+        return;
+      }
+
       event.preventDefault();
       event.stopPropagation();
       handleWheelFromViewport(event.clientX, event.clientY, event.deltaY);

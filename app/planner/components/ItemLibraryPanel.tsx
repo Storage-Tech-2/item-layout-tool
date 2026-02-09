@@ -522,7 +522,7 @@ export function ItemLibraryPanel({
       {!isLoadingCatalog && !catalogError ? (
         <div
           ref={listRef}
-          className="relative flex-1 overflow-y-auto overscroll-contain px-[0.8rem] pb-[0.8rem] pt-[0.6rem]"
+          className="relative flex-1 overflow-y-auto overscroll-contain px-[0.8rem] pb-[0.8rem] pt-[0.6rem] max-[1200px]:overscroll-auto"
           onPointerDown={handleListPointerDown}
           onPointerMove={handleListPointerMove}
           onPointerUp={handleListPointerEnd}
