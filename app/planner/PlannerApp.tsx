@@ -37,7 +37,7 @@ import { buildOrderedSlotIds } from "./utils";
 import { withBasePath } from "./base-path";
 
 const TOOLBAR_BUTTON_CLASS =
-  "cursor-pointer rounded-[0.35rem] bg-transparent px-[0.46rem] py-[0.2rem] text-[0.8rem] font-semibold text-[#3b2f22] hover:text-[#241c14] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(122,99,66,0.35)] disabled:cursor-not-allowed disabled:opacity-45";
+  "cursor-pointer rounded-[0.35rem] bg-transparent px-[0.46rem] py-[0.2rem] text-[0.8rem] font-semibold text-[#3b2f22] hover:text-[#241c14] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(122,99,66,0.35)] disabled:cursor-not-allowed disabled:opacity-45 dark:text-[#cad9ef] dark:hover:text-[#eff6ff] dark:focus-visible:ring-[rgba(148,163,184,0.45)]";
 const AUTOSAVE_DEBOUNCE_MS = 800;
 
 function shouldIgnoreHistoryHotkeys(target: EventTarget | null): boolean {
@@ -594,12 +594,12 @@ export function PlannerApp() {
     pendingAutosaveRestore?.snapshot.labelNames.layoutName || "Untitled Layout";
 
   return (
-    <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_15%_12%,#fff8e8_0%,rgba(255,248,232,0)_35%),radial-gradient(circle_at_88%_8%,#e2f1ee_0%,rgba(226,241,238,0)_30%),linear-gradient(180deg,#f9f4ea_0%,#f2eadd_100%)] text-[#1f1a16] max-[1200px]:h-auto max-[1200px]:overflow-auto">
-      <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-b-[rgba(114,88,46,0.28)] bg-[linear-gradient(180deg,rgba(255,252,245,0.94)_0%,rgba(249,241,226,0.9)_100%)] px-4 py-[0.55rem]">
+    <div className="flex h-screen min-h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_15%_12%,#fff8e8_0%,rgba(255,248,232,0)_35%),radial-gradient(circle_at_88%_8%,#e2f1ee_0%,rgba(226,241,238,0)_30%),linear-gradient(180deg,#f9f4ea_0%,#f2eadd_100%)] text-[#1f1a16] dark:bg-[radial-gradient(circle_at_15%_12%,rgba(108,138,184,0.28)_0%,rgba(108,138,184,0)_35%),radial-gradient(circle_at_88%_8%,rgba(91,159,153,0.2)_0%,rgba(91,159,153,0)_30%),linear-gradient(180deg,#121c29_0%,#0c141f_100%)] dark:text-[#e4ecf7] max-[1200px]:h-auto max-[1200px]:overflow-auto">
+      <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-b-[rgba(114,88,46,0.28)] bg-[linear-gradient(180deg,rgba(255,252,245,0.94)_0%,rgba(249,241,226,0.9)_100%)] px-4 py-[0.55rem] dark:border-b-[rgba(119,143,176,0.4)] dark:bg-[linear-gradient(180deg,rgba(27,39,56,0.95)_0%,rgba(16,26,39,0.94)_100%)]">
         <div className="flex items-center gap-[0.45rem]">
           <a
             href="https://storagecatalog.org"
-            className="mr-[0.3rem] flex items-center gap-[0.34rem] rounded-[0.35rem] px-[0.08rem] py-[0.04rem] hover:bg-[rgba(255,255,255,0.42)]"
+            className="mr-[0.3rem] flex items-center gap-[0.34rem] rounded-[0.35rem] px-[0.08rem] py-[0.04rem] hover:bg-[rgba(255,255,255,0.42)] dark:hover:bg-[rgba(89,114,152,0.32)]"
           >
             <Image
               src={withBasePath("/logo.png")}
@@ -609,7 +609,7 @@ export function PlannerApp() {
               className="h-7 w-7 rounded-[0.35rem] object-cover"
               unoptimized
             />
-            <span className="whitespace-nowrap text-[0.94rem] font-bold tracking-[0.015em] text-[#3e301f]">
+            <span className="whitespace-nowrap text-[0.94rem] font-bold tracking-[0.015em] text-[#3e301f] dark:text-[#d7e4f8]">
               Storage Catalog
             </span>
           </a>
@@ -649,16 +649,16 @@ export function PlannerApp() {
               {isExportingLayout ? "Exporting..." : "Export"}
             </button>
             {isExportMenuOpen ? (
-              <div className="absolute left-0 top-[calc(100%+0.35rem)] z-20 min-w-64 rounded-[0.45rem] border border-[rgba(114,88,46,0.3)] bg-[rgba(255,250,242,0.98)] p-1 shadow-[0_10px_22px_rgba(64,48,24,0.18)]">
+              <div className="absolute left-0 top-[calc(100%+0.35rem)] z-20 min-w-64 rounded-[0.45rem] border border-[rgba(114,88,46,0.3)] bg-[rgba(255,250,242,0.98)] p-1 shadow-[0_10px_22px_rgba(64,48,24,0.18)] dark:border-[rgba(111,135,165,0.5)] dark:bg-[rgba(21,31,45,0.98)] dark:shadow-[0_14px_28px_rgba(4,8,16,0.48)]">
                 {LITEMATIC_EXPORT_OPTIONS.map((option) => (
                   <button
                     key={option.mode}
                     type="button"
-                    className="block w-full rounded-[0.35rem] px-2 py-1.5 text-left text-[0.78rem] leading-tight text-[#3b2f22] hover:bg-[rgba(210,184,142,0.2)]"
+                    className="block w-full rounded-[0.35rem] px-2 py-1.5 text-left text-[0.78rem] leading-tight text-[#3b2f22] hover:bg-[rgba(210,184,142,0.2)] dark:text-[#d6e3f5] dark:hover:bg-[rgba(92,124,173,0.28)]"
                     onClick={() => void handleExportLayoutClick(option.mode)}
                   >
                     <span className="block text-[0.8rem] font-semibold">{option.label}</span>
-                    <span className="mt-0.5 block text-[0.72rem] text-[#6d5a3f]">
+                    <span className="mt-0.5 block text-[0.72rem] text-[#6d5a3f] dark:text-[#9fb2ce]">
                       {option.description}
                     </span>
                   </button>
@@ -670,7 +670,7 @@ export function PlannerApp() {
         <div className="justify-self-center">
           <input
             type="text"
-            className="min-w-48 max-w-[44vw] border-0 bg-transparent px-1 py-[0.08rem] text-center text-[1.08rem] font-bold tracking-[0.02em] text-[#4b3a24] placeholder:text-[#8a7a63] focus:outline-none"
+            className="min-w-48 max-w-[44vw] border-0 bg-transparent px-1 py-[0.08rem] text-center text-[1.08rem] font-bold tracking-[0.02em] text-[#4b3a24] placeholder:text-[#8a7a63] focus:outline-none dark:text-[#d9e5f8] dark:placeholder:text-[#90a3be]"
             title="Click to rename layout"
             placeholder="Untitled Layout"
             value={labelNames.layoutName}
@@ -698,7 +698,7 @@ export function PlannerApp() {
       </header>
 
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden max-[1200px]:flex-col">
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r border-r-[rgba(114,88,46,0.24)] max-[1200px]:min-h-[62vh] max-[1200px]:border-r-0 max-[1200px]:border-b max-[1200px]:border-b-[rgba(114,88,46,0.24)]">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r border-r-[rgba(114,88,46,0.24)] dark:border-r-[rgba(119,143,176,0.35)] max-[1200px]:min-h-[62vh] max-[1200px]:border-r-0 max-[1200px]:border-b max-[1200px]:border-b-[rgba(114,88,46,0.24)] dark:max-[1200px]:border-b-[rgba(119,143,176,0.35)]">
           <LayoutViewport
             storageLayoutPreset={storageLayoutPreset}
             onStorageLayoutPresetChange={applyPresetChange}
@@ -766,24 +766,24 @@ export function PlannerApp() {
 
       {pendingAutosaveRestore ? (
         <div className="fixed inset-0 z-70 grid place-items-center bg-[rgba(19,15,10,0.45)] px-4">
-          <div className="w-full max-w-md rounded-[0.9rem] border border-[rgba(126,101,67,0.46)] bg-[linear-gradient(180deg,rgba(255,252,244,0.98)_0%,rgba(247,236,217,0.98)_100%)] p-4 shadow-[0_16px_42px_rgba(23,19,13,0.35)]">
-            <h3 className="m-0 text-[1rem] font-bold text-[#3b3126]">
-              Restore <span className="font-extrabold text-[#2f251b]">{autosaveLayoutName}</span>?
+          <div className="w-full max-w-md rounded-[0.9rem] border border-[rgba(126,101,67,0.46)] bg-[linear-gradient(180deg,rgba(255,252,244,0.98)_0%,rgba(247,236,217,0.98)_100%)] p-4 shadow-[0_16px_42px_rgba(23,19,13,0.35)] dark:border-[rgba(116,142,178,0.52)] dark:bg-[linear-gradient(180deg,rgba(23,35,53,0.98)_0%,rgba(15,25,38,0.98)_100%)] dark:shadow-[0_20px_46px_rgba(4,8,14,0.52)]">
+            <h3 className="m-0 text-[1rem] font-bold text-[#3b3126] dark:text-[#dbe6f7]">
+              Restore <span className="font-extrabold text-[#2f251b] dark:text-[#eef4ff]">{autosaveLayoutName}</span>?
             </h3>
-            <p className="mt-1 text-[0.84rem] leading-[1.35] text-[#5f5446]">
+            <p className="mt-1 text-[0.84rem] leading-[1.35] text-[#5f5446] dark:text-[#a8b9d1]">
               A local autosave from{" "}
-              <span className="font-semibold text-[#3b2f22]">
+              <span className="font-semibold text-[#3b2f22] dark:text-[#d8e4f6]">
                 {formatAutosaveTimestamp(pendingAutosaveRestore.savedAt)}
               </span>{" "}
               was found.
             </p>
-            <p className="mt-1 text-[0.78rem] text-[#6c5f4e]">
+            <p className="mt-1 text-[0.78rem] text-[#6c5f4e] dark:text-[#8fa4c1]">
               Restore the autosaved layout and history?
             </p>
             <div className="mt-3 flex items-center justify-end gap-2">
               <button
                 type="button"
-                className="rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.88)] px-3 py-[0.34rem] text-[0.78rem] font-semibold text-[#3b2f22]"
+                className="rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.88)] px-3 py-[0.34rem] text-[0.78rem] font-semibold text-[#3b2f22] dark:border-[rgba(115,136,165,0.55)] dark:bg-[rgba(28,42,61,0.95)] dark:text-[#d5e3f8]"
                 onClick={() => {
                   void handleDiscardAutosaveClick();
                 }}
@@ -792,7 +792,7 @@ export function PlannerApp() {
               </button>
               <button
                 type="button"
-                className="rounded-[0.45rem] border border-[rgba(61,116,87,0.52)] bg-[rgba(231,250,238,0.95)] px-3 py-[0.34rem] text-[0.78rem] font-semibold text-[#204b35]"
+                className="rounded-[0.45rem] border border-[rgba(61,116,87,0.52)] bg-[rgba(231,250,238,0.95)] px-3 py-[0.34rem] text-[0.78rem] font-semibold text-[#204b35] dark:border-[rgba(79,157,139,0.62)] dark:bg-[rgba(28,73,66,0.92)] dark:text-[#bcefe4]"
                 onClick={handleRestoreAutosaveClick}
               >
                 Restore
@@ -804,30 +804,30 @@ export function PlannerApp() {
 
       {pendingLayoutChange ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[rgba(27,22,16,0.42)] px-4">
-          <div className="w-full max-w-md rounded-[0.9rem] border border-[rgba(137,107,67,0.45)] bg-[linear-gradient(180deg,rgba(255,251,241,0.98)_0%,rgba(248,238,220,0.98)_100%)] p-4 shadow-[0_16px_42px_rgba(23,19,13,0.34)]">
-            <h3 className="m-0 text-[1rem] font-bold text-[#3b3126]">Confirm Layout Change</h3>
-            <p className="mt-2 text-[0.85rem] leading-[1.35] text-[#5f5446]">
+          <div className="w-full max-w-md rounded-[0.9rem] border border-[rgba(137,107,67,0.45)] bg-[linear-gradient(180deg,rgba(255,251,241,0.98)_0%,rgba(248,238,220,0.98)_100%)] p-4 shadow-[0_16px_42px_rgba(23,19,13,0.34)] dark:border-[rgba(116,142,178,0.52)] dark:bg-[linear-gradient(180deg,rgba(23,35,53,0.98)_0%,rgba(15,25,38,0.98)_100%)] dark:shadow-[0_20px_46px_rgba(4,8,14,0.52)]">
+            <h3 className="m-0 text-[1rem] font-bold text-[#3b3126] dark:text-[#dbe6f7]">Confirm Layout Change</h3>
+            <p className="mt-2 text-[0.85rem] leading-[1.35] text-[#5f5446] dark:text-[#a8b9d1]">
               Switching to this layout will remove{" "}
-              <span className="font-semibold text-[#8a2f22]">
+              <span className="font-semibold text-[#8a2f22] dark:text-[#ff9f9f]">
                 {pendingLayoutChange.removedCount}
               </span>{" "}
               placed item{pendingLayoutChange.removedCount === 1 ? "" : "s"} because the new
               layout has fewer slots.
             </p>
-            <p className="mt-1 text-[0.78rem] text-[#6c5f4e]">
+            <p className="mt-1 text-[0.78rem] text-[#6c5f4e] dark:text-[#8fa4c1]">
               Do you want to continue?
             </p>
             <div className="mt-3 flex items-center justify-end gap-2">
               <button
                 type="button"
-                className="rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.88)] px-3 py-[0.34rem] text-[0.78rem] font-semibold text-[#3b2f22]"
+                className="rounded-[0.45rem] border border-[rgba(122,99,66,0.45)] bg-[rgba(255,255,255,0.88)] px-3 py-[0.34rem] text-[0.78rem] font-semibold text-[#3b2f22] dark:border-[rgba(115,136,165,0.55)] dark:bg-[rgba(28,42,61,0.95)] dark:text-[#d5e3f8]"
                 onClick={() => setPendingLayoutChange(null)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="rounded-[0.45rem] border border-[rgba(156,55,42,0.52)] bg-[rgba(255,235,231,0.95)] px-3 py-[0.34rem] text-[0.78rem] font-semibold text-[#7c2217]"
+                className="rounded-[0.45rem] border border-[rgba(156,55,42,0.52)] bg-[rgba(255,235,231,0.95)] px-3 py-[0.34rem] text-[0.78rem] font-semibold text-[#7c2217] dark:border-[rgba(200,111,111,0.6)] dark:bg-[rgba(92,37,37,0.9)] dark:text-[#ffd9d9]"
                 onClick={confirmPendingLayoutChange}
               >
                 Continue

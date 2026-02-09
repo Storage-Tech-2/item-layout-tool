@@ -178,48 +178,48 @@ type SectionVisualTheme = {
 const VISIBILITY_OVERSCAN = 80;
 const LAYOUT_HINT_DISMISSED_STORAGE_KEY = "planner:layout-hint-dismissed";
 const SECTION_DIVIDER_CLASS_NAME =
-  "bg-[rgba(104,84,58,0.62)] shadow-[0_0_0_1px_rgba(255,243,221,0.68)]";
+  "bg-[rgba(104,84,58,0.62)] shadow-[0_0_0_1px_rgba(255,243,221,0.68)] dark:bg-[rgba(116,140,177,0.58)] dark:shadow-[0_0_0_1px_rgba(35,49,72,0.7)]";
 
 const SECTION_VISUAL_THEMES: SectionVisualTheme[] = [
   {
     areaClassName:
-      "border-[rgba(157,114,56,0.26)] bg-[linear-gradient(180deg,rgba(255,229,185,0.28)_0%,rgba(255,247,230,0.05)_100%)]",
+      "border-[rgba(157,114,56,0.26)] bg-[linear-gradient(180deg,rgba(255,229,185,0.28)_0%,rgba(255,247,230,0.05)_100%)] dark:border-[rgba(186,136,74,0.35)] dark:bg-[linear-gradient(180deg,rgba(113,82,43,0.35)_0%,rgba(37,28,19,0.22)_100%)]",
     labelClassName:
-      "border-[rgba(151,104,48,0.42)] bg-[rgba(255,244,221,0.96)] text-[#5f4423] shadow-[0_1px_3px_rgba(95,68,35,0.2)]",
+      "border-[rgba(151,104,48,0.42)] bg-[rgba(255,244,221,0.96)] text-[#5f4423] shadow-[0_1px_3px_rgba(95,68,35,0.2)] dark:border-[rgba(186,136,74,0.52)] dark:bg-[rgba(83,59,30,0.88)] dark:text-[#ffe8ca] dark:shadow-[0_1px_4px_rgba(10,12,18,0.45)]",
     indexChipClassName:
-      "border-[rgba(151,104,48,0.52)] bg-[rgba(229,185,120,0.35)] text-[#5a3d1d]",
-    titleClassName: "text-[#5a3d1d]",
-    slotTintClassName: "bg-[rgba(199,169,122,0.18)]",
+      "border-[rgba(151,104,48,0.52)] bg-[rgba(229,185,120,0.35)] text-[#5a3d1d] dark:border-[rgba(196,149,91,0.62)] dark:bg-[rgba(169,123,67,0.38)] dark:text-[#fff0dc]",
+    titleClassName: "text-[#5a3d1d] dark:text-[#ffe8ca]",
+    slotTintClassName: "bg-[rgba(199,169,122,0.18)] dark:bg-[rgba(171,123,67,0.2)]",
   },
   {
     areaClassName:
-      "border-[rgba(43,115,106,0.26)] bg-[linear-gradient(180deg,rgba(188,244,226,0.26)_0%,rgba(234,251,244,0.05)_100%)]",
+      "border-[rgba(43,115,106,0.26)] bg-[linear-gradient(180deg,rgba(188,244,226,0.26)_0%,rgba(234,251,244,0.05)_100%)] dark:border-[rgba(60,140,132,0.35)] dark:bg-[linear-gradient(180deg,rgba(27,83,78,0.34)_0%,rgba(16,43,43,0.22)_100%)]",
     labelClassName:
-      "border-[rgba(33,121,109,0.42)] bg-[rgba(233,253,246,0.95)] text-[#1e5a53] shadow-[0_1px_3px_rgba(31,86,79,0.2)]",
+      "border-[rgba(33,121,109,0.42)] bg-[rgba(233,253,246,0.95)] text-[#1e5a53] shadow-[0_1px_3px_rgba(31,86,79,0.2)] dark:border-[rgba(73,169,157,0.52)] dark:bg-[rgba(21,67,64,0.88)] dark:text-[#c8f6ea] dark:shadow-[0_1px_4px_rgba(10,12,18,0.45)]",
     indexChipClassName:
-      "border-[rgba(33,121,109,0.52)] bg-[rgba(129,225,196,0.34)] text-[#1a5149]",
-    titleClassName: "text-[#1d564f]",
-    slotTintClassName: "bg-[rgba(82,189,158,0.2)]",
+      "border-[rgba(33,121,109,0.52)] bg-[rgba(129,225,196,0.34)] text-[#1a5149] dark:border-[rgba(83,173,153,0.62)] dark:bg-[rgba(52,126,113,0.4)] dark:text-[#dcfff6]",
+    titleClassName: "text-[#1d564f] dark:text-[#c8f6ea]",
+    slotTintClassName: "bg-[rgba(82,189,158,0.2)] dark:bg-[rgba(52,126,113,0.24)]",
   },
   {
     areaClassName:
-      "border-[rgba(52,92,148,0.26)] bg-[linear-gradient(180deg,rgba(196,221,255,0.24)_0%,rgba(240,247,255,0.05)_100%)]",
+      "border-[rgba(52,92,148,0.26)] bg-[linear-gradient(180deg,rgba(196,221,255,0.24)_0%,rgba(240,247,255,0.05)_100%)] dark:border-[rgba(94,129,184,0.35)] dark:bg-[linear-gradient(180deg,rgba(35,59,96,0.34)_0%,rgba(16,28,50,0.22)_100%)]",
     labelClassName:
-      "border-[rgba(58,99,159,0.42)] bg-[rgba(236,244,255,0.95)] text-[#274878] shadow-[0_1px_3px_rgba(39,72,120,0.2)]",
+      "border-[rgba(58,99,159,0.42)] bg-[rgba(236,244,255,0.95)] text-[#274878] shadow-[0_1px_3px_rgba(39,72,120,0.2)] dark:border-[rgba(106,143,206,0.52)] dark:bg-[rgba(25,44,74,0.88)] dark:text-[#cfe3ff] dark:shadow-[0_1px_4px_rgba(10,12,18,0.45)]",
     indexChipClassName:
-      "border-[rgba(58,99,159,0.52)] bg-[rgba(156,192,241,0.34)] text-[#203f6a]",
-    titleClassName: "text-[#234472]",
-    slotTintClassName: "bg-[rgba(115,156,222,0.2)]",
+      "border-[rgba(58,99,159,0.52)] bg-[rgba(156,192,241,0.34)] text-[#203f6a] dark:border-[rgba(114,149,206,0.62)] dark:bg-[rgba(70,103,156,0.4)] dark:text-[#e1edff]",
+    titleClassName: "text-[#234472] dark:text-[#cfe3ff]",
+    slotTintClassName: "bg-[rgba(115,156,222,0.2)] dark:bg-[rgba(70,103,156,0.24)]",
   },
   {
     areaClassName:
-      "border-[rgba(93,111,57,0.24)] bg-[linear-gradient(180deg,rgba(214,236,182,0.22)_0%,rgba(246,251,236,0.05)_100%)]",
+      "border-[rgba(93,111,57,0.24)] bg-[linear-gradient(180deg,rgba(214,236,182,0.22)_0%,rgba(246,251,236,0.05)_100%)] dark:border-[rgba(117,142,77,0.35)] dark:bg-[linear-gradient(180deg,rgba(58,81,39,0.35)_0%,rgba(24,34,20,0.22)_100%)]",
     labelClassName:
-      "border-[rgba(95,129,60,0.42)] bg-[rgba(245,252,232,0.95)] text-[#41592a] shadow-[0_1px_3px_rgba(65,89,42,0.18)]",
+      "border-[rgba(95,129,60,0.42)] bg-[rgba(245,252,232,0.95)] text-[#41592a] shadow-[0_1px_3px_rgba(65,89,42,0.18)] dark:border-[rgba(138,171,90,0.52)] dark:bg-[rgba(43,61,31,0.88)] dark:text-[#e0f2cc] dark:shadow-[0_1px_4px_rgba(10,12,18,0.45)]",
     indexChipClassName:
-      "border-[rgba(95,129,60,0.5)] bg-[rgba(184,220,136,0.32)] text-[#385024]",
-    titleClassName: "text-[#3e5628]",
-    slotTintClassName: "bg-[rgba(156,196,96,0.18)]",
+      "border-[rgba(95,129,60,0.5)] bg-[rgba(184,220,136,0.32)] text-[#385024] dark:border-[rgba(150,185,103,0.62)] dark:bg-[rgba(94,126,64,0.36)] dark:text-[#f0ffe0]",
+    titleClassName: "text-[#3e5628] dark:text-[#e0f2cc]",
+    slotTintClassName: "bg-[rgba(156,196,96,0.18)] dark:bg-[rgba(94,126,64,0.24)]",
   },
 ];
 
@@ -600,7 +600,7 @@ export function LayoutViewport({
   const viewportBackgroundStyle = useMemo(
     () => ({
       backgroundImage:
-        "linear-gradient(90deg, rgba(124, 98, 61, 0.12) 1px, transparent 1px), linear-gradient(rgba(124, 98, 61, 0.12) 1px, transparent 1px), radial-gradient(circle at 20% 16%, rgba(255, 251, 240, 0.75) 0%, rgba(255, 251, 240, 0) 40%), #f6eddf",
+        "linear-gradient(90deg, var(--planner-stage-grid-line) 1px, transparent 1px), linear-gradient(var(--planner-stage-grid-line) 1px, transparent 1px), radial-gradient(circle at 20% 16%, var(--planner-stage-radial) 0%, transparent 40%), var(--planner-stage-bg)",
       backgroundSize: "24px 24px, 24px 24px, auto, auto",
     }),
     [],
@@ -1009,11 +1009,11 @@ export function LayoutViewport({
         key={slotId}
         type="button"
         className={`relative z-0 grid h-8.5 w-8.5 cursor-pointer place-items-center overflow-visible rounded-[0.45rem] border p-0 transition hover:z-20 hover:-translate-y-px ${isSelected
-          ? "hover:shadow-[0_0_0_2px_rgba(37,99,235,0.55)]"
-          : "hover:shadow-[0_3px_8px_rgba(57,47,30,0.22)]"
+          ? "hover:shadow-[0_0_0_2px_rgba(37,99,235,0.55)] dark:hover:shadow-[0_0_0_2px_rgba(96,165,250,0.6)]"
+          : "hover:shadow-[0_3px_8px_rgba(57,47,30,0.22)] dark:hover:shadow-[0_3px_10px_rgba(5,8,16,0.5)]"
           } ${assignedItem
-            ? "border-[rgba(40,102,110,0.62)] bg-[linear-gradient(145deg,rgba(237,253,249,0.95)_0%,rgba(205,235,226,0.95)_100%)]"
-            : "border-[rgba(108,89,62,0.35)] bg-[linear-gradient(145deg,rgba(245,233,216,0.95)_0%,rgba(231,212,184,0.95)_100%)]"
+            ? "border-[rgba(40,102,110,0.62)] bg-[linear-gradient(145deg,rgba(237,253,249,0.95)_0%,rgba(205,235,226,0.95)_100%)] dark:border-[rgba(83,173,153,0.62)] dark:bg-[linear-gradient(145deg,rgba(24,72,66,0.95)_0%,rgba(20,55,58,0.95)_100%)]"
+            : "border-[rgba(108,89,62,0.35)] bg-[linear-gradient(145deg,rgba(245,233,216,0.95)_0%,rgba(231,212,184,0.95)_100%)] dark:border-[rgba(107,131,163,0.45)] dark:bg-[linear-gradient(145deg,rgba(38,54,77,0.95)_0%,rgba(27,40,59,0.95)_100%)]"
           } ${isDropTarget
             ? isSwapPreview
               ? "border-[rgba(194,65,12,0.92)] shadow-[0_0_0_2px_rgba(251,146,60,0.45)]"
@@ -1323,10 +1323,10 @@ export function LayoutViewport({
             );
             const misCardSurfaceClass =
               expandedIndex === 0
-                ? "border-[rgba(18,125,87,0.95)] bg-[linear-gradient(180deg,rgba(209,247,229,0.98)_0%,rgba(180,237,213,0.98)_100%)]"
+                ? "border-[rgba(18,125,87,0.95)] bg-[linear-gradient(180deg,rgba(209,247,229,0.98)_0%,rgba(180,237,213,0.98)_100%)] dark:border-[rgba(83,173,153,0.82)] dark:bg-[linear-gradient(180deg,rgba(23,72,66,0.96)_0%,rgba(19,59,56,0.96)_100%)]"
                 : expandedIndex === 1
-                  ? "border-[rgba(50,91,168,0.95)] bg-[linear-gradient(180deg,rgba(220,235,255,0.98)_0%,rgba(193,218,250,0.98)_100%)]"
-                  : "border-[rgba(73,97,78,0.45)] bg-[linear-gradient(180deg,rgba(244,250,240,0.95)_0%,rgba(221,235,212,0.95)_100%)]";
+                  ? "border-[rgba(50,91,168,0.95)] bg-[linear-gradient(180deg,rgba(220,235,255,0.98)_0%,rgba(193,218,250,0.98)_100%)] dark:border-[rgba(106,143,206,0.82)] dark:bg-[linear-gradient(180deg,rgba(25,44,74,0.96)_0%,rgba(20,35,60,0.96)_100%)]"
+                  : "border-[rgba(73,97,78,0.45)] bg-[linear-gradient(180deg,rgba(244,250,240,0.95)_0%,rgba(221,235,212,0.95)_100%)] dark:border-[rgba(103,128,161,0.45)] dark:bg-[linear-gradient(180deg,rgba(30,48,66,0.94)_0%,rgba(25,41,58,0.94)_100%)]";
             const misCardPreviewClass = hasPreview
               ? hasSwapPreview
                 ? "shadow-[0_0_0_2px_rgba(251,146,60,0.45)] border-[rgba(194,65,12,0.92)]"
@@ -1387,9 +1387,9 @@ export function LayoutViewport({
                       hallDirections={hallLayout.directions}
                     />
                   ) : null}
-                  <div className="leading-none text-[0.5rem] font-bold tracking-[0.02em] text-[#355039]">
+                  <div className="leading-none text-[0.5rem] font-bold tracking-[0.02em] text-[#355039] dark:text-[#b9e0d4]">
                     <span
-                      className="inline-block min-w-[1.6rem] rounded-[0.18rem] px-[0.06rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none"
+                      className="inline-block min-w-[1.6rem] rounded-[0.18rem] px-[0.06rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none dark:focus:bg-[rgba(31,45,64,0.95)]"
                       contentEditable
                       suppressContentEditableWarning
                       role="textbox"
@@ -1408,7 +1408,7 @@ export function LayoutViewport({
                       }}
                     >{misDisplayName(misTarget, `MIS ${misGroupNumber}`)}</span>
                   </div>
-                  <div className="leading-none text-[0.48rem] font-semibold text-[#33524f]">
+                  <div className="leading-none text-[0.48rem] font-semibold text-[#33524f] dark:text-[#a4cfd1]">
                     {previewEntries.length}/{sideConfig.misSlotsPerSlice}
                   </div>
                   <div
@@ -1426,10 +1426,10 @@ export function LayoutViewport({
                           <div
                             key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${row}-${entry.itemId}-${previewIndex}`}
                             className={`grid h-4 w-4 place-items-center overflow-hidden rounded-[0.2rem] border ${entry.previewKind === "swap"
-                              ? "border-[rgba(194,65,12,0.55)] bg-[rgba(255,233,213,0.92)]"
+                              ? "border-[rgba(194,65,12,0.55)] bg-[rgba(255,233,213,0.92)] dark:border-[rgba(222,139,96,0.7)] dark:bg-[rgba(92,53,31,0.85)]"
                               : entry.previewKind === "place"
-                                ? "border-[rgba(22,132,120,0.55)] bg-[rgba(203,246,236,0.92)]"
-                                : "border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
+                                ? "border-[rgba(22,132,120,0.55)] bg-[rgba(203,246,236,0.92)] dark:border-[rgba(83,173,153,0.7)] dark:bg-[rgba(24,72,66,0.85)]"
+                                : "border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)] dark:border-[rgba(103,128,161,0.45)] dark:bg-[rgba(29,46,67,0.78)]"
                               }`}
                           >
                             <Image
@@ -1495,9 +1495,9 @@ export function LayoutViewport({
                       hallDirections={hallLayout.directions}
                     />
                   ) : null}
-                  <div className="leading-none text-[0.5rem] font-bold tracking-[0.02em] text-[#355039]">
+                  <div className="leading-none text-[0.5rem] font-bold tracking-[0.02em] text-[#355039] dark:text-[#b9e0d4]">
                     <span
-                      className="inline-block min-w-[1.6rem] rounded-[0.18rem] px-[0.06rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none"
+                      className="inline-block min-w-[1.6rem] rounded-[0.18rem] px-[0.06rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none dark:focus:bg-[rgba(31,45,64,0.95)]"
                       contentEditable
                       suppressContentEditableWarning
                       role="textbox"
@@ -1516,7 +1516,7 @@ export function LayoutViewport({
                       }}
                     >{misDisplayName(misTarget, `MIS ${misGroupNumber}`)}</span>
                   </div>
-                  <div className="leading-none text-[0.48rem] font-semibold text-[#33524f]">
+                  <div className="leading-none text-[0.48rem] font-semibold text-[#33524f] dark:text-[#a4cfd1]">
                     {previewEntries.length}/{sideConfig.misSlotsPerSlice}
                   </div>
                   <div
@@ -1534,10 +1534,10 @@ export function LayoutViewport({
                           <div
                             key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${row}-${entry.itemId}-${previewIndex}`}
                             className={`grid h-4 w-4 place-items-center overflow-hidden rounded-[0.2rem] border ${entry.previewKind === "swap"
-                              ? "border-[rgba(194,65,12,0.55)] bg-[rgba(255,233,213,0.92)]"
+                              ? "border-[rgba(194,65,12,0.55)] bg-[rgba(255,233,213,0.92)] dark:border-[rgba(222,139,96,0.7)] dark:bg-[rgba(92,53,31,0.85)]"
                               : entry.previewKind === "place"
-                                ? "border-[rgba(22,132,120,0.55)] bg-[rgba(203,246,236,0.92)]"
-                                : "border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)]"
+                                ? "border-[rgba(22,132,120,0.55)] bg-[rgba(203,246,236,0.92)] dark:border-[rgba(83,173,153,0.7)] dark:bg-[rgba(24,72,66,0.85)]"
+                                : "border-[rgba(56,89,84,0.28)] bg-[rgba(236,249,245,0.8)] dark:border-[rgba(103,128,161,0.45)] dark:bg-[rgba(29,46,67,0.78)]"
                               }`}
                           >
                             <Image
@@ -1601,7 +1601,7 @@ export function LayoutViewport({
       <>
         {orientation === "horizontal" ? (
           <div
-            className="absolute left-0 right-0 rounded-[99px] bg-[linear-gradient(180deg,rgba(45,119,127,0.18)_0%,rgba(45,119,127,0.08)_100%)]"
+            className="absolute left-0 right-0 rounded-[99px] bg-[linear-gradient(180deg,rgba(45,119,127,0.18)_0%,rgba(45,119,127,0.08)_100%)] dark:bg-[linear-gradient(180deg,rgba(84,137,185,0.24)_0%,rgba(84,137,185,0.12)_100%)]"
             style={{
               top: crossAxisStartDepth,
               height: Math.max(8, hallHeight - crossAxisStartDepth - crossAxisEndDepth),
@@ -1609,7 +1609,7 @@ export function LayoutViewport({
           />
         ) : (
           <div
-            className="absolute top-0 bottom-0 rounded-[99px] bg-[linear-gradient(180deg,rgba(45,119,127,0.18)_0%,rgba(45,119,127,0.08)_100%)]"
+            className="absolute top-0 bottom-0 rounded-[99px] bg-[linear-gradient(180deg,rgba(45,119,127,0.18)_0%,rgba(45,119,127,0.08)_100%)] dark:bg-[linear-gradient(180deg,rgba(84,137,185,0.24)_0%,rgba(84,137,185,0.12)_100%)]"
             style={{
               left: crossAxisStartDepth,
               width: Math.max(8, hallWidth - crossAxisStartDepth - crossAxisEndDepth),
@@ -1657,7 +1657,7 @@ export function LayoutViewport({
                     {section.sectionIndex + 1}
                   </span>
                   <span
-                    className={`inline-block min-w-[2.1rem] whitespace-nowrap rounded-[0.2rem] px-[0.1rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none ${theme.titleClassName}`}
+                    className={`inline-block min-w-[2.1rem] whitespace-nowrap rounded-[0.2rem] px-[0.1rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none dark:focus:bg-[rgba(31,45,64,0.95)] ${theme.titleClassName}`}
                     contentEditable
                     suppressContentEditableWarning
                     role="textbox"
@@ -1709,7 +1709,7 @@ export function LayoutViewport({
                   {section.sectionIndex + 1}
                 </span>
                 <span
-                  className={`inline-block min-w-[2.1rem] whitespace-nowrap rounded-[0.2rem] px-[0.1rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none ${theme.titleClassName}`}
+                  className={`inline-block min-w-[2.1rem] whitespace-nowrap rounded-[0.2rem] px-[0.1rem] text-center normal-case focus:bg-[rgba(255,255,255,0.92)] focus:outline-none dark:focus:bg-[rgba(31,45,64,0.95)] ${theme.titleClassName}`}
                   contentEditable
                   suppressContentEditableWarning
                   role="textbox"
@@ -1867,7 +1867,7 @@ export function LayoutViewport({
       {isHintBoxVisible ? (
         <button
           type="button"
-          className="absolute bottom-4 left-4 z-20 grid cursor-pointer gap-[0.1rem] rounded-[0.55rem] border border-[rgba(134,105,67,0.35)] bg-[rgba(255,252,245,0.92)] px-[0.55rem] py-[0.45rem] text-left text-[0.72rem] leading-[1.3] text-[#6d6256]"
+          className="absolute bottom-4 left-4 z-20 grid cursor-pointer gap-[0.1rem] rounded-[0.55rem] border border-[rgba(134,105,67,0.35)] bg-[rgba(255,252,245,0.92)] px-[0.55rem] py-[0.45rem] text-left text-[0.72rem] leading-[1.3] text-[#6d6256] dark:border-[rgba(112,136,167,0.5)] dark:bg-[rgba(22,34,50,0.92)] dark:text-[#9eb3d1]"
           data-no-pan
           title="Click to dismiss tips"
           onClick={(event) => {
@@ -1888,33 +1888,33 @@ export function LayoutViewport({
       ) : null}
 
       <div className="absolute left-4 top-4 z-20 grid gap-[0.45rem]" data-no-pan>
-        <div className="grid gap-[0.28rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem] text-[0.68rem] text-[#4f4639]">
+        <div className="grid gap-[0.28rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem] text-[0.68rem] text-[#4f4639] dark:border-[rgba(112,136,167,0.5)] dark:bg-[rgba(21,33,49,0.9)] dark:text-[#b7c9e2]">
 
-          <div className="font-semibold text-[#3a332b]">
+          <div className="font-semibold text-[#3a332b] dark:text-[#e2edff]">
             Total Types: {layoutSummary.totalTypes}
           </div>
           <div className="grid grid-cols-3 gap-[0.2rem]">
-            <div className="grid justify-items-center rounded-[0.35rem] border border-[rgba(137,107,67,0.28)] bg-[rgba(255,255,255,0.62)] px-[0.2rem] py-[0.14rem] text-center">
+            <div className="grid justify-items-center rounded-[0.35rem] border border-[rgba(137,107,67,0.28)] bg-[rgba(255,255,255,0.62)] px-[0.2rem] py-[0.14rem] text-center dark:border-[rgba(104,128,160,0.45)] dark:bg-[rgba(31,45,64,0.85)]">
               <span>Bulk</span>
-              <span className="font-semibold text-[#2f5f4a]">{layoutSummary.bulkTypes}</span>
+              <span className="font-semibold text-[#2f5f4a] dark:text-[#9fe1cb]">{layoutSummary.bulkTypes}</span>
             </div>
-            <div className="grid justify-items-center rounded-[0.35rem] border border-[rgba(137,107,67,0.28)] bg-[rgba(255,255,255,0.62)] px-[0.2rem] py-[0.14rem] text-center">
+            <div className="grid justify-items-center rounded-[0.35rem] border border-[rgba(137,107,67,0.28)] bg-[rgba(255,255,255,0.62)] px-[0.2rem] py-[0.14rem] text-center dark:border-[rgba(104,128,160,0.45)] dark:bg-[rgba(31,45,64,0.85)]">
               <span>Chest</span>
-              <span className="font-semibold text-[#2f5f4a]">{layoutSummary.chestTypes}</span>
+              <span className="font-semibold text-[#2f5f4a] dark:text-[#9fe1cb]">{layoutSummary.chestTypes}</span>
             </div>
-            <div className="grid justify-items-center rounded-[0.35rem] border border-[rgba(137,107,67,0.28)] bg-[rgba(255,255,255,0.62)] px-[0.2rem] py-[0.14rem] text-center">
+            <div className="grid justify-items-center rounded-[0.35rem] border border-[rgba(137,107,67,0.28)] bg-[rgba(255,255,255,0.62)] px-[0.2rem] py-[0.14rem] text-center dark:border-[rgba(104,128,160,0.45)] dark:bg-[rgba(31,45,64,0.85)]">
               <span>MIS</span>
-              <span className="font-semibold text-[#2f5f4a]">{layoutSummary.misTypes}</span>
+              <span className="font-semibold text-[#2f5f4a] dark:text-[#9fe1cb]">{layoutSummary.misTypes}</span>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-[0.35rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem]">
-          <div className="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-[#5e513f]">
+        <div className="grid gap-[0.35rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem] dark:border-[rgba(112,136,167,0.5)] dark:bg-[rgba(21,33,49,0.9)]">
+          <div className="text-[0.72rem] font-semibold uppercase tracking-[0.04em] text-[#5e513f] dark:text-[#a6b9d5]">
             Layout Options
           </div>
           <select
-            className="min-w-[8.2rem] rounded-[0.42rem] border border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] px-[0.45rem] py-[0.22rem] text-[0.7rem] font-semibold text-[#3b2f22]"
+            className="min-w-[8.2rem] rounded-[0.42rem] border border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] px-[0.45rem] py-[0.22rem] text-[0.7rem] font-semibold text-[#3b2f22] dark:border-[rgba(112,136,167,0.52)] dark:bg-[rgba(31,45,64,0.95)] dark:text-[#d8e4f8]"
             value={storageLayoutPreset}
             onChange={(event) =>
               onStorageLayoutPresetChange(event.target.value as StorageLayoutPreset)
@@ -1930,13 +1930,13 @@ export function LayoutViewport({
 
       <div className="absolute right-4 top-4 z-20 grid justify-items-end gap-[0.45rem]" data-no-pan>
         <div className="grid gap-[0.45rem]">
-          <div className="grid gap-[0.35rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem]">
+          <div className="grid gap-[0.35rem] rounded-[0.65rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.92)] p-[0.45rem] dark:border-[rgba(112,136,167,0.5)] dark:bg-[rgba(21,33,49,0.9)]">
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${viewMode === "storage"
-                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342] dark:border-[rgba(83,173,153,0.65)] dark:bg-[rgba(23,72,66,0.9)] dark:text-[#c2f3e8]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22] dark:border-[rgba(112,136,167,0.52)] dark:bg-[rgba(31,45,64,0.92)] dark:text-[#d4e2f5]"
                   }`}
                 onClick={() => {
                   if (viewMode === "storage") {
@@ -1951,8 +1951,8 @@ export function LayoutViewport({
               <button
                 type="button"
                 className={`rounded-[0.4rem] border px-[0.42rem] py-[0.2rem] text-[0.68rem] font-semibold ${viewMode === "flat"
-                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342] dark:border-[rgba(83,173,153,0.65)] dark:bg-[rgba(23,72,66,0.9)] dark:text-[#c2f3e8]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22] dark:border-[rgba(112,136,167,0.52)] dark:bg-[rgba(31,45,64,0.92)] dark:text-[#d4e2f5]"
                   }`}
                 onClick={() => {
                   if (viewMode === "flat") {
@@ -1974,21 +1974,21 @@ export function LayoutViewport({
         </div>
 
         <div
-          className="w-fit justify-self-end flex items-center gap-[0.45rem] rounded-full border border-[rgba(134,105,67,0.35)] bg-[rgba(255,250,239,0.92)] px-[0.45rem] py-1"
+          className="w-fit justify-self-end flex items-center gap-[0.45rem] rounded-full border border-[rgba(134,105,67,0.35)] bg-[rgba(255,250,239,0.92)] px-[0.45rem] py-1 dark:border-[rgba(112,136,167,0.5)] dark:bg-[rgba(21,33,49,0.9)]"
         >
           <button
             type="button"
-            className="h-[1.6rem] w-[1.6rem] cursor-pointer rounded-full border border-[rgba(132,101,64,0.5)] bg-white text-[1rem] leading-none text-[#2b2b2b]"
+            className="h-[1.6rem] w-[1.6rem] cursor-pointer rounded-full border border-[rgba(132,101,64,0.5)] bg-white text-[1rem] leading-none text-[#2b2b2b] dark:border-[rgba(112,136,167,0.52)] dark:bg-[rgba(31,45,64,0.95)] dark:text-[#d8e4f8]"
             onClick={() => onAdjustZoom(0.2)}
           >
             +
           </button>
-          <span className="min-w-[2.8rem] text-center text-[0.76rem] font-bold text-[#6d6256]">
+          <span className="min-w-[2.8rem] text-center text-[0.76rem] font-bold text-[#6d6256] dark:text-[#a6b9d5]">
             {Math.round(zoom * 100)}%
           </span>
           <button
             type="button"
-            className="h-[1.6rem] w-[1.6rem] cursor-pointer rounded-full border border-[rgba(132,101,64,0.5)] bg-white text-[1rem] leading-none text-[#2b2b2b]"
+            className="h-[1.6rem] w-[1.6rem] cursor-pointer rounded-full border border-[rgba(132,101,64,0.5)] bg-white text-[1rem] leading-none text-[#2b2b2b] dark:border-[rgba(112,136,167,0.52)] dark:bg-[rgba(31,45,64,0.95)] dark:text-[#d8e4f8]"
             onClick={() => onAdjustZoom(-0.2)}
           >
             -
@@ -2030,7 +2030,7 @@ export function LayoutViewport({
         >
           {viewMode === "storage" && hallLayout.core ? (
             <div
-              className="absolute grid place-items-center rounded-[1.1rem] border-2 border-dashed border-[rgba(41,86,92,0.7)] bg-[repeating-linear-gradient(-45deg,rgba(186,225,222,0.45)_0,rgba(186,225,222,0.45)_8px,rgba(210,234,231,0.6)_8px,rgba(210,234,231,0.6)_16px)] text-[0.875rem] font-bold uppercase tracking-[0.08em] text-[#18444c]"
+              className="absolute grid place-items-center rounded-[1.1rem] border-2 border-dashed border-[rgba(41,86,92,0.7)] bg-[repeating-linear-gradient(-45deg,rgba(186,225,222,0.45)_0,rgba(186,225,222,0.45)_8px,rgba(210,234,231,0.6)_8px,rgba(210,234,231,0.6)_16px)] text-[0.875rem] font-bold uppercase tracking-[0.08em] text-[#18444c] dark:border-[rgba(86,148,170,0.72)] dark:bg-[repeating-linear-gradient(-45deg,rgba(41,82,102,0.46)_0,rgba(41,82,102,0.46)_8px,rgba(30,62,84,0.62)_8px,rgba(30,62,84,0.62)_16px)] dark:text-[#cfe9ff]"
               style={{
                 width: `${hallLayout.core.width}px`,
                 height: `${hallLayout.core.height}px`,
@@ -2071,7 +2071,7 @@ export function LayoutViewport({
             return (
               <section
                 key={hallId}
-                className="absolute rounded-[0.85rem] border border-[rgba(72,64,52,0.4)] bg-[rgba(255,250,240,0.8)] shadow-[0_5px_15px_rgba(42,34,20,0.12)]"
+                className="absolute rounded-[0.85rem] border border-[rgba(72,64,52,0.4)] bg-[rgba(255,250,240,0.8)] shadow-[0_5px_15px_rgba(42,34,20,0.12)] dark:border-[rgba(106,128,158,0.52)] dark:bg-[rgba(22,35,53,0.86)] dark:shadow-[0_8px_20px_rgba(5,9,17,0.45)]"
                 data-hall-section
                 style={{
                   left: `${placement.left}px`,
@@ -2122,7 +2122,7 @@ export function LayoutViewport({
 
       {selectionBox ? (
         <div
-          className="pointer-events-none absolute z-40 border border-[rgba(37,99,235,0.9)] bg-[rgba(37,99,235,0.18)]"
+          className="pointer-events-none absolute z-40 border border-[rgba(37,99,235,0.9)] bg-[rgba(37,99,235,0.18)] dark:border-[rgba(96,165,250,0.95)] dark:bg-[rgba(96,165,250,0.22)]"
           style={{
             left: `${selectionBox.left}px`,
             top: `${selectionBox.top}px`,

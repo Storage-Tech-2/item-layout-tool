@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+:root {
+  color-scheme: light;
+  --planner-stage-grid-line: rgba(124, 98, 61, 0.12);
+  --planner-stage-radial: rgba(255, 251, 240, 0.75);
+  --planner-stage-bg: #f6eddf;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -13,4 +20,18 @@ body {
 body {
   color: #1f1a16;
   font-family: "Avenir Next", "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --planner-stage-grid-line: rgba(141, 169, 214, 0.14);
+    --planner-stage-radial: rgba(76, 116, 177, 0.22);
+    --planner-stage-bg: #18212e;
+  }
+
+  body {
+    background: #0d1420;
+    color: #e4ecf7;
+  }
 }

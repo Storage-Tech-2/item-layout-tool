@@ -97,7 +97,7 @@ function highlightMatches(text: string, matcher: SearchMatcher): ReactNode {
     fragments.push(
       <mark
         key={`match-${index}-${range.start}`}
-        className="rounded-[0.2rem] bg-[rgba(255,224,138,0.72)] px-[0.06rem] text-inherit"
+        className="rounded-[0.2rem] bg-[rgba(255,224,138,0.72)] px-[0.06rem] text-inherit dark:bg-[rgba(186,139,61,0.62)]"
       >
         {text.slice(range.start, range.end)}
       </mark>,
@@ -431,21 +431,21 @@ export function ItemLibraryPanel({
 
   return (
     <aside
-      className="flex min-h-0 w-[min(420px,36vw)] min-w-75 max-w-125 flex-col overflow-hidden bg-linear-to-b from-[#fff7e7] to-[#feecd2] max-[1200px]:min-h-[38vh] max-[1200px]:w-full max-[1200px]:min-w-0 max-[1200px]:max-w-none"
+      className="flex min-h-0 w-[min(420px,36vw)] min-w-75 max-w-125 flex-col overflow-hidden bg-linear-to-b from-[#fff7e7] to-[#feecd2] dark:from-[#1a283a] dark:to-[#111b2a] max-[1200px]:min-h-[38vh] max-[1200px]:w-full max-[1200px]:min-w-0 max-[1200px]:max-w-none"
       onDragOver={onLibraryDragOver}
       onDrop={onLibraryDrop}
       data-no-pan
     >
-      <div className="grid gap-[0.4rem] border-b border-b-[rgba(134,106,67,0.3)] px-[0.95rem] pb-[0.9rem] pt-4">
+      <div className="grid gap-[0.4rem] border-b border-b-[rgba(134,106,67,0.3)] px-[0.95rem] pb-[0.9rem] pt-4 dark:border-b-[rgba(113,138,173,0.38)]">
         <div className="flex items-start justify-between gap-[0.45rem]">
-          <h2 className="m-0 text-[1.1rem] tracking-[0.02em]">Item Library</h2>
-          <div className="flex items-center gap-[0.2rem] rounded-[0.55rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.95)] p-[0.2rem]">
+          <h2 className="m-0 text-[1.1rem] tracking-[0.02em] dark:text-[#e2edff]">Item Library</h2>
+          <div className="flex items-center gap-[0.2rem] rounded-[0.55rem] border border-[rgba(121,96,62,0.35)] bg-[rgba(255,250,239,0.95)] p-[0.2rem] dark:border-[rgba(112,136,167,0.5)] dark:bg-[rgba(19,31,47,0.92)]">
             <button
               type="button"
               className={`rounded-[0.36rem] border px-[0.34rem] py-[0.16rem] text-[0.64rem] font-semibold ${
                 fillDirection === "row"
-                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342] dark:border-[rgba(83,173,153,0.65)] dark:bg-[rgba(23,72,66,0.9)] dark:text-[#c2f3e8]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22] dark:border-[rgba(112,136,167,0.52)] dark:bg-[rgba(31,44,62,0.92)] dark:text-[#d4e2f5]"
               }`}
               onClick={() => onFillDirectionChange("row")}
             >
@@ -455,8 +455,8 @@ export function ItemLibraryPanel({
               type="button"
               className={`rounded-[0.36rem] border px-[0.34rem] py-[0.16rem] text-[0.64rem] font-semibold ${
                 fillDirection === "column"
-                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342]"
-                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22]"
+                  ? "border-[rgba(33,114,82,0.58)] bg-[rgba(226,253,239,0.96)] text-[#245342] dark:border-[rgba(83,173,153,0.65)] dark:bg-[rgba(23,72,66,0.9)] dark:text-[#c2f3e8]"
+                  : "border-[rgba(123,98,66,0.48)] bg-[rgba(255,255,255,0.92)] text-[#3b2f22] dark:border-[rgba(112,136,167,0.52)] dark:bg-[rgba(31,44,62,0.92)] dark:text-[#d4e2f5]"
               }`}
               onClick={() => onFillDirectionChange("column")}
             >
@@ -464,21 +464,21 @@ export function ItemLibraryPanel({
             </button>
           </div>
         </div>
-        <p className="m-0 text-[0.78rem] text-[#6d6256]">
+        <p className="m-0 text-[0.78rem] text-[#6d6256] dark:text-[#a6b9d5]">
           {usedItemIds.size} placed / {catalogItems.length} total
         </p>
-        <p className="m-0 mt-[-0.1rem] text-[0.72rem] text-[#4a6a5f]">
+        <p className="m-0 mt-[-0.1rem] text-[0.72rem] text-[#4a6a5f] dark:text-[#89c7b4]">
           Drop a placed layout item here to return it to the list.
         </p>
-        <p className="m-0 mt-[-0.1rem] text-[0.72rem] text-[#4a6a5f]">
+        <p className="m-0 mt-[-0.1rem] text-[0.72rem] text-[#4a6a5f] dark:text-[#89c7b4]">
           Right-click an item to place it at the layout cursor.
         </p>
 
         <label className="grid gap-[0.22rem]">
-          <span className="text-[0.74rem] text-[#6d6256]">Search</span>
+          <span className="text-[0.74rem] text-[#6d6256] dark:text-[#a6b9d5]">Search</span>
           <div className="flex items-center gap-[0.45rem]">
             <input
-              className="min-w-0 flex-1 rounded-[0.45rem] border border-[rgba(127,99,62,0.4)] bg-[#fffdf8] px-2 py-[0.42rem] text-[0.84rem] outline-none"
+              className="min-w-0 flex-1 rounded-[0.45rem] border border-[rgba(127,99,62,0.4)] bg-[#fffdf8] px-2 py-[0.42rem] text-[0.84rem] outline-none dark:border-[rgba(112,136,167,0.5)] dark:bg-[rgba(18,30,47,0.95)] dark:text-[#e2ecfa] dark:placeholder:text-[#879cb9]"
               type="text"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
@@ -486,7 +486,7 @@ export function ItemLibraryPanel({
             />
             <button
               type="button"
-              className="shrink-0 rounded-[0.45rem] border border-[rgba(41,117,90,0.45)] bg-[rgba(234,255,245,0.96)] px-[0.58rem] py-[0.36rem] text-[0.72rem] font-semibold text-[#255344] disabled:cursor-not-allowed disabled:border-[rgba(121,96,62,0.28)] disabled:bg-[rgba(255,255,255,0.85)] disabled:text-[#847564]"
+              className="shrink-0 rounded-[0.45rem] border border-[rgba(41,117,90,0.45)] bg-[rgba(234,255,245,0.96)] px-[0.58rem] py-[0.36rem] text-[0.72rem] font-semibold text-[#255344] disabled:cursor-not-allowed disabled:border-[rgba(121,96,62,0.28)] disabled:bg-[rgba(255,255,255,0.85)] disabled:text-[#847564] dark:border-[rgba(83,173,153,0.58)] dark:bg-[rgba(24,72,66,0.92)] dark:text-[#c2f3e8] dark:disabled:border-[rgba(104,122,147,0.35)] dark:disabled:bg-[rgba(26,37,54,0.85)] dark:disabled:text-[#7f95b3]"
               onClick={() => {
                 const visibleItemIds = visibleItems.map((item) => item.id);
                 const allVisibleSelected = visibleItemIds.every((itemId) =>
@@ -508,13 +508,13 @@ export function ItemLibraryPanel({
       </div>
 
       {isLoadingCatalog ? (
-        <div className="mx-[0.95rem] my-[0.8rem] rounded-[0.6rem] border border-[rgba(122,99,66,0.32)] bg-[rgba(255,252,245,0.85)] px-3 py-[0.65rem] text-[0.84rem] text-[#6d6256]">
+        <div className="mx-[0.95rem] my-[0.8rem] rounded-[0.6rem] border border-[rgba(122,99,66,0.32)] bg-[rgba(255,252,245,0.85)] px-3 py-[0.65rem] text-[0.84rem] text-[#6d6256] dark:border-[rgba(112,136,167,0.45)] dark:bg-[rgba(19,31,47,0.9)] dark:text-[#a6b9d5]">
           Loading item catalog...
         </div>
       ) : null}
 
       {catalogError ? (
-        <div className="mx-[0.95rem] my-[0.8rem] rounded-[0.6rem] border border-[rgba(156,55,42,0.48)] bg-[rgba(255,234,230,0.95)] px-3 py-[0.65rem] text-[0.84rem] text-[#7c2217]">
+        <div className="mx-[0.95rem] my-[0.8rem] rounded-[0.6rem] border border-[rgba(156,55,42,0.48)] bg-[rgba(255,234,230,0.95)] px-3 py-[0.65rem] text-[0.84rem] text-[#7c2217] dark:border-[rgba(200,111,111,0.62)] dark:bg-[rgba(92,37,37,0.88)] dark:text-[#ffd9d9]">
           {catalogError}
         </div>
       ) : null}
@@ -536,7 +536,7 @@ export function ItemLibraryPanel({
         >
           {selectionBox ? (
             <div
-              className="pointer-events-none absolute z-10 rounded-[0.35rem] border border-[rgba(47,118,105,0.68)] bg-[rgba(129,219,199,0.2)]"
+              className="pointer-events-none absolute z-10 rounded-[0.35rem] border border-[rgba(47,118,105,0.68)] bg-[rgba(129,219,199,0.2)] dark:border-[rgba(88,186,172,0.8)] dark:bg-[rgba(84,158,183,0.22)]"
               style={{
                 left: selectionBox.left,
                 top: selectionBox.top,
@@ -567,14 +567,14 @@ export function ItemLibraryPanel({
                         }
                         updateMeasuredHeight(category.id, element.offsetHeight);
                       }}
-                      className={`overflow-hidden rounded-[0.68rem] border border-[rgba(137,107,67,0.35)] bg-[rgba(255,251,241,0.9)] ${
+                      className={`overflow-hidden rounded-[0.68rem] border border-[rgba(137,107,67,0.35)] bg-[rgba(255,251,241,0.9)] dark:border-[rgba(112,136,167,0.5)] dark:bg-[rgba(20,33,49,0.9)] ${
                         !isLastVisible ? "mb-[0.6rem]" : ""
                       }`}
                     >
-                <div className="grid min-h-[2.35rem] grid-cols-[auto_1fr_auto] items-center gap-[0.4rem] border-b border-b-[rgba(145,114,73,0.22)] bg-[rgba(255,245,226,0.98)] px-2 py-2">
+                <div className="grid min-h-[2.35rem] grid-cols-[auto_1fr_auto] items-center gap-[0.4rem] border-b border-b-[rgba(145,114,73,0.22)] bg-[rgba(255,245,226,0.98)] px-2 py-2 dark:border-b-[rgba(107,130,161,0.4)] dark:bg-[rgba(24,39,58,0.95)]">
                   <button
                     type="button"
-                    className="h-[1.4rem] w-[1.4rem] cursor-pointer rounded-[0.32rem] border border-[rgba(114,87,52,0.38)] bg-[#fffcf5] p-0 text-[#4f3c23]"
+                    className="h-[1.4rem] w-[1.4rem] cursor-pointer rounded-[0.32rem] border border-[rgba(114,87,52,0.38)] bg-[#fffcf5] p-0 text-[#4f3c23] dark:border-[rgba(106,128,158,0.5)] dark:bg-[rgba(30,45,66,0.95)] dark:text-[#d0def2]"
                     aria-label={isCollapsed ? "Expand category" : "Collapse category"}
                     onClick={() => {
                       setCollapsedOverrides((current) => ({
@@ -617,17 +617,17 @@ export function ItemLibraryPanel({
                   </button>
 
                   <div className="grid gap-[0.1rem]">
-                    <div className="text-[0.8rem] font-bold text-[#3f3327]">
+                    <div className="text-[0.8rem] font-bold text-[#3f3327] dark:text-[#e2edff]">
                       {categoryLabel}
                     </div>
-                    <div className="text-[0.68rem] text-[#6d6256]">
+                    <div className="text-[0.68rem] text-[#6d6256] dark:text-[#9db2cf]">
                       {category.items.length} available
                     </div>
                   </div>
 
                   <button
                     type="button"
-                    className="cursor-grab rounded-full border border-dashed border-[rgba(114,87,52,0.42)] bg-[#fff7e7] px-[0.36rem] py-[0.14rem] text-[0.66rem] font-bold text-[#5a4934] hover:border-[rgba(40,111,88,0.5)] hover:bg-[#f2fff9]"
+                    className="cursor-grab rounded-full border border-dashed border-[rgba(114,87,52,0.42)] bg-[#fff7e7] px-[0.36rem] py-[0.14rem] text-[0.66rem] font-bold text-[#5a4934] hover:border-[rgba(40,111,88,0.5)] hover:bg-[#f2fff9] dark:border-[rgba(106,128,158,0.55)] dark:bg-[rgba(30,45,66,0.95)] dark:text-[#d0def2] dark:hover:border-[rgba(83,173,153,0.58)] dark:hover:bg-[rgba(26,64,62,0.92)]"
                     draggable={category.items.length > 0}
                     onDragStart={(event) => onCategoryDragStart(event, categoryItemIds)}
                     onDragEnd={onAnyDragEnd}
@@ -643,10 +643,10 @@ export function ItemLibraryPanel({
                       <button
                         key={item.id}
                         type="button"
-                        className={`flex min-h-8 cursor-grab items-center gap-[0.4rem] rounded-lg border px-[0.4rem] py-[0.3rem] text-left text-[#342b21] ${
+                        className={`flex min-h-8 cursor-grab items-center gap-[0.4rem] rounded-lg border px-[0.4rem] py-[0.3rem] text-left text-[#342b21] dark:text-[#dce9fb] ${
                           selectedLibraryItemIds.has(item.id)
-                            ? "border-[rgba(30,117,94,0.62)] bg-[rgba(223,250,240,0.98)]"
-                            : "border-[rgba(116,92,59,0.36)] bg-[rgba(255,253,247,0.95)] hover:border-[rgba(38,109,88,0.5)] hover:bg-[#f0fff8]"
+                            ? "border-[rgba(30,117,94,0.62)] bg-[rgba(223,250,240,0.98)] dark:border-[rgba(84,170,152,0.68)] dark:bg-[rgba(25,75,71,0.88)]"
+                            : "border-[rgba(116,92,59,0.36)] bg-[rgba(255,253,247,0.95)] hover:border-[rgba(38,109,88,0.5)] hover:bg-[#f0fff8] dark:border-[rgba(106,128,158,0.48)] dark:bg-[rgba(27,41,60,0.9)] dark:hover:border-[rgba(83,173,153,0.62)] dark:hover:bg-[rgba(26,64,62,0.92)]"
                         }`}
                         draggable
                         onClick={(event) => {
@@ -735,7 +735,7 @@ export function ItemLibraryPanel({
           ) : null}
 
           {categories.length === 0 ? (
-            <div className="mx-[0.95rem] my-[0.8rem] rounded-[0.6rem] border border-[rgba(122,99,66,0.32)] bg-[rgba(255,252,245,0.85)] px-3 py-[0.65rem] text-[0.84rem] text-[#6d6256]">
+            <div className="mx-[0.95rem] my-[0.8rem] rounded-[0.6rem] border border-[rgba(122,99,66,0.32)] bg-[rgba(255,252,245,0.85)] px-3 py-[0.65rem] text-[0.84rem] text-[#6d6256] dark:border-[rgba(112,136,167,0.45)] dark:bg-[rgba(19,31,47,0.9)] dark:text-[#a6b9d5]">
               No items match your search.
             </div>
           ) : null}
