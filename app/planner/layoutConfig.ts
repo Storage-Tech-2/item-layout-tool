@@ -41,7 +41,7 @@ type HallAnchor = {
     transform: string;
 };
 
-type StorageLayoutDefinition = {
+export type StorageLayoutDefinition = {
     core: HallCore;
 };
 
@@ -412,7 +412,6 @@ function normalizeSide(side: HallSide | HallSideConfig | undefined): HallSideCon
             type: "bulk",
             rowsPerSlice: 1,
             misSlotsPerSlice: 54,
-            misUnitsPerSlice: 1,
             misWidth: 1,
         };
     }
@@ -421,7 +420,6 @@ function normalizeSide(side: HallSide | HallSideConfig | undefined): HallSideCon
         type: side.type,
         rowsPerSlice: side.rowsPerSlice,
         misSlotsPerSlice: side.misSlotsPerSlice ?? 54,
-        misUnitsPerSlice: side.rowsPerSlice ?? 1,
         misWidth,
     };
 }
@@ -438,6 +436,7 @@ export function buildInitialHallConfigs(
         const sections = layoutHall?.sections ?? [];
         result[hallId] = {
             name: layoutHall?.name ?? defaultHallName(hallId),
+            direction: layoutHall?.direction ?? "east",
             sections: sections.map((section) => ({
                 slices: Math.max(1, section.slices),
                 sideLeft: normalizeSide(section.sideLeft),
@@ -525,7 +524,7 @@ export function resolveStorageLayout(
     const hallIds = Object.keys(hallConfigs).map((key) => Number(key));
     for (const hallId of hallIds) {
         const layoutHall = hallsById[hallId];
-        const hallDirection = layoutHall?.direction ?? "east";
+        const hallDirection = hallConfigs[hallId]?.direction ?? layoutHall?.direction ?? "east";
         if (!byDirection.has(hallDirection)) {
             byDirection.set(hallDirection, []);
         }
