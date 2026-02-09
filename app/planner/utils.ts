@@ -271,12 +271,12 @@ export function nonMisSlotId(
 
 export function misSlotId(
   hallId: HallId,
-  slice: number,
+  misSlice: number,
   side: 0 | 1,
-  misUnit: number,
+  row: number,
   index: number,
 ): string {
-  return `${hallId}:m:${slice}:${side}:${misUnit}:${index}`;
+  return `${hallId}:m:${misSlice}:${side}:${row}:${index}`;
 }
 
 export type HallSliceDescriptor = {
@@ -291,7 +291,7 @@ export type HallSliceDescriptor = {
 
 function sideDepthPx(side: HallSideConfig): number {
   if (side.type === "mis") {
-    return side.misUnitsPerSlice * MIS_CROSS + Math.max(0, side.misUnitsPerSlice - 1) * SLOT_GAP;
+    return side.rowsPerSlice * MIS_CROSS + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
   }
   return side.rowsPerSlice * SLOT_SIZE + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
 }
@@ -419,9 +419,9 @@ export function buildOrderedSlotIds(
           continue;
         }
         seenMisSlices.add(misSlice);
-        for (let misUnit = 0; misUnit < sideConfig.misUnitsPerSlice; misUnit += 1) {
+        for (let row = 0; row < sideConfig.rowsPerSlice; row += 1) {
           for (let index = 0; index < sideConfig.misSlotsPerSlice; index += 1) {
-            ordered.push(misSlotId(hallId, misSlice, side, misUnit, index));
+            ordered.push(misSlotId(hallId, misSlice, side, row, index));
           }
         }
       }

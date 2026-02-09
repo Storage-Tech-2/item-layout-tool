@@ -41,7 +41,7 @@ type ParsedMisSlot = {
   hallId: HallId;
   slice: number;
   side: number;
-  misUnit: number;
+  row: number;
   index: number;
 };
 
@@ -90,9 +90,9 @@ function parseSlotId(slotId: string): ParsedSlot | null {
   if (kindRaw === "m") {
     const a = parseIntPart(parts[2]);
     const side = parseIntPart(parts[3]);
-    const misUnit = parseIntPart(parts[4]);
+    const row = parseIntPart(parts[4]);
     const index = parseIntPart(parts[5]);
-    if (a === null || side === null || misUnit === null || index === null) {
+    if (a === null || side === null || row === null || index === null) {
       return null;
     }
     return {
@@ -100,7 +100,7 @@ function parseSlotId(slotId: string): ParsedSlot | null {
       hallId,
       slice: a,
       side,
-      misUnit,
+      row,
       index,
     };
   }
@@ -140,13 +140,13 @@ function projectRepresentationTargetSlotId(
   if (origin.kind === "mis" && source.kind === "mis" && anchor.kind === "mis") {
     const targetSlice = anchor.slice + (source.slice - origin.slice);
     const targetSide = anchor.side + (source.side - origin.side);
-    const targetMisUnit = anchor.misUnit + (source.misUnit - origin.misUnit);
+    const targetMisRow = anchor.row + (source.row - origin.row);
     const targetIndex = anchor.index + (source.index - origin.index);
 
     if (targetSide < 0 || targetSide > 1) {
       return null;
     }
-    return `${anchor.hallId}:m:${targetSlice}:${targetSide}:${targetMisUnit}:${targetIndex}`;
+    return `${anchor.hallId}:m:${targetSlice}:${targetSide}:${targetMisRow}:${targetIndex}`;
   }
 
   return null;
@@ -169,7 +169,7 @@ function findNextEmptyMisSlot(
       candidate.hallId === parsed.hallId &&
       candidate.slice === parsed.slice &&
       candidate.side === parsed.side &&
-      candidate.misUnit === parsed.misUnit
+      candidate.row === parsed.row
     );
   });
 

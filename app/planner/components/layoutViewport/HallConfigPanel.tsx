@@ -30,7 +30,7 @@ type HallConfigPanelProps = {
     side: HallSideKey,
     value: string,
   ) => void;
-  onSectionSideMisUnitsChange: (
+  onSectionSideMisRowsChange: (
     hallId: HallId,
     sectionIndex: number,
     side: HallSideKey,
@@ -56,7 +56,7 @@ export function HallConfigPanel({
   onSectionSideTypeChange,
   onSectionSideRowsChange,
   onSectionSideMisCapacityChange,
-  onSectionSideMisUnitsChange,
+  onSectionSideMisRowsChange,
   onSectionSideMisWidthChange,
 }: HallConfigPanelProps) {
   const renderSideEditor = (
@@ -93,8 +93,8 @@ export function HallConfigPanel({
             className="w-[2.2rem] rounded-sm border border-[rgba(124,96,61,0.45)] bg-white px-[0.1rem] py-[0.05rem] text-[0.56rem]"
             min={1}
             max={8}
-            value={sideConfig.misUnitsPerSlice}
-            onCommit={(value) => onSectionSideMisUnitsChange(hallId, sectionIndex, side, value)}
+            value={sideConfig.rowsPerSlice}
+            onCommit={(value) => onSectionSideMisRowsChange(hallId, sectionIndex, side, value)}
           />
           <span className="text-[0.54rem] font-semibold">W</span>
           <DeferredNumberInput

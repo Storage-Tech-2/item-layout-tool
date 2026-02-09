@@ -17,7 +17,7 @@ type UsePlannerLabelNamesResult = {
     hallId: HallId,
     slice: number,
     side: 0 | 1,
-    misUnit: number,
+    row: number,
     rawName: string,
   ) => void;
 };
@@ -111,10 +111,10 @@ export function usePlannerLabelNames(): UsePlannerLabelNamesResult {
     hallId: HallId,
     slice: number,
     side: 0 | 1,
-    misUnit: number,
+    row: number,
     rawName: string,
   ) => {
-    const key = misNameKey(hallId, slice, side, misUnit);
+    const key = misNameKey(hallId, slice, side, row);
     const trimmed = rawName.trim();
     setLabelNames((current) => {
       if (trimmed.length === 0) {

@@ -38,7 +38,7 @@ type UseLayoutAssignmentsResult = {
   clearLayout: () => void;
   clearDragState: () => void;
   setCursorSlot: (slotId: string) => void;
-  setCursorMisUnit: (hallId: HallId, slice: number, side: 0 | 1, misUnit: number) => void;
+  setCursorMisRow: (hallId: HallId, slice: number, side: 0 | 1, row: number) => void;
   placeLibraryItemAtCursor: (itemId: string) => boolean;
   beginItemDrag: (event: DragEvent<HTMLElement>, itemId: string) => void;
   beginCategoryDrag: (event: DragEvent<HTMLElement>, itemIds: string[]) => void;
@@ -66,11 +66,11 @@ type UseLayoutAssignmentsResult = {
   setSelectedSlotIds: (slotIds: string[]) => void;
 };
 
-type ParsedMisUnit = {
+type ParsedMisRow = {
   hallId: HallId;
   slice: number;
   side: number;
-  misUnit: number;
+  row: number;
 };
 
 export function useLayoutAssignments({
@@ -145,7 +145,7 @@ export function useLayoutAssignments({
     [activeSlotAssignments, orderedSlotIds, selectedSlotIdSet],
   );
 
-  function parseMisUnit(slotId: string): ParsedMisUnit | null {
+  function parseMisRow(slotId: string): ParsedMisRow | null {
     const parsed = parseMisSlotIdValue(slotId);
     if (!parsed) {
       return null;
@@ -154,24 +154,24 @@ export function useLayoutAssignments({
       hallId: parsed.hallId,
       slice: parsed.slice,
       side: parsed.side,
-      misUnit: parsed.misUnit,
+      row: parsed.row,
     };
   }
 
-  function isSameMisUnit(a: ParsedMisUnit, b: ParsedMisUnit): boolean {
+  function isSameMisRow(a: ParsedMisRow, b: ParsedMisRow): boolean {
     return (
       a.hallId === b.hallId &&
       a.slice === b.slice &&
       a.side === b.side &&
-      a.misUnit === b.misUnit
+      a.row === b.row
     );
   }
 
-  function getMisUnitSlotIds(unit: ParsedMisUnit, slotIds: string[]): string[] {
+  function getMisRowSlotIds(unit: ParsedMisRow, slotIds: string[]): string[] {
     return slotIds
       .filter((slotId) => {
-        const parsed = parseMisUnit(slotId);
-        return parsed ? isSameMisUnit(parsed, unit) : false;
+        const parsed = parseMisRow(slotId);
+        return parsed ? isSameMisRow(parsed, unit) : false;
       })
       .sort((a, b) => {
         const ai = Number(a.split(":")[5]);
@@ -234,19 +234,19 @@ export function useLayoutAssignments({
     setCursorSlotId(slotId);
   }
 
-  function setCursorMisUnit(
+  function setCursorMisRow(
     hallId: HallId,
     slice: number,
     side: 0 | 1,
-    misUnit: number,
+    row: number,
   ): void {
-    const targetUnit: ParsedMisUnit = {
+    const targetUnit: ParsedMisRow = {
       hallId,
       slice,
       side,
-      misUnit,
+      row,
     };
-    const unitSlotIds = getMisUnitSlotIds(targetUnit, orderedSlotIds);
+    const unitSlotIds = getMisRowSlotIds(targetUnit, orderedSlotIds);
     if (unitSlotIds.length === 0) {
       return;
     }
@@ -318,14 +318,14 @@ export function useLayoutAssignments({
       return null;
     }
 
-    const sourceUnit = parseMisUnit(payload.originSlotId);
-    const targetUnit = parseMisUnit(anchorSlotId);
-    if (!sourceUnit || !targetUnit || isSameMisUnit(sourceUnit, targetUnit)) {
+    const sourceUnit = parseMisRow(payload.originSlotId);
+    const targetUnit = parseMisRow(anchorSlotId);
+    if (!sourceUnit || !targetUnit || isSameMisRow(sourceUnit, targetUnit)) {
       return null;
     }
 
-    const sourceSlotIds = getMisUnitSlotIds(sourceUnit, orderedSlotIds);
-    const targetSlotIds = getMisUnitSlotIds(targetUnit, orderedSlotIds);
+    const sourceSlotIds = getMisRowSlotIds(sourceUnit, orderedSlotIds);
+    const targetSlotIds = getMisRowSlotIds(targetUnit, orderedSlotIds);
     if (sourceSlotIds.length === 0 || targetSlotIds.length === 0) {
       return null;
     }
@@ -368,19 +368,19 @@ export function useLayoutAssignments({
     return previews;
   }
 
-  function placeMisUnitSwap(anchorSlotId: string, payload: DragPayload): boolean {
+  function placeMisRowSwap(anchorSlotId: string, payload: DragPayload): boolean {
     if (payload.source !== "layout" || !payload.originSlotId) {
       return false;
     }
 
-    const sourceUnit = parseMisUnit(payload.originSlotId);
-    const targetUnit = parseMisUnit(anchorSlotId);
-    if (!sourceUnit || !targetUnit || isSameMisUnit(sourceUnit, targetUnit)) {
+    const sourceUnit = parseMisRow(payload.originSlotId);
+    const targetUnit = parseMisRow(anchorSlotId);
+    if (!sourceUnit || !targetUnit || isSameMisRow(sourceUnit, targetUnit)) {
       return false;
     }
 
-    const sourceSlotIds = getMisUnitSlotIds(sourceUnit, orderedSlotIds);
-    const targetSlotIds = getMisUnitSlotIds(targetUnit, orderedSlotIds);
+    const sourceSlotIds = getMisRowSlotIds(sourceUnit, orderedSlotIds);
+    const targetSlotIds = getMisRowSlotIds(targetUnit, orderedSlotIds);
     if (sourceSlotIds.length === 0 || targetSlotIds.length === 0) {
       return false;
     }
@@ -661,7 +661,7 @@ export function useLayoutAssignments({
       return;
     }
 
-    if (placeMisUnitSwap(anchorSlotId, payload)) {
+    if (placeMisRowSwap(anchorSlotId, payload)) {
       clearDragState();
       return;
     }
@@ -912,7 +912,7 @@ export function useLayoutAssignments({
     clearLayout,
     clearDragState,
     setCursorSlot,
-    setCursorMisUnit,
+    setCursorMisRow,
     placeLibraryItemAtCursor,
     beginItemDrag,
     beginCategoryDrag,

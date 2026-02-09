@@ -1,7 +1,9 @@
 import type { StorageLayoutPreset } from "../layoutConfig";
+import { buildInitialHallConfigs } from "../layoutConfig";
 import type {
   FillDirection,
   HallConfig,
+  HallDirection,
   HallId,
   HallSideConfig,
   HallType,
@@ -12,6 +14,7 @@ import { clamp } from "../utils";
 const STORAGE_LAYOUT_PRESETS: StorageLayoutPreset[] = ["cross", "h", "hcross", "octa"];
 const FILL_DIRECTIONS: FillDirection[] = ["row", "column"];
 const HALL_TYPES: HallType[] = ["bulk", "chest", "mis"];
+const HALL_DIRECTIONS: HallDirection[] = ["north", "east", "south", "west"];
 
 export const SAVE_FILE_VERSION = 1;
 
@@ -68,9 +71,9 @@ export function misNameKey(
   hallId: HallId,
   slice: number,
   side: 0 | 1,
-  misUnit: number,
+  row: number,
 ): string {
-  return `${hallId}:${slice}:${side}:${misUnit}`;
+  return `${hallId}:${slice}:${side}:${row}`;
 }
 
 export function createEmptyPlannerLabelNames(): PlannerLabelNames {
@@ -98,7 +101,6 @@ function defaultSideConfig(type: HallType): HallSideConfig {
         type: "bulk",
         rowsPerSlice: 1,
         misSlotsPerSlice: 54,
-        misUnitsPerSlice: 1,
         misWidth: 1,
       };
     case "chest":
@@ -106,7 +108,6 @@ function defaultSideConfig(type: HallType): HallSideConfig {
         type: "chest",
         rowsPerSlice: 4,
         misSlotsPerSlice: 54,
-        misUnitsPerSlice: 1,
         misWidth: 1,
       };
     case "mis":
@@ -114,7 +115,6 @@ function defaultSideConfig(type: HallType): HallSideConfig {
         type: "mis",
         rowsPerSlice: 4,
         misSlotsPerSlice: 54,
-        misUnitsPerSlice: 1,
         misWidth: 2,
       };
   }
@@ -122,6 +122,7 @@ function defaultSideConfig(type: HallType): HallSideConfig {
 
 function cloneHallConfig(hallConfig: HallConfig): HallConfig {
   const nextConfig: HallConfig = {
+    direction: hallConfig.direction,
     sections: hallConfig.sections.map((section) => ({
       slices: section.slices,
       sideLeft: { ...section.sideLeft },
@@ -224,13 +225,15 @@ function isHallSideConfigEqual(a: HallSideConfig, b: HallSideConfig): boolean {
     a.type === b.type &&
     a.rowsPerSlice === b.rowsPerSlice &&
     a.misSlotsPerSlice === b.misSlotsPerSlice &&
-    a.misUnitsPerSlice === b.misUnitsPerSlice &&
     a.misWidth === b.misWidth
   );
 }
 
 function isHallConfigEqual(a: HallConfig, b: HallConfig): boolean {
   if ((a.name ?? "") !== (b.name ?? "")) {
+    return false;
+  }
+  if (a.direction !== b.direction) {
     return false;
   }
   if (a.sections.length !== b.sections.length) {
@@ -478,6 +481,13 @@ function parseHallType(value: unknown): HallType | null {
   return HALL_TYPES.includes(value as HallType) ? (value as HallType) : null;
 }
 
+function parseHallDirection(value: unknown): HallDirection | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  return HALL_DIRECTIONS.includes(value as HallDirection) ? (value as HallDirection) : null;
+}
+
 function parseHallSideConfig(value: unknown): HallSideConfig | null {
   if (!isRecord(value)) {
     return null;
@@ -489,24 +499,21 @@ function parseHallSideConfig(value: unknown): HallSideConfig | null {
   }
 
   const defaults = defaultSideConfig(type);
+  const rowsPerSliceFallback = defaults.rowsPerSlice;
+  const rowsPerSliceMax = type === "mis" ? 8 : 9;
   return {
     type,
-    rowsPerSlice: clamp(toFiniteNumber(value.rowsPerSlice, defaults.rowsPerSlice), 1, 9),
+    rowsPerSlice: clamp(toFiniteNumber(value.rowsPerSlice, rowsPerSliceFallback), 1, rowsPerSliceMax),
     misSlotsPerSlice: clamp(
       toFiniteNumber(value.misSlotsPerSlice, defaults.misSlotsPerSlice),
       1,
       200,
     ),
-    misUnitsPerSlice: clamp(
-      toFiniteNumber(value.misUnitsPerSlice, defaults.misUnitsPerSlice),
-      1,
-      8,
-    ),
     misWidth: clamp(toFiniteNumber(value.misWidth, defaults.misWidth), 1, 16),
   };
 }
 
-function parseHallConfig(value: unknown): HallConfig | null {
+function parseHallConfig(value: unknown, fallbackDirection: HallDirection): HallConfig | null {
   if (!isRecord(value) || !Array.isArray(value.sections) || value.sections.length === 0) {
     return null;
   }
@@ -534,6 +541,7 @@ function parseHallConfig(value: unknown): HallConfig | null {
   }
 
   const hallConfig: HallConfig = {
+    direction: parseHallDirection(value.direction) ?? fallbackDirection,
     sections: sections.filter((section): section is HallConfig["sections"][number] => Boolean(section)),
   };
   if (typeof value.name === "string") {
@@ -542,11 +550,15 @@ function parseHallConfig(value: unknown): HallConfig | null {
   return hallConfig;
 }
 
-function parseHallConfigs(value: unknown): Record<HallId, HallConfig> | null {
+function parseHallConfigs(
+  value: unknown,
+  preset: StorageLayoutPreset,
+): Record<HallId, HallConfig> | null {
   if (!isRecord(value)) {
     return null;
   }
 
+  const defaultHallConfigs = buildInitialHallConfigs(preset);
   const entries: Array<[HallId, HallConfig]> = [];
   for (const [hallIdRaw, hallConfigValue] of Object.entries(value)) {
     const hallId = Number(hallIdRaw);
@@ -554,7 +566,8 @@ function parseHallConfigs(value: unknown): Record<HallId, HallConfig> | null {
       return null;
     }
 
-    const hallConfig = parseHallConfig(hallConfigValue);
+    const fallbackDirection = defaultHallConfigs[hallId]?.direction ?? "east";
+    const hallConfig = parseHallConfig(hallConfigValue, fallbackDirection);
     if (!hallConfig) {
       return null;
     }
@@ -663,7 +676,9 @@ export function parsePlannerSnapshot(value: unknown): PlannerSnapshot | null {
 
   const storageLayoutPreset = parseStorageLayoutPreset(value.storageLayoutPreset);
   const fillDirection = parseFillDirection(value.fillDirection);
-  const hallConfigs = parseHallConfigs(value.hallConfigs);
+  const hallConfigs = storageLayoutPreset
+    ? parseHallConfigs(value.hallConfigs, storageLayoutPreset)
+    : null;
 
   if (!storageLayoutPreset || !fillDirection || !hallConfigs) {
     return null;

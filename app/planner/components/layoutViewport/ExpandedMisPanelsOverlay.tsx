@@ -6,7 +6,7 @@ export type ExpandedMisTarget = {
   hallId: HallId;
   slice: number;
   side: 0 | 1;
-  misUnit: number;
+  row: number;
 };
 
 export type ExpandedMisPanel = ExpandedMisTarget & {
@@ -67,11 +67,11 @@ export function ExpandedMisPanelsOverlay({
           hallId: panel.hallId,
           slice: panel.slice,
           side: panel.side,
-          misUnit: panel.misUnit,
+          row: panel.row,
         };
         return (
           <div
-            key={`${panel.hallId}:${panel.slice}:${panel.side}:${panel.misUnit}`}
+            key={`${panel.hallId}:${panel.slice}:${panel.side}:${panel.row}`}
             className={`w-[min(30vw,370px)] overflow-hidden rounded-[0.85rem] border shadow-[0_12px_34px_rgba(38,48,33,0.28)] max-[980px]:w-[78vw] ${frameClass}`}
             data-mis-panel
           >

@@ -7,7 +7,7 @@ type ParsedMisSlotId = {
   hallId: HallId;
   slice: number;
   side: 0 | 1;
-  misUnit: number;
+  row: number;
   index: number;
 };
 
@@ -17,7 +17,6 @@ type ParsedSlotMeta = {
   slice: number;
   side: 0 | 1;
   row?: number;
-  misUnit?: number;
   index?: number;
 };
 
@@ -29,18 +28,18 @@ export function parseMisSlotIdValue(slotId: string): ParsedMisSlotId | null {
   const hallId = Number(parts[0]);
   const slice = Number(parts[2]);
   const side = Number(parts[3]);
-  const misUnit = Number(parts[4]);
+  const row = Number(parts[4]);
   const index = Number(parts[5]);
   if (
     !Number.isFinite(hallId) ||
     !Number.isFinite(slice) ||
     (side !== 0 && side !== 1) ||
-    !Number.isFinite(misUnit) ||
+    !Number.isFinite(row) ||
     !Number.isFinite(index)
   ) {
     return null;
   }
-  return { hallId, slice, side, misUnit, index };
+  return { hallId, slice, side, row, index };
 }
 
 function parseSlotMeta(slotId: string): ParsedSlotMeta | null {
@@ -76,9 +75,9 @@ function parseSlotMeta(slotId: string): ParsedSlotMeta | null {
   }
 
   if (kind === "m" && parts.length >= 6) {
-    const misUnit = Number(parts[4]);
+    const row = Number(parts[4]);
     const index = Number(parts[5]);
-    if (!Number.isFinite(misUnit) || !Number.isFinite(index)) {
+    if (!Number.isFinite(row) || !Number.isFinite(index)) {
       return null;
     }
     return {
@@ -86,7 +85,7 @@ function parseSlotMeta(slotId: string): ParsedSlotMeta | null {
       kind: "m",
       slice,
       side,
-      misUnit,
+      row,
       index,
     };
   }
@@ -113,8 +112,8 @@ export function buildCursorMovementHint(
   }
 
 
-  const fromRow = fromMeta.row ?? fromMeta.misUnit ?? 0;
-  const toRow = toMeta.row ?? toMeta.misUnit ?? 0;
+  const fromRow = fromMeta.row ?? 0;
+  const toRow = toMeta.row ?? 0;
   if (fromMeta.slice === toMeta.slice && fromMeta.hallId === toMeta.hallId && fromMeta.side === toMeta.side && fromRow === toRow) {
     return null;
   }
@@ -222,7 +221,7 @@ export function buildPopupCursorHint(
     fromMeta.hallId === toMeta.hallId &&
     fromMeta.slice === toMeta.slice &&
     fromMeta.side === toMeta.side &&
-    fromMeta.misUnit === toMeta.misUnit &&
+    fromMeta.row === toMeta.row &&
     toMeta.index > fromMeta.index &&
     Math.floor(toMeta.index / columns) > Math.floor(fromMeta.index / columns),
   );

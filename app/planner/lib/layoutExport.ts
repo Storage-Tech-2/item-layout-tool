@@ -349,8 +349,8 @@ export function buildExportCellsForLayout(
   }
 
   // Calculate max size for vertical and horizontal
-  const maxVerticalSize = Math.max(northSize, southSize); // remove spacing after last hall
-  const maxHorizontalSize = Math.max(westSize, eastSize);
+  const maxHorizontalSize = Math.max(northSize, southSize); // remove spacing after last hall
+  const maxVerticalSize = Math.max(westSize, eastSize);
 
   const halfVertical = Math.floor(maxVerticalSize / 2);
   const halfHorizontal = Math.floor(maxHorizontalSize / 2);
@@ -372,12 +372,15 @@ export function buildExportCellsForLayout(
   const bottomOffset = Math.max(westHallsDimensions[westHallsDimensions.length - 1]?.[1].leftSize ?? 0, eastHallsDimensions[eastHallsDimensions.length - 1]?.[1].rightSize ?? 0);
   
   // west halls
+  // we assume there will be only at most 2 halls per direction.
+
+  // in the game, east is positive, and south is positive.
   for (let i = 0; i < westHallsDimensions.length; i++) {
     const [hallId] = westHallsDimensions[i];
 
     const isNorth = i === 0;
     hallCoordinates[hallId] = {
-      x: halfHorizontal - maxHorizontalSize + 1, // start from the left edge
+      x: halfHorizontal - maxHorizontalSize, // start from the left edge
       z: isNorth ? (halfVertical - maxVerticalSize + topOffset + 1) : (halfVertical + bottomOffset + 1), // start from the top edge
     };
   }
@@ -411,7 +414,7 @@ export function buildExportCellsForLayout(
     const isWest = i === 0;
     hallCoordinates[hallId] = {
       x: isWest ? (halfHorizontal - maxHorizontalSize + leftOffset + 1) : (halfHorizontal + rightOffset + 1), // start from the left edge
-      z: halfVertical - maxVerticalSize + 1, // start from the top edge
+      z: halfVertical - maxVerticalSize, // start from the top edge
     };
   }
 
@@ -423,6 +426,16 @@ export function buildExportCellsForLayout(
       x: isWest ? (halfHorizontal - maxHorizontalSize + leftOffset + 1) : (halfHorizontal + rightOffset + 1), // start from the left edge
       z: halfVertical + 1, // start from the bottom edge
     };
+  }
+
+  // log coordinates
+  console.log(`Horizontal size: ${maxHorizontalSize}, Vertical size: ${maxVerticalSize}`);
+  console.log(`Half Horizontal: ${halfHorizontal}, Half Vertical: ${halfVertical}`);
+  console.log(`Top Offset: ${topOffset}, Bottom Offset: ${bottomOffset}, Left Offset: ${leftOffset}, Right Offset: ${rightOffset}`);
+  console.log("Hall Coordinates:");
+  for (const [hallId, coord] of Object.entries(hallCoordinates)) {
+    const name = hallConfigs[parseInt(hallId)].name;
+    console.log(`Hall ${hallId} (${name}): x=${coord.x}, z=${coord.z}`);
   }
   
   // now we have coordinates for each hall, we can place cells relative to those coordinates
@@ -520,11 +533,16 @@ export function measureHallDimensions(hallConfig: HallConfig): { leftSize: numbe
     if (section.sideLeft.type === "mis") {
       const widthRemainder = section.slices % section.sideLeft.misWidth;
       leftSize = Math.max(leftSize, section.sideLeft.rowsPerSlice * (widthRemainder < 2 ? 2 : 1));
+    } else {
+      leftSize = Math.max(leftSize, section.sideLeft.rowsPerSlice);
     }
     if (section.sideRight.type === "mis") {
       const widthRemainder = section.slices % section.sideRight.misWidth;
       rightSize = Math.max(rightSize, section.sideRight.rowsPerSlice * (widthRemainder < 2 ? 2 : 1));
+    } else {
+      rightSize = Math.max(rightSize, section.sideRight.rowsPerSlice);
     }
+    
 
     totalSlices += section.slices + 1; // add 1 for spacing between sections
   }
@@ -636,7 +654,8 @@ export function applySideToExportCells(
 
         const posX = sectionStartX + groupStartSlice;
         // north is negative Z
-        const posZ = (side === "left" ?-1 : 1) * (row * (canDoubleChestFit ? 1 : 2) + 1);
+        const rowSize = canDoubleChestFit ? 1 : 2;
+        const posZ = side === "left" ? ((row - rows + 1) * rowSize - 1) : (row * rowSize + 1);
 
         // check if we can use single chest or double chest
         if (greatestSlotIndex <= 26) { // single chest is possible
@@ -698,7 +717,7 @@ export function applySideToExportCells(
       const globalSlice = globalSliceStart + slice;
       for (let row = 0; row < rows; row++) {
         const posX = sectionStartX + slice;
-        const posZ = (side === "left" ? -1 : 1) * (row + 1);
+        const posZ = side === "left" ? (- rows + row) : (row + 1);
         const key = nonMisSlotId(hallId, globalSlice, side === "left" ? 0 : 1, row);
         const itemId = slotAssignments[key];
         if (!itemId) {

@@ -91,7 +91,7 @@ export function PlannerApp() {
     setSectionSideType,
     setSectionSideRows,
     setSectionSideMisCapacity,
-    setSectionSideMisUnits,
+    setSectionSideMisRows,
     setSectionSideMisWidth,
     addHallSection,
     removeHallSection,
@@ -108,7 +108,7 @@ export function PlannerApp() {
     dragPreviews,
     clearDragState,
     setCursorSlot,
-    setCursorMisUnit,
+    setCursorMisRow,
     placeLibraryItemAtCursor,
     beginItemDrag,
     beginCategoryDrag,
@@ -418,13 +418,13 @@ export function PlannerApp() {
     setSectionSideMisCapacity(hallId, sectionIndex, side, value);
   }
 
-  function handleSectionSideMisUnitsChange(
+  function handleSectionSideMisRowsChange(
     hallId: HallId,
     sectionIndex: number,
     side: HallSideKey,
     value: string,
   ): void {
-    setSectionSideMisUnits(hallId, sectionIndex, side, value);
+    setSectionSideMisRows(hallId, sectionIndex, side, value);
   }
 
   function handleSectionSideMisWidthChange(
@@ -718,12 +718,12 @@ export function PlannerApp() {
             onSlotDrop={handleSlotDrop}
             onViewportDropFallback={handleViewportDropFallback}
             onCursorSlotChange={setCursorSlot}
-            onCursorMisChange={setCursorMisUnit}
+            onCursorMisChange={setCursorMisRow}
             onSectionSlicesChange={handleSectionSlicesChange}
             onSectionSideTypeChange={handleSectionSideTypeChange}
             onSectionSideRowsChange={handleSectionSideRowsChange}
             onSectionSideMisCapacityChange={handleSectionSideMisCapacityChange}
-            onSectionSideMisUnitsChange={handleSectionSideMisUnitsChange}
+            onSectionSideMisRowsChange={handleSectionSideMisRowsChange}
             onSectionSideMisWidthChange={handleSectionSideMisWidthChange}
             onHallNameChange={handleHallNameChange}
             onSectionNameChange={handleSectionNameChange}

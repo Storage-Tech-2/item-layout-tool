@@ -11,10 +11,9 @@ function sideDepthPx(side: {
   type: "bulk" | "chest" | "mis";
   rowsPerSlice: number;
   misSlotsPerSlice: number;
-  misUnitsPerSlice: number;
 }): number {
   if (side.type === "mis") {
-    return side.misUnitsPerSlice * 112 + Math.max(0, side.misUnitsPerSlice - 1) * SLOT_GAP;
+    return side.rowsPerSlice * 112 + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
   }
   return side.rowsPerSlice * SLOT_SIZE + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
 }
@@ -82,9 +81,9 @@ export function buildSlotCenters(
           const groupMainSize = groupLastSlice.mainStart + groupLastSlice.mainSize - groupFirstSlice.mainStart;
           const unitColumns = misColumns(sideConfig.misSlotsPerSlice);
           const unitRows = Math.max(1, Math.ceil(sideConfig.misSlotsPerSlice / unitColumns));
-          for (let misUnit = 0; misUnit < sideConfig.misUnitsPerSlice; misUnit += 1) {
+          for (let row = 0; row < sideConfig.rowsPerSlice; row += 1) {
             const unitMain = groupMainSize;
-            const unitCross = sideDepth / sideConfig.misUnitsPerSlice;
+            const unitCross = sideDepth / sideConfig.rowsPerSlice;
             const cellMain = unitMain / unitColumns;
             const cellCross = unitCross / unitRows;
 
@@ -95,13 +94,13 @@ export function buildSlotCenters(
               if (orientation === "horizontal") {
                 const baseY = side === 0 ? hallTopLeft.y : hallTopLeft.y + hallTopLeft.height - sideDepth;
                 const x = hallTopLeft.x + groupMainStart + (column + 0.5) * cellMain;
-                const y = baseY + misUnit * unitCross + (row + 0.5) * cellCross;
-                slotCenters.set(`${hallId}:m:${misSlice}:${side}:${misUnit}:${index}`, { x, y });
+                const y = baseY + row * unitCross + (row + 0.5) * cellCross;
+                slotCenters.set(`${hallId}:m:${misSlice}:${side}:${row}:${index}`, { x, y });
               } else {
                 const baseX = side === 0 ? hallTopLeft.x : hallTopLeft.x + hallTopLeft.width - sideDepth;
-                const x = baseX + misUnit * unitCross + (row + 0.5) * cellCross;
+                const x = baseX + row * unitCross + (row + 0.5) * cellCross;
                 const y = hallTopLeft.y + groupMainStart + (column + 0.5) * cellMain;
-                slotCenters.set(`${hallId}:m:${misSlice}:${side}:${misUnit}:${index}`, { x, y });
+                slotCenters.set(`${hallId}:m:${misSlice}:${side}:${row}:${index}`, { x, y });
               }
             }
           }

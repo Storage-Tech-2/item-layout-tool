@@ -72,7 +72,7 @@ type LayoutViewportProps = {
   onSlotDrop: (event: DragEvent<HTMLElement>, slotId: string) => void;
   onViewportDropFallback: (event: DragEvent<HTMLElement>) => void;
   onCursorSlotChange: (slotId: string) => void;
-  onCursorMisChange: (hallId: HallId, slice: number, side: 0 | 1, misUnit: number) => void;
+  onCursorMisChange: (hallId: HallId, slice: number, side: 0 | 1, row: number) => void;
   onSectionSlicesChange: (hallId: HallId, sectionIndex: number, value: string) => void;
   onSectionSideTypeChange: (
     hallId: HallId,
@@ -92,7 +92,7 @@ type LayoutViewportProps = {
     side: HallSideKey,
     value: string,
   ) => void;
-  onSectionSideMisUnitsChange: (
+  onSectionSideMisRowsChange: (
     hallId: HallId,
     sectionIndex: number,
     side: HallSideKey,
@@ -110,7 +110,7 @@ type LayoutViewportProps = {
     hallId: HallId,
     slice: number,
     side: 0 | 1,
-    misUnit: number,
+    row: number,
     rawName: string,
   ) => void;
   onAddSection: (hallId: HallId) => void;
@@ -227,7 +227,7 @@ function defaultHallLabel(hallId: HallId): string {
 }
 
 function expandedMisKey(target: ExpandedMisTarget): string {
-  return `${target.hallId}:${target.slice}:${target.side}:${target.misUnit}`;
+  return `${target.hallId}:${target.slice}:${target.side}:${target.row}`;
 }
 
 function sectionNameKey(hallId: HallId, sectionIndex: number): string {
@@ -252,7 +252,7 @@ function misPreviewLayout(cardWidth: number, cardHeight: number): { columns: num
 
 function sideDepthPx(side: HallSideConfig): number {
   if (side.type === "mis") {
-    return side.misUnitsPerSlice * 112 + Math.max(0, side.misUnitsPerSlice - 1) * SLOT_GAP;
+    return side.rowsPerSlice * 112 + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
   }
   return side.rowsPerSlice * SLOT_SIZE + Math.max(0, side.rowsPerSlice - 1) * SLOT_GAP;
 }
@@ -445,7 +445,7 @@ export function LayoutViewport({
   onSectionSideTypeChange,
   onSectionSideRowsChange,
   onSectionSideMisCapacityChange,
-  onSectionSideMisUnitsChange,
+  onSectionSideMisRowsChange,
   onSectionSideMisWidthChange,
   onHallNameChange,
   onSectionNameChange,
@@ -721,7 +721,7 @@ export function LayoutViewport({
   );
 
   const updateMisName = useCallback((target: ExpandedMisTarget, rawName: string): void => {
-    onMisNameChange(target.hallId, target.slice, target.side, target.misUnit, rawName);
+    onMisNameChange(target.hallId, target.slice, target.side, target.row, rawName);
   }, [onMisNameChange]);
 
   const misDisplayName = useCallback(
@@ -760,7 +760,7 @@ export function LayoutViewport({
               continue;
             }
             seenMisSlices.add(misSlice);
-            misTypes += sideConfig.misUnitsPerSlice * sideConfig.misSlotsPerSlice;
+            misTypes += sideConfig.rowsPerSlice * sideConfig.misSlotsPerSlice;
             continue;
           }
 
@@ -899,14 +899,14 @@ export function LayoutViewport({
           return null;
         }
         const sideConfig = target.side === 0 ? slice.sideLeft : slice.sideRight;
-        if (sideConfig.type !== "mis" || target.misUnit >= sideConfig.misUnitsPerSlice) {
+        if (sideConfig.type !== "mis" || target.row >= sideConfig.rowsPerSlice) {
           return null;
         }
         const misWidth = Math.max(1, sideConfig.misWidth);
         const fallbackLabel = `MIS ${Math.floor(slice.sectionSlice / misWidth) + 1}`;
         const slotIds = Array.from(
           { length: sideConfig.misSlotsPerSlice },
-          (_, index) => misSlotId(target.hallId, target.slice, target.side, target.misUnit, index),
+          (_, index) => misSlotId(target.hallId, target.slice, target.side, target.row, index),
         );
         const columns =
           sideConfig.misSlotsPerSlice % 9 === 0
@@ -1257,10 +1257,10 @@ export function LayoutViewport({
           );
           const misMainSize = groupLastSlice.mainStart + groupLastSlice.mainSize - groupFirstSlice.mainStart;
           const misGroupNumber = Math.floor(groupStartSectionSlice / misWidth) + 1;
-          Array.from({ length: sideConfig.misUnitsPerSlice }, (_, misUnit) => {
+          Array.from({ length: sideConfig.rowsPerSlice }, (_, row) => {
             const unitSlotIds = Array.from(
               { length: sideConfig.misSlotsPerSlice },
-              (_, index) => misSlotId(hallId, misSlice, side, misUnit, index),
+              (_, index) => misSlotId(hallId, misSlice, side, row, index),
             );
             const assignedIds = unitSlotIds
               .map((slotId) => slotAssignments[slotId])
@@ -1305,7 +1305,7 @@ export function LayoutViewport({
               hallId,
               slice: misSlice,
               side,
-              misUnit,
+              row,
             };
             const misTargetKey = expandedMisKey(misTarget);
             const expandedIndex = expandedMisTargets.findIndex(
@@ -1333,11 +1333,11 @@ export function LayoutViewport({
             if (orientation === "horizontal") {
               const unitCrossSize = 112;
               const baseTop = visualSide === 0 ? 0 : hallHeight - sideDepth;
-              const visualMisUnit = reverseCrossAxisForDirection
-                ? sideConfig.misUnitsPerSlice - 1 - misUnit
-                : misUnit;
+              const visualMisRow = reverseCrossAxisForDirection
+                ? sideConfig.rowsPerSlice - 1 - row
+                : row;
               const x = misMainStart + 2;
-              const y = baseTop + visualMisUnit * (unitCrossSize + SLOT_GAP) + 2;
+              const y = baseTop + visualMisRow * (unitCrossSize + SLOT_GAP) + 2;
               const cardWidth = Math.max(12, misMainSize - 4);
               const cardHeight = Math.max(42, unitCrossSize - 4);
               if (!isLocalRectVisible(x, y, cardWidth, cardHeight)) {
@@ -1347,7 +1347,7 @@ export function LayoutViewport({
               const previewColumns = previewLayout.columns;
               slots.push(
                 <div
-                  key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
+                  key={`${hallId}:mcard:${slice.globalSlice}:${side}:${row}`}
                   className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-visible rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass} ${misCardPreviewClass} ${misCardCursorClass}`}
                   style={{ left: x, top: y, width: cardWidth, height: cardHeight }}
                   data-no-pan
@@ -1367,7 +1367,7 @@ export function LayoutViewport({
                   onDrop={(event) => onSlotDrop(event, nextEmptySlot)}
                   onClick={(event) => {
                     event.stopPropagation();
-                    onCursorMisChange(misTarget.hallId, misTarget.slice, misTarget.side, misTarget.misUnit);
+                    onCursorMisChange(misTarget.hallId, misTarget.slice, misTarget.side, misTarget.row);
                     toggleExpandedMis(misTarget);
                   }}
                 >
@@ -1414,7 +1414,7 @@ export function LayoutViewport({
                         }
                         return (
                           <div
-                            key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${entry.itemId}-${previewIndex}`}
+                            key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${row}-${entry.itemId}-${previewIndex}`}
                             className={`grid h-4 w-4 place-items-center overflow-hidden rounded-[0.2rem] border ${entry.previewKind === "swap"
                               ? "border-[rgba(194,65,12,0.55)] bg-[rgba(255,233,213,0.92)]"
                               : entry.previewKind === "place"
@@ -1441,10 +1441,10 @@ export function LayoutViewport({
             } else {
               const unitCrossSize = 112;
               const baseLeft = visualSide === 0 ? 0 : hallWidth - sideDepth;
-              const visualMisUnit = reverseCrossAxisForDirection
-                ? sideConfig.misUnitsPerSlice - 1 - misUnit
-                : misUnit;
-              const x = baseLeft + visualMisUnit * (unitCrossSize + SLOT_GAP) + 2;
+              const visualMisRow = reverseCrossAxisForDirection
+                ? sideConfig.rowsPerSlice - 1 - row
+                : row;
+              const x = baseLeft + visualMisRow * (unitCrossSize + SLOT_GAP) + 2;
               const y = misMainStart + 2;
               const cardWidth = Math.max(42, unitCrossSize - 4);
               const cardHeight = Math.max(12, misMainSize - 4);
@@ -1455,7 +1455,7 @@ export function LayoutViewport({
               const previewColumns = previewLayout.columns;
               slots.push(
                 <div
-                  key={`${hallId}:mcard:${slice.globalSlice}:${side}:${misUnit}`}
+                  key={`${hallId}:mcard:${slice.globalSlice}:${side}:${row}`}
                   className={`absolute grid grid-rows-[auto_auto_1fr] gap-[0.04rem] overflow-visible rounded-[0.45rem] border p-[0.16rem] ${misCardSurfaceClass} ${misCardPreviewClass} ${misCardCursorClass}`}
                   style={{ left: x, top: y, width: cardWidth, height: cardHeight }}
                   data-no-pan
@@ -1475,7 +1475,7 @@ export function LayoutViewport({
                   onDrop={(event) => onSlotDrop(event, nextEmptySlot)}
                   onClick={(event) => {
                     event.stopPropagation();
-                    onCursorMisChange(misTarget.hallId, misTarget.slice, misTarget.side, misTarget.misUnit);
+                    onCursorMisChange(misTarget.hallId, misTarget.slice, misTarget.side, misTarget.row);
                     toggleExpandedMis(misTarget);
                   }}
                 >
@@ -1522,7 +1522,7 @@ export function LayoutViewport({
                         }
                         return (
                           <div
-                            key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${misUnit}-${entry.itemId}-${previewIndex}`}
+                            key={`${hallId}-mis-preview-${slice.globalSlice}-${side}-${row}-${entry.itemId}-${previewIndex}`}
                             className={`grid h-4 w-4 place-items-center overflow-hidden rounded-[0.2rem] border ${entry.previewKind === "swap"
                               ? "border-[rgba(194,65,12,0.55)] bg-[rgba(255,233,213,0.92)]"
                               : entry.previewKind === "place"
@@ -2090,7 +2090,7 @@ export function LayoutViewport({
                   onSectionSideTypeChange={onSectionSideTypeChange}
                   onSectionSideRowsChange={onSectionSideRowsChange}
                   onSectionSideMisCapacityChange={onSectionSideMisCapacityChange}
-                  onSectionSideMisUnitsChange={onSectionSideMisUnitsChange}
+                  onSectionSideMisRowsChange={onSectionSideMisRowsChange}
                   onSectionSideMisWidthChange={onSectionSideMisWidthChange}
                 />
 

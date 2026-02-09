@@ -42,9 +42,8 @@ next-env.d.ts
 
 minecraft-assets-1.21.11
 public/items
-public/nucleation/
 mcsrc-main/
 itemfetch/.cache/
 Blocks.java
 Items.java
-nucleation/
+/nucleation/

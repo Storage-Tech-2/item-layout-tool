@@ -2,6 +2,7 @@ export type HallId = number;
 export type FillDirection = "row" | "column";
 
 export type HallType = "bulk" | "chest" | "mis";
+export type HallDirection = "north" | "east" | "south" | "west";
 
 export type HallOrientation = "horizontal" | "vertical";
 
@@ -9,7 +10,6 @@ export type HallSideConfig = {
   type: HallType;
   rowsPerSlice: number;
   misSlotsPerSlice: number;
-  misUnitsPerSlice: number;
   misWidth: number;
 };
 
@@ -21,6 +21,7 @@ export type HallSectionConfig = {
 
 export type HallConfig = {
   name?: string;
+  direction: HallDirection;
   sections: HallSectionConfig[];
 };
 
@@ -36,7 +37,7 @@ export type LegacyHallConfig = {
   slices: number;
   rowsPerSide: number;
   misSlotsPerSlice: number;
-  misUnitsPerSlice: number;
+  rowsPerSlice: number;
   misWidth?: number;
 };
 
