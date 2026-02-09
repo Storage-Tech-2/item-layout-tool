@@ -267,10 +267,10 @@ function emptyHallPlacements(hallIds: HallId[]): Record<HallId, HallPlacement> {
 }
 
 function readInitialHintVisibility(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
   try {
+    if (typeof window === "undefined") {
+      return false;
+    }
     return window.localStorage.getItem(LAYOUT_HINT_DISMISSED_STORAGE_KEY) !== "1";
   } catch {
     // Ignore storage access issues; default to showing hint.
@@ -571,7 +571,7 @@ export function LayoutViewport({
     width: number;
     height: number;
   } | null>(null);
-  const [isHintBoxVisible, setIsHintBoxVisible] = useState(readInitialHintVisibility);
+  const [isHintBoxVisible, setIsHintBoxVisible] = useState(false);
   const [viewMode, setViewMode] = useState<LayoutViewMode>("storage");
   const [expandedMisTargets, setExpandedMisTargets] = useState<ExpandedMisTarget[]>([]);
   const hallIds = useMemo(() => Object.keys(hallConfigs).map((key) => Number(key)), [hallConfigs]);
@@ -579,6 +579,10 @@ export function LayoutViewport({
   useEffect(() => {
     onViewModeChange?.(viewMode);
   }, [onViewModeChange, viewMode]);
+
+  useEffect(() => {
+    setIsHintBoxVisible(readInitialHintVisibility());
+  }, []);
 
   const visibleWorldBounds = useMemo<WorldBounds | null>(() => {
     if (zoom <= 0 || viewportSize.width <= 0 || viewportSize.height <= 0) {
