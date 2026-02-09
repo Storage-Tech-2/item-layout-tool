@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { GoogleAnalytics } from "@next/third-parties/google";
 
 const DEFAULT_SITE_ORIGIN = "https://storage-tech-2.github.io";
 const SITE_NAME = "Minecraft Item Layout Tool";
@@ -86,6 +87,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <GoogleAnalytics gaId="G-W8ZF7F6FXL" />
+      </head>
       <body className="antialiased">{children}</body>
     </html>
   );

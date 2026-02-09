@@ -11,10 +11,11 @@
     "build:nucleation": "cd nucleation && ./build-wasm.sh && mkdir -p ../public/nucleation && rm -rf ../public/nucleation/pkg && cp -R pkg ../public/nucleation/pkg"
   },
   "dependencies": {
-    "tsx": "^4.20.5",
+    "@next/third-parties": "^16.1.6",
     "next": "^16.1.6",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "tsx": "^4.20.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",

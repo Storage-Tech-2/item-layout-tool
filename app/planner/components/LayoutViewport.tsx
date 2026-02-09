@@ -581,7 +581,20 @@ export function LayoutViewport({
   }, [onViewModeChange, viewMode]);
 
   useEffect(() => {
-    setIsHintBoxVisible(readInitialHintVisibility());
+    let isCancelled = false;
+    const frameId = window.requestAnimationFrame(() => {
+      if (isCancelled) {
+        return;
+      }
+      if (readInitialHintVisibility()) {
+        setIsHintBoxVisible(true);
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+      window.cancelAnimationFrame(frameId);
+    };
   }, []);
 
   const visibleWorldBounds = useMemo<WorldBounds | null>(() => {
