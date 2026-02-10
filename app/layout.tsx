@@ -88,7 +88,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <GoogleAnalytics gaId="G-W8ZF7F6FXL" />
+        <GoogleAnalytics gaId="G-77Y9ZBT4TY" />
       </head>
       <body className="antialiased">{children}</body>
     </html>
