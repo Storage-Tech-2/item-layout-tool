@@ -1933,6 +1933,9 @@ export function LayoutViewport({
               onStorageLayoutPresetChange(event.target.value as StorageLayoutPreset)
             }
           >
+            <option value="single">Single Layout</option>
+            <option value="double">Double Layout</option>
+            <option value="triple">Triple Layout</option>
             <option value="cross">Cross Layout</option>
             <option value="h">H Layout</option>
             <option value="hcross">H-Cross Layout</option>

@@ -3,7 +3,7 @@ import type { HallConfig, HallId, HallOrientation, HallSideConfig } from "./type
 import { getHallSize } from "./utils";
 
 export type HallDirection = "north" | "east" | "south" | "west";
-export type StorageLayoutPreset = "cross" | "h" | "hcross" | "octa";
+export type StorageLayoutPreset =  "single" | "double" | "triple" | "cross" | "h" | "hcross" | "octa";
 
 export type HallCore = {
     name: string;
@@ -60,6 +60,115 @@ export type ResolvedStorageLayout = {
 function defaultHallName(hallId: HallId): string {
     return `Hall ${hallId}`;
 }
+
+
+const SINGLE_LAYOUT: StorageLayoutDefinition = {
+    core: {
+        name: "Front",
+        shape: "rectangle",
+        width: CORE_SIZE / 4,
+        height: CORE_SIZE,
+        halls: [
+            {
+                id: 1,
+                name: "Main Hall",
+                direction: "east",
+                sections: [
+                    {
+                        slices: 16,
+                        sideLeft: { type: "chest", rowsPerSlice: 4 },
+                        sideRight: { type: "chest", rowsPerSlice: 4 },
+                    },
+                ],
+            },
+        ],
+    },
+};
+
+
+const DOUBLE_LAYOUT: StorageLayoutDefinition = {
+    core: {
+        name: "Core",
+        shape: "rectangle",
+        width: CORE_SIZE / 2,
+        height: CORE_SIZE,
+        halls: [
+            {
+                id: 1,
+                name: "Main Hall",
+                direction: "east",
+                sections: [
+                    {
+                        slices: 16,
+                        sideLeft: { type: "chest", rowsPerSlice: 4 },
+                        sideRight: { type: "chest", rowsPerSlice: 4 },
+                    },
+                ],
+            },
+            {
+                id: 2,
+                name: "Main Hall",
+                direction: "west",
+                sections: [
+                    {
+                        slices: 16,
+                        sideLeft: { type: "chest", rowsPerSlice: 4 },
+                        sideRight: { type: "chest", rowsPerSlice: 4 },
+                    },
+                ],
+            },
+        ],
+    },
+};
+
+
+const TRIPLE_LAYOUT: StorageLayoutDefinition = {
+    core: {
+        name: "Core",
+        shape: "rectangle",
+        width: CORE_SIZE,
+        height: CORE_SIZE,
+        halls: [
+            {
+                id: 1,
+                name: "East Hall",
+                direction: "east",
+                sections: [
+                    {
+                        slices: 16,
+                        sideLeft: { type: "chest", rowsPerSlice: 4 },
+                        sideRight: { type: "chest", rowsPerSlice: 4 },
+                    },
+                ],
+            },
+            {
+                id: 2,
+                name: "West Hall",
+                direction: "west",
+                sections: [
+                    {
+                        slices: 16,
+                        sideLeft: { type: "chest", rowsPerSlice: 4 },
+                        sideRight: { type: "chest", rowsPerSlice: 4 },
+                    },
+                ],
+            },
+            {
+                id: 3,
+                name: "South Hall",
+                direction: "south",
+                sections: [
+                    {
+                        slices: 8,
+                        sideLeft: { type: "mis", rowsPerSlice: 1, misSlotsPerSlice: 54 },
+                        sideRight: { type: "mis", rowsPerSlice: 1, misSlotsPerSlice: 54 },
+                    },
+                ],
+            },
+        ],
+    },
+};
+
 
 const CROSS_LAYOUT: StorageLayoutDefinition = {
     core: {
@@ -373,6 +482,9 @@ const OCTA_LAYOUT: StorageLayoutDefinition = {
 
 
 const STORAGE_LAYOUTS: Record<StorageLayoutPreset, StorageLayoutDefinition> = {
+    single: SINGLE_LAYOUT,
+    double: DOUBLE_LAYOUT,
+    triple: TRIPLE_LAYOUT,
     cross: CROSS_LAYOUT,
     h: H_LAYOUT,
     hcross: HCROSS_LAYOUT,
