@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const basePath = "/item-layout-tool";
+const basePath = "";
 
 const nextConfig: NextConfig = {
   /**
