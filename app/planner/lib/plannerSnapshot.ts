@@ -11,7 +11,7 @@ import type {
 } from "../types";
 import { clamp } from "../utils";
 
-const STORAGE_LAYOUT_PRESETS: StorageLayoutPreset[] = ["cross", "h", "hcross", "octa"];
+const STORAGE_LAYOUT_PRESETS: StorageLayoutPreset[] = ["single", "double", "triple", "cross", "h", "hcross", "octa"];
 const FILL_DIRECTIONS: FillDirection[] = ["row", "column"];
 const HALL_TYPES: HallType[] = ["bulk", "chest", "mis"];
 const HALL_DIRECTIONS: HallDirection[] = ["north", "east", "south", "west"];
