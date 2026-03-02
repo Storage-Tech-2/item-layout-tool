@@ -2,7 +2,7 @@ import { withBasePath } from "../base-path";
 import type { CatalogItem, HallConfig, HallId, HallSideConfig } from "../types";
 import { misSlotId, nonMisSlotId } from "../utils";
 
-export type LayoutExportMode = "containers" | "item_frames" | "blocks_and_frames";
+export type LayoutExportMode = "containers" | "item_frames" | "blocks_and_frames" | "boxes";
 export type LayoutViewMode = "storage" | "flat";
 
 export type LayoutExportOption = {
@@ -31,6 +31,12 @@ export const LITEMATIC_EXPORT_OPTIONS: readonly LayoutExportOption[] = [
     description: "Place block items as blocks, and non-blocks as item frames.",
     fileSuffix: "blocks-and-frames",
   },
+  {
+    mode: "boxes",
+    label: "Litematic: Full boxes",
+    description: "Each slot is a full shulker box containing the assigned item.",
+    fileSuffix: "boxes",
+  }
 ] as const;
 
 type LayoutLitematicExportInput = {
@@ -367,7 +373,7 @@ export function buildExportCellsForLayout(
   const hallCoordinates: Record<HallId, { x: number; z: number }> = {};
 
   // first start with horizontal halls
-  const westHallsDimensions = Object.entries(hallConfigs)    .filter(([_, config]) => config.direction === "west")
+  const westHallsDimensions = Object.entries(hallConfigs).filter(([_, config]) => config.direction === "west")
     .map(([hallId]) => [parseInt(hallId), hallDimensions[hallId]] as const);
   const eastHallsDimensions = Object.entries(hallConfigs)
     .filter(([_, config]) => config.direction === "east")
@@ -375,10 +381,10 @@ export function buildExportCellsForLayout(
 
   // top is north here
   const topOffset = Math.max(westHallsDimensions[0]?.[1].rightSize ?? 0, eastHallsDimensions[0]?.[1].leftSize ?? 0);
-  
+
   // bottom is south here
   const bottomOffset = Math.max(westHallsDimensions[westHallsDimensions.length - 1]?.[1].leftSize ?? 0, eastHallsDimensions[eastHallsDimensions.length - 1]?.[1].rightSize ?? 0);
-  
+
   // west halls
   // we assume there will be only at most 2 halls per direction.
 
@@ -445,7 +451,7 @@ export function buildExportCellsForLayout(
     const name = hallConfigs[parseInt(hallId)].name;
     console.log(`Hall ${hallId} (${name}): x=${coord.x}, z=${coord.z}`);
   }
-  
+
   // now we have coordinates for each hall, we can place cells relative to those coordinates
   for (const [hallIdRaw, config] of Object.entries(hallConfigs)) {
     const hallId = Number(hallIdRaw);
@@ -609,7 +615,7 @@ export function measureHallDimensions(hallConfig: HallConfig): { leftSize: numbe
     } else {
       rightSize = Math.max(rightSize, section.sideRight.rowsPerSlice);
     }
-    
+
 
     totalSlices += section.slices + 1; // add 1 for spacing between sections
   }
@@ -694,7 +700,7 @@ export function applySideToExportCells(
   if (sideConfig.type === "mis") {
     const slotsPerSlice = sideConfig.misSlotsPerSlice;
     const misWidth = sideConfig.misWidth;
-    
+
     // divide up slices by mis width
     const sliceGroups = Math.ceil(numSlices / misWidth);
     for (let misGroup = 0; misGroup < sliceGroups; misGroup++) {
@@ -778,7 +784,7 @@ export function applySideToExportCells(
       }
     }
 
-    
+
   } else if (sideConfig.type === "bulk" || sideConfig.type === "chest") {
     for (let slice = 0; slice < numSlices; slice++) {
       const globalSlice = globalSliceStart + slice;
@@ -833,6 +839,15 @@ export function applySideToExportCells(
               itemId,
             });
           }
+        } else if (mode === "boxes") {
+          const catalogItem = itemById.get(itemId);
+          output.push({
+            type: "container",
+            x: posX,
+            z: posZ,
+            blockState: `minecraft:shulker_box[facing=up]`,
+            items: Array.from({ length: 27 }, (_, slot) => ({ slot, itemId, count: catalogItem?.maxStackSize || 64 })),
+          });
         } else {
           throw new Error("Unknown export mode");
         }
