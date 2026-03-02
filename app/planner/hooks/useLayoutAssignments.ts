@@ -61,7 +61,13 @@ type UseLayoutAssignmentsResult = {
     previousConfigs: Record<HallId, HallConfig>,
     nextConfigs: Record<HallId, HallConfig>,
   ) => void;
-  replaceSlotAssignments: (assignments: Record<string, string>) => void;
+  replaceSlotAssignments: (
+    assignments: Record<string, string>,
+    options?: {
+      validSlotIds?: Set<string>;
+      orderedSlotIds?: string[];
+    },
+  ) => void;
   clearSlot: (slotId: string) => void;
   setSelectedSlotIds: (slotIds: string[]) => void;
 };
@@ -767,10 +773,36 @@ export function useLayoutAssignments({
     setSelectedSlotIdsState(slotIds);
   }
 
-  function replaceSlotAssignments(assignments: Record<string, string>): void {
-    const normalizedAssignments = retainValidAssignments(assignments, orderedSlotIdSet);
+  function replaceSlotAssignments(
+    assignments: Record<string, string>,
+    options?: {
+      validSlotIds?: Set<string>;
+      orderedSlotIds?: string[];
+    },
+  ): void {
+    const validSlotIds = options?.validSlotIds ?? orderedSlotIdSet;
+    const orderedIds = options?.orderedSlotIds ?? orderedSlotIds;
+    const normalizedAssignments = retainValidAssignments(assignments, validSlotIds);
     setSlotAssignments({ ...normalizedAssignments });
-    setCursorSlotId(resolveCursorForAssignments(normalizedAssignments));
+    if (orderedIds.length === 0) {
+      setCursorSlotId(null);
+    } else {
+      const startIndex =
+        cursorSlotId && validSlotIds.has(cursorSlotId)
+          ? orderedIds.indexOf(cursorSlotId)
+          : 0;
+      const normalizedStartIndex = startIndex >= 0 ? startIndex : 0;
+      let nextCursor: string | null = orderedIds[0] ?? null;
+      for (let offset = 0; offset < orderedIds.length; offset += 1) {
+        const index = (normalizedStartIndex + offset) % orderedIds.length;
+        const slotId = orderedIds[index];
+        if (!normalizedAssignments[slotId]) {
+          nextCursor = slotId;
+          break;
+        }
+      }
+      setCursorSlotId(nextCursor);
+    }
     setSelectedSlotIdsState([]);
     clearDragState();
   }

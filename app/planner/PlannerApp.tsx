@@ -190,7 +190,14 @@ export function PlannerApp() {
       setSelectedSlotIds([]);
       setFillDirection(snapshot.fillDirection);
       setLayoutState(snapshot.storageLayoutPreset, cloneHallConfigs(snapshot.hallConfigs));
-      replaceSlotAssignments(cloneSlotAssignments(snapshot.slotAssignments));
+      const snapshotOrderedSlotIds = buildOrderedSlotIds(
+        snapshot.hallConfigs,
+        snapshot.fillDirection,
+      );
+      replaceSlotAssignments(cloneSlotAssignments(snapshot.slotAssignments), {
+        validSlotIds: new Set(snapshotOrderedSlotIds),
+        orderedSlotIds: snapshotOrderedSlotIds,
+      });
       replaceLabelNames(snapshot.labelNames);
       if (options?.recenter ?? true) {
         recenterViewport();
