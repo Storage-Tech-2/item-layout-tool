@@ -119,6 +119,11 @@ export async function exportLayoutAsLitematic(
 
   const schematic = new nucleationModule.SchematicWrapper();
   applyMetadata(schematic, input.layoutName, option);
+
+  // set 0 0
+  setBlockState(schematic, 0, 0, 0, "minecraft:diamond_block");
+  setBlockState(schematic, 0, 1, 0, "minecraft:torch");
+  
   writeExportCells(schematic, cells);
 
   const rawBytes = schematic.to_litematic?.();
@@ -233,7 +238,8 @@ function placeItemFrameSlot(
   if (!schematic.addItemFrameEntity) {
     throw new Error("Nucleation module is missing addItemFrameEntity(). Rebuild your WASM package.");
   }
-  schematic.addItemFrameEntity(toMinecraftId(itemId), x, y, z, 1, 0, true);
+  setBlockState(schematic, x, y, z, "minecraft:light_gray_stained_glass");
+  schematic.addItemFrameEntity(toMinecraftId(itemId), x, y + 1, z, 1, 0, true);
 }
 
 function setBlockState(
