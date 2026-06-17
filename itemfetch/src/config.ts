@@ -53,6 +53,14 @@ export const CREATIVE_MODE_TABS_CLASS_CANDIDATES = [
 export const VANILLA_BLOCK_LOOT_CLASS_CANDIDATES = [
   "net/minecraft/data/loot/packs/VanillaBlockLoot.class",
 ];
+export const COLOR_COLLECTION_CLASS_CANDIDATES = [
+  "net/minecraft/world/level/block/ColorCollection.class",
+];
+export const WEATHERING_COPPER_COLLECTION_CLASS_CANDIDATES = [
+  "net/minecraft/world/level/block/WeatheringCopperCollection.class",
+];
+export const BLOCK_ITEM_IDS_CLASS_CANDIDATES = ["net/minecraft/references/BlockItemIds.class"];
+export const ITEM_IDS_CLASS_CANDIDATES = ["net/minecraft/references/ItemIds.class"];
 
 export function toFabricManifestUrl(versionId: string): string {
   const normalized = versionId.replace(/\./g, "_");

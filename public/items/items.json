@@ -1,23 +1,23 @@
 {
-  "generatedAt": "2026-06-09T08:15:41.042Z",
-  "gameVersion": "26.1.2",
+  "generatedAt": "2026-06-17T17:48:00.647Z",
+  "gameVersion": "26.2",
   "counts": {
-    "itemCount": 1141,
-    "texturedItemCount": 1141,
-    "missingTextureItemCount": 0,
-    "filteredOutItemCount": 365,
-    "codeItemCount": 1482,
-    "itemsWithCodeDataCount": 1117,
-    "blockCount": 1144,
+    "itemCount": 1169,
+    "texturedItemCount": 1169,
+    "missingTextureItemCount": 3,
+    "filteredOutItemCount": 367,
+    "codeItemCount": 1537,
+    "itemsWithCodeDataCount": 1167,
+    "blockCount": 1166,
     "noLootTableBlockCount": 22,
-    "overrideLootTableBlockCount": 61,
+    "overrideLootTableBlockCount": 46,
     "foodDefinitionCount": 40,
     "itemsWithFoodReferenceCount": 40,
     "itemsWithFoodDataCount": 36,
     "creativeTabCount": 14,
     "creativeTabsWithItemsCount": 11,
-    "itemsWithCreativeTabCount": 1114,
-    "unresolvedCreativeTabItemFieldCount": 3
+    "itemsWithCreativeTabCount": 1166,
+    "unresolvedCreativeTabItemFieldCount": 0
   },
   "items": [
     {
@@ -1385,7 +1385,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -1700,7 +1701,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -2163,7 +2165,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -2724,6 +2727,21 @@
       }
     },
     {
+      "id": "chiseled_cinnabar",
+      "texturePath": "/items/textures/chiseled_cinnabar.png",
+      "sourceTexture": "minecraft:block/chiseled_cinnabar",
+      "sourceModel": "minecraft:block/chiseled_cinnabar",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
       "id": "chiseled_copper",
       "texturePath": "/items/textures/chiseled_copper.png",
       "sourceTexture": "minecraft:block/chiseled_copper",
@@ -2859,6 +2877,21 @@
       }
     },
     {
+      "id": "chiseled_sulfur",
+      "texturePath": "/items/textures/chiseled_sulfur.png",
+      "sourceTexture": "minecraft:block/chiseled_sulfur",
+      "sourceModel": "minecraft:block/chiseled_sulfur",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
       "id": "chiseled_tuff",
       "texturePath": "/items/textures/chiseled_tuff.png",
       "sourceTexture": "minecraft:block/chiseled_tuff_top",
@@ -2919,6 +2952,127 @@
         "saturationModifier": 0.3,
         "alwaysEdible": true,
         "effectCount": 0
+      }
+    },
+    {
+      "id": "cinnabar",
+      "texturePath": "/items/textures/cinnabar.png",
+      "sourceTexture": "minecraft:block/cinnabar",
+      "sourceModel": "minecraft:block/cinnabar",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks",
+        "natural_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "cinnabar_brick_slab",
+      "texturePath": "/items/textures/cinnabar_brick_slab.png",
+      "sourceTexture": "minecraft:block/cinnabar_bricks",
+      "sourceModel": "minecraft:block/cinnabar_brick_slab",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
+    },
+    {
+      "id": "cinnabar_brick_stairs",
+      "texturePath": "/items/textures/cinnabar_brick_stairs.png",
+      "sourceTexture": "minecraft:block/cinnabar_bricks",
+      "sourceModel": "minecraft:block/cinnabar_brick_stairs",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "cinnabar_brick_wall",
+      "texturePath": "/items/textures/cinnabar_brick_wall.png",
+      "sourceTexture": "minecraft:block/cinnabar_bricks",
+      "sourceModel": "minecraft:block/cinnabar_brick_wall_inventory",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "cinnabar_bricks",
+      "texturePath": "/items/textures/cinnabar_bricks.png",
+      "sourceTexture": "minecraft:block/cinnabar_bricks",
+      "sourceModel": "minecraft:block/cinnabar_bricks",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "cinnabar_slab",
+      "texturePath": "/items/textures/cinnabar_slab.png",
+      "sourceTexture": "minecraft:block/cinnabar",
+      "sourceModel": "minecraft:block/cinnabar_slab",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
+    },
+    {
+      "id": "cinnabar_stairs",
+      "texturePath": "/items/textures/cinnabar_stairs.png",
+      "sourceTexture": "minecraft:block/cinnabar",
+      "sourceModel": "minecraft:block/cinnabar_stairs",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "cinnabar_wall",
+      "texturePath": "/items/textures/cinnabar_wall.png",
+      "sourceTexture": "minecraft:block/cinnabar",
+      "sourceModel": "minecraft:block/cinnabar_wall_inventory",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
       }
     },
     {
@@ -3403,7 +3557,15 @@
       "texturePath": "/items/textures/copper_bars.png",
       "sourceTexture": "minecraft:block/copper_bars",
       "sourceModel": "minecraft:item/copper_bars",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "copper_block",
@@ -3429,7 +3591,8 @@
       "maxStackSize": 64,
       "creativeTabs": [
         "building_blocks",
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -3441,7 +3604,16 @@
       "texturePath": "/items/textures/copper_chain.png",
       "sourceTexture": "minecraft:item/copper_chain",
       "sourceModel": "minecraft:item/copper_chain",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks",
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "copper_chest",
@@ -3451,7 +3623,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -3484,8 +3657,7 @@
         "functional_blocks"
       ],
       "blockLoot": {
-        "behavior": "default",
-        "lootMethod": "custom"
+        "behavior": "default"
       }
     },
     {
@@ -3519,7 +3691,15 @@
       "texturePath": "/items/textures/copper_lantern.png",
       "sourceTexture": "minecraft:item/copper_lantern",
       "sourceModel": "minecraft:item/copper_lantern",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
     },
     {
       "id": "copper_nugget",
@@ -4246,7 +4426,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -5702,13 +5883,38 @@
       "texturePath": "/items/textures/exposed_copper_bars.png",
       "sourceTexture": "minecraft:block/exposed_copper_bars",
       "sourceModel": "minecraft:item/exposed_copper_bars",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "exposed_copper_bulb",
       "texturePath": "/items/textures/exposed_copper_bulb.png",
       "sourceTexture": "minecraft:block/exposed_copper_bulb",
       "sourceModel": "minecraft:block/exposed_copper_bulb",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks",
+        "functional_blocks",
+        "redstone_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "exposed_copper_chain",
+      "texturePath": "/items/textures/exposed_copper_chain.png",
+      "sourceTexture": "minecraft:item/exposed_copper_chain",
+      "sourceModel": "minecraft:item/exposed_copper_chain",
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
@@ -5721,13 +5927,6 @@
       }
     },
     {
-      "id": "exposed_copper_chain",
-      "texturePath": "/items/textures/exposed_copper_chain.png",
-      "sourceTexture": "minecraft:item/exposed_copper_chain",
-      "sourceModel": "minecraft:item/exposed_copper_chain",
-      "creativeTabs": []
-    },
-    {
       "id": "exposed_copper_chest",
       "texturePath": "/items/textures/exposed_copper_chest.png",
       "sourceTexture": "special/Exposed_Copper_Chest.png",
@@ -5735,7 +5934,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -5768,8 +5968,7 @@
         "functional_blocks"
       ],
       "blockLoot": {
-        "behavior": "default",
-        "lootMethod": "custom"
+        "behavior": "default"
       }
     },
     {
@@ -5792,7 +5991,15 @@
       "texturePath": "/items/textures/exposed_copper_lantern.png",
       "sourceTexture": "minecraft:item/exposed_copper_lantern",
       "sourceModel": "minecraft:item/exposed_copper_lantern",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
     },
     {
       "id": "exposed_copper_trapdoor",
@@ -5862,7 +6069,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -6006,7 +6214,10 @@
       "sourceModel": "minecraft:item/firework_rocket",
       "registration": "item",
       "maxStackSize": 64,
-      "creativeTabs": []
+      "creativeTabs": [
+        "tools_and_utilities",
+        "combat"
+      ]
     },
     {
       "id": "fletching_table",
@@ -6642,7 +6853,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -6805,7 +7017,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -7856,7 +8069,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -8019,7 +8233,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -8050,7 +8265,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -8258,7 +8474,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -8451,7 +8668,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -8787,11 +9005,7 @@
       "texturePath": "/items/textures/melon_seeds.png",
       "sourceTexture": "minecraft:item/melon_seeds",
       "sourceModel": "minecraft:item/melon_seeds",
-      "registration": "item",
-      "maxStackSize": 64,
-      "creativeTabs": [
-        "natural_blocks"
-      ]
+      "creativeTabs": []
     },
     {
       "id": "melon_slice",
@@ -9699,7 +9913,9 @@
       "registration": "item",
       "maxStackSize": 64,
       "rarity": "Rarity.UNCOMMON",
-      "creativeTabs": []
+      "creativeTabs": [
+        "food_and_drinks"
+      ]
     },
     {
       "id": "ominous_trial_key",
@@ -9898,7 +10114,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -9955,13 +10172,38 @@
       "texturePath": "/items/textures/oxidized_copper_bars.png",
       "sourceTexture": "minecraft:block/oxidized_copper_bars",
       "sourceModel": "minecraft:item/oxidized_copper_bars",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "oxidized_copper_bulb",
       "texturePath": "/items/textures/oxidized_copper_bulb.png",
       "sourceTexture": "minecraft:block/oxidized_copper_bulb",
       "sourceModel": "minecraft:block/oxidized_copper_bulb",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks",
+        "functional_blocks",
+        "redstone_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "oxidized_copper_chain",
+      "texturePath": "/items/textures/oxidized_copper_chain.png",
+      "sourceTexture": "minecraft:item/oxidized_copper_chain",
+      "sourceModel": "minecraft:item/oxidized_copper_chain",
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
@@ -9974,13 +10216,6 @@
       }
     },
     {
-      "id": "oxidized_copper_chain",
-      "texturePath": "/items/textures/oxidized_copper_chain.png",
-      "sourceTexture": "minecraft:item/oxidized_copper_chain",
-      "sourceModel": "minecraft:item/oxidized_copper_chain",
-      "creativeTabs": []
-    },
-    {
       "id": "oxidized_copper_chest",
       "texturePath": "/items/textures/oxidized_copper_chest.png",
       "sourceTexture": "special/Oxidized_Copper_Chest.png",
@@ -9988,7 +10223,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -10021,8 +10257,7 @@
         "functional_blocks"
       ],
       "blockLoot": {
-        "behavior": "default",
-        "lootMethod": "custom"
+        "behavior": "default"
       }
     },
     {
@@ -10045,7 +10280,15 @@
       "texturePath": "/items/textures/oxidized_copper_lantern.png",
       "sourceTexture": "minecraft:item/oxidized_copper_lantern",
       "sourceModel": "minecraft:item/oxidized_copper_lantern",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
     },
     {
       "id": "oxidized_copper_trapdoor",
@@ -10115,7 +10358,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -10160,7 +10404,8 @@
       "registration": "item",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "op_blocks"
       ]
     },
     {
@@ -10704,7 +10949,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -11022,6 +11268,66 @@
       }
     },
     {
+      "id": "polished_cinnabar",
+      "texturePath": "/items/textures/polished_cinnabar.png",
+      "sourceTexture": "minecraft:block/polished_cinnabar",
+      "sourceModel": "minecraft:block/polished_cinnabar",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "polished_cinnabar_slab",
+      "texturePath": "/items/textures/polished_cinnabar_slab.png",
+      "sourceTexture": "minecraft:block/polished_cinnabar",
+      "sourceModel": "minecraft:block/polished_cinnabar_slab",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
+    },
+    {
+      "id": "polished_cinnabar_stairs",
+      "texturePath": "/items/textures/polished_cinnabar_stairs.png",
+      "sourceTexture": "minecraft:block/polished_cinnabar",
+      "sourceModel": "minecraft:block/polished_cinnabar_stairs",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "polished_cinnabar_wall",
+      "texturePath": "/items/textures/polished_cinnabar_wall.png",
+      "sourceTexture": "minecraft:block/polished_cinnabar",
+      "sourceModel": "minecraft:block/polished_cinnabar_wall_inventory",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
       "id": "polished_deepslate",
       "texturePath": "/items/textures/polished_deepslate.png",
       "sourceTexture": "minecraft:block/polished_deepslate",
@@ -11172,6 +11478,66 @@
       }
     },
     {
+      "id": "polished_sulfur",
+      "texturePath": "/items/textures/polished_sulfur.png",
+      "sourceTexture": "minecraft:block/polished_sulfur",
+      "sourceModel": "minecraft:block/polished_sulfur",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "polished_sulfur_slab",
+      "texturePath": "/items/textures/polished_sulfur_slab.png",
+      "sourceTexture": "minecraft:block/polished_sulfur",
+      "sourceModel": "minecraft:block/polished_sulfur_slab",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
+    },
+    {
+      "id": "polished_sulfur_stairs",
+      "texturePath": "/items/textures/polished_sulfur_stairs.png",
+      "sourceTexture": "minecraft:block/polished_sulfur",
+      "sourceModel": "minecraft:block/polished_sulfur_stairs",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "polished_sulfur_wall",
+      "texturePath": "/items/textures/polished_sulfur_wall.png",
+      "sourceTexture": "minecraft:block/polished_sulfur",
+      "sourceModel": "minecraft:block/polished_sulfur_wall_inventory",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
       "id": "polished_tuff",
       "texturePath": "/items/textures/polished_tuff.png",
       "sourceTexture": "minecraft:block/polished_tuff",
@@ -11289,6 +11655,21 @@
         "nutrition": 1,
         "saturationModifier": 0.3,
         "effectCount": 0
+      }
+    },
+    {
+      "id": "potent_sulfur",
+      "texturePath": "/items/textures/potent_sulfur.png",
+      "sourceTexture": "minecraft:block/potent_sulfur",
+      "sourceModel": "minecraft:block/potent_sulfur",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "natural_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
       }
     },
     {
@@ -11502,11 +11883,7 @@
       "texturePath": "/items/textures/pumpkin_seeds.png",
       "sourceTexture": "minecraft:item/pumpkin_seeds",
       "sourceModel": "minecraft:item/pumpkin_seeds",
-      "registration": "item",
-      "maxStackSize": 64,
-      "creativeTabs": [
-        "natural_blocks"
-      ]
+      "creativeTabs": []
     },
     {
       "id": "purple_banner",
@@ -11664,7 +12041,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -12311,7 +12689,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -14267,6 +14646,142 @@
       }
     },
     {
+      "id": "sulfur",
+      "texturePath": "/items/textures/sulfur.png",
+      "sourceTexture": "minecraft:block/sulfur",
+      "sourceModel": "minecraft:block/sulfur",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks",
+        "natural_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "sulfur_brick_slab",
+      "texturePath": "/items/textures/sulfur_brick_slab.png",
+      "sourceTexture": "minecraft:block/sulfur_bricks",
+      "sourceModel": "minecraft:block/sulfur_brick_slab",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
+    },
+    {
+      "id": "sulfur_brick_stairs",
+      "texturePath": "/items/textures/sulfur_brick_stairs.png",
+      "sourceTexture": "minecraft:block/sulfur_bricks",
+      "sourceModel": "minecraft:block/sulfur_brick_stairs",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "sulfur_brick_wall",
+      "texturePath": "/items/textures/sulfur_brick_wall.png",
+      "sourceTexture": "minecraft:block/sulfur_bricks",
+      "sourceModel": "minecraft:block/sulfur_brick_wall_inventory",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "sulfur_bricks",
+      "texturePath": "/items/textures/sulfur_bricks.png",
+      "sourceTexture": "minecraft:block/sulfur_bricks",
+      "sourceModel": "minecraft:block/sulfur_bricks",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "sulfur_slab",
+      "texturePath": "/items/textures/sulfur_slab.png",
+      "sourceTexture": "minecraft:block/sulfur",
+      "sourceModel": "minecraft:block/sulfur_slab",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
+    },
+    {
+      "id": "sulfur_spike",
+      "texturePath": "/items/textures/sulfur_spike.png",
+      "sourceTexture": "minecraft:item/sulfur_spike",
+      "sourceModel": "minecraft:item/sulfur_spike",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "natural_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "sulfur_stairs",
+      "texturePath": "/items/textures/sulfur_stairs.png",
+      "sourceTexture": "minecraft:block/sulfur",
+      "sourceModel": "minecraft:block/sulfur_stairs",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "sulfur_wall",
+      "texturePath": "/items/textures/sulfur_wall.png",
+      "sourceTexture": "minecraft:block/sulfur",
+      "sourceModel": "minecraft:block/sulfur_wall_inventory",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
       "id": "sunflower",
       "texturePath": "/items/textures/sunflower.png",
       "sourceTexture": "minecraft:block/sunflower_front",
@@ -15095,7 +15610,15 @@
       "texturePath": "/items/textures/waxed_copper_bars.png",
       "sourceTexture": "minecraft:block/copper_bars",
       "sourceModel": "minecraft:item/copper_bars",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "waxed_copper_block",
@@ -15134,7 +15657,16 @@
       "texturePath": "/items/textures/waxed_copper_chain.png",
       "sourceTexture": "minecraft:item/copper_chain",
       "sourceModel": "minecraft:item/copper_chain",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks",
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "waxed_copper_chest",
@@ -15178,8 +15710,7 @@
         "functional_blocks"
       ],
       "blockLoot": {
-        "behavior": "default",
-        "lootMethod": "custom"
+        "behavior": "default"
       }
     },
     {
@@ -15202,7 +15733,15 @@
       "texturePath": "/items/textures/waxed_copper_lantern.png",
       "sourceTexture": "minecraft:item/copper_lantern",
       "sourceModel": "minecraft:item/copper_lantern",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
     },
     {
       "id": "waxed_copper_trapdoor",
@@ -15299,7 +15838,15 @@
       "texturePath": "/items/textures/waxed_exposed_copper_bars.png",
       "sourceTexture": "minecraft:block/exposed_copper_bars",
       "sourceModel": "minecraft:item/exposed_copper_bars",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "waxed_exposed_copper_bulb",
@@ -15323,7 +15870,16 @@
       "texturePath": "/items/textures/waxed_exposed_copper_chain.png",
       "sourceTexture": "minecraft:item/exposed_copper_chain",
       "sourceModel": "minecraft:item/exposed_copper_chain",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks",
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "waxed_exposed_copper_chest",
@@ -15333,7 +15889,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -15366,8 +15923,7 @@
         "functional_blocks"
       ],
       "blockLoot": {
-        "behavior": "default",
-        "lootMethod": "custom"
+        "behavior": "default"
       }
     },
     {
@@ -15390,7 +15946,15 @@
       "texturePath": "/items/textures/waxed_exposed_copper_lantern.png",
       "sourceTexture": "minecraft:item/exposed_copper_lantern",
       "sourceModel": "minecraft:item/exposed_copper_lantern",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
     },
     {
       "id": "waxed_exposed_copper_trapdoor",
@@ -15460,7 +16024,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -15518,7 +16083,15 @@
       "texturePath": "/items/textures/waxed_oxidized_copper_bars.png",
       "sourceTexture": "minecraft:block/oxidized_copper_bars",
       "sourceModel": "minecraft:item/oxidized_copper_bars",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "waxed_oxidized_copper_bulb",
@@ -15542,7 +16115,16 @@
       "texturePath": "/items/textures/waxed_oxidized_copper_chain.png",
       "sourceTexture": "minecraft:item/oxidized_copper_chain",
       "sourceModel": "minecraft:item/oxidized_copper_chain",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks",
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "waxed_oxidized_copper_chest",
@@ -15552,7 +16134,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -15585,8 +16168,7 @@
         "functional_blocks"
       ],
       "blockLoot": {
-        "behavior": "default",
-        "lootMethod": "custom"
+        "behavior": "default"
       }
     },
     {
@@ -15609,7 +16191,15 @@
       "texturePath": "/items/textures/waxed_oxidized_copper_lantern.png",
       "sourceTexture": "minecraft:item/oxidized_copper_lantern",
       "sourceModel": "minecraft:item/oxidized_copper_lantern",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
     },
     {
       "id": "waxed_oxidized_copper_trapdoor",
@@ -15679,7 +16269,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -15721,7 +16312,15 @@
       "texturePath": "/items/textures/waxed_weathered_copper_bars.png",
       "sourceTexture": "minecraft:block/weathered_copper_bars",
       "sourceModel": "minecraft:item/weathered_copper_bars",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "waxed_weathered_copper_bulb",
@@ -15745,7 +16344,16 @@
       "texturePath": "/items/textures/waxed_weathered_copper_chain.png",
       "sourceTexture": "minecraft:item/weathered_copper_chain",
       "sourceModel": "minecraft:item/weathered_copper_chain",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks",
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "waxed_weathered_copper_chest",
@@ -15755,7 +16363,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -15788,8 +16397,7 @@
         "functional_blocks"
       ],
       "blockLoot": {
-        "behavior": "default",
-        "lootMethod": "custom"
+        "behavior": "default"
       }
     },
     {
@@ -15812,7 +16420,15 @@
       "texturePath": "/items/textures/waxed_weathered_copper_lantern.png",
       "sourceTexture": "minecraft:item/weathered_copper_lantern",
       "sourceModel": "minecraft:item/weathered_copper_lantern",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
     },
     {
       "id": "waxed_weathered_copper_trapdoor",
@@ -15882,7 +16498,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -15936,13 +16553,38 @@
       "texturePath": "/items/textures/weathered_copper_bars.png",
       "sourceTexture": "minecraft:block/weathered_copper_bars",
       "sourceModel": "minecraft:item/weathered_copper_bars",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
     },
     {
       "id": "weathered_copper_bulb",
       "texturePath": "/items/textures/weathered_copper_bulb.png",
       "sourceTexture": "minecraft:block/weathered_copper_bulb",
       "sourceModel": "minecraft:block/weathered_copper_bulb",
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "building_blocks",
+        "functional_blocks",
+        "redstone_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "drop_self"
+      }
+    },
+    {
+      "id": "weathered_copper_chain",
+      "texturePath": "/items/textures/weathered_copper_chain.png",
+      "sourceTexture": "minecraft:item/weathered_copper_chain",
+      "sourceModel": "minecraft:item/weathered_copper_chain",
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
@@ -15955,13 +16597,6 @@
       }
     },
     {
-      "id": "weathered_copper_chain",
-      "texturePath": "/items/textures/weathered_copper_chain.png",
-      "sourceTexture": "minecraft:item/weathered_copper_chain",
-      "sourceModel": "minecraft:item/weathered_copper_chain",
-      "creativeTabs": []
-    },
-    {
       "id": "weathered_copper_chest",
       "texturePath": "/items/textures/weathered_copper_chest.png",
       "sourceTexture": "special/Weathered_Copper_Chest.png",
@@ -15969,7 +16604,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -16002,8 +16638,7 @@
         "functional_blocks"
       ],
       "blockLoot": {
-        "behavior": "default",
-        "lootMethod": "custom"
+        "behavior": "default"
       }
     },
     {
@@ -16026,7 +16661,15 @@
       "texturePath": "/items/textures/weathered_copper_lantern.png",
       "sourceTexture": "minecraft:item/weathered_copper_lantern",
       "sourceModel": "minecraft:item/weathered_copper_lantern",
-      "creativeTabs": []
+      "registration": "block",
+      "maxStackSize": 64,
+      "creativeTabs": [
+        "functional_blocks"
+      ],
+      "blockLoot": {
+        "behavior": "default",
+        "lootMethod": "custom"
+      }
     },
     {
       "id": "weathered_copper_trapdoor",
@@ -16096,7 +16739,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "functional_blocks"
+        "functional_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",
@@ -16559,7 +17203,8 @@
       "registration": "block",
       "maxStackSize": 64,
       "creativeTabs": [
-        "colored_blocks"
+        "colored_blocks",
+        "redstone_blocks"
       ],
       "blockLoot": {
         "behavior": "default",

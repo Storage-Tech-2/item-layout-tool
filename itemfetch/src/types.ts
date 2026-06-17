@@ -42,6 +42,7 @@ export type ParsedBlock = {
 
 export type ParsedItem = {
   fieldName: string;
+  collectionFieldName: string | null;
   id: string;
   registration: "block" | "item" | "spawn_egg" | "other";
   blockField: string | null;
@@ -96,6 +97,10 @@ export type LoadedJavaSources = {
   foodsJavaSource: string | null;
   creativeModeTabsJavaSource: string | null;
   vanillaBlockLootJavaSource: string | null;
+  colorCollectionJavaSource: string | null;
+  weatheringCopperCollectionJavaSource: string | null;
+  blockItemIdsJavaSource: string | null;
+  itemIdsJavaSource: string | null;
   jarPath: string | null;
   cacheVersionRoot: string | null;
   minecraftVersion: string | null;

@@ -3,6 +3,7 @@ import path from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
 import {
   parseBlocks,
+  parseCollectionExpansions,
   parseCreativeModeTabs,
   parseFoods,
   parseItems,
@@ -2578,6 +2579,10 @@ async function main(): Promise<void> {
     foodsJavaSource,
     creativeModeTabsJavaSource,
     vanillaBlockLootJavaSource,
+    colorCollectionJavaSource,
+    weatheringCopperCollectionJavaSource,
+    blockItemIdsJavaSource,
+    itemIdsJavaSource,
     jarPath,
     cacheVersionRoot,
     minecraftVersion,
@@ -2594,17 +2599,32 @@ async function main(): Promise<void> {
 
   console.log(`Using local assets from ${activeAssetsRoot}`);
 
-  const parsedBlocks = parseBlocks(blocksJavaSource);
+  const collectionExpansions = parseCollectionExpansions({
+    colorCollectionSource: colorCollectionJavaSource,
+    weatheringCopperCollectionSource: weatheringCopperCollectionJavaSource,
+    blockItemIdsSource: blockItemIdsJavaSource,
+    itemIdsSource: itemIdsJavaSource,
+  });
+  const parsedBlocks = parseBlocks(blocksJavaSource, collectionExpansions);
   const blockMap = new Map(parsedBlocks.map((block) => [block.fieldName, block]));
-  const parsedItems = parseItems(itemsJavaSource, blockMap);
+  const parsedItems = parseItems(itemsJavaSource, blockMap, collectionExpansions);
   const vanillaBlockLootEntries = vanillaBlockLootJavaSource
-    ? parseVanillaBlockLoot(vanillaBlockLootJavaSource)
+    ? parseVanillaBlockLoot(vanillaBlockLootJavaSource, collectionExpansions)
     : [];
   const vanillaBlockLootByField = new Map(
     vanillaBlockLootEntries.map((entry) => [entry.blockField, entry]),
   );
   const parsedItemById = new Map(parsedItems.map((item) => [item.id, item]));
   const parsedItemByFieldName = new Map(parsedItems.map((item) => [item.fieldName, item]));
+  const parsedItemsByCollectionFieldName = new Map<string, ParsedItem[]>();
+  for (const parsedItem of parsedItems) {
+    if (!parsedItem.collectionFieldName) {
+      continue;
+    }
+    const existing = parsedItemsByCollectionFieldName.get(parsedItem.collectionFieldName) ?? [];
+    existing.push(parsedItem);
+    parsedItemsByCollectionFieldName.set(parsedItem.collectionFieldName, existing);
+  }
   const parsedFoods = foodsJavaSource ? parseFoods(foodsJavaSource) : [];
   const parsedFoodByReference = new Map(parsedFoods.map((food) => [food.reference, food]));
   const parsedFoodByFieldName = new Map(parsedFoods.map((food) => [food.fieldName, food]));
@@ -2614,18 +2634,33 @@ async function main(): Promise<void> {
 
   const creativeTabIdsByItemId = new Map<string, Set<string>>();
   const unresolvedCreativeTabItemFieldNames = new Set<string>();
+  const addCreativeTabForParsedItem = (parsedItem: ParsedItem, tabId: string): void => {
+    if (!creativeTabIdsByItemId.has(parsedItem.id)) {
+      creativeTabIdsByItemId.set(parsedItem.id, new Set<string>());
+    }
+    creativeTabIdsByItemId.get(parsedItem.id)!.add(tabId);
+  };
+
   for (const tab of parsedCreativeTabs) {
     for (const itemField of tab.itemFields) {
+      const collectionItems = parsedItemsByCollectionFieldName.get(itemField);
+      if (collectionItems) {
+        for (const collectionItem of collectionItems) {
+          addCreativeTabForParsedItem(collectionItem, tab.id);
+        }
+        continue;
+      }
+
       const parsedItem = parsedItemByFieldName.get(itemField);
+      if (parsedItem) {
+        addCreativeTabForParsedItem(parsedItem, tab.id);
+        continue;
+      }
+
       if (!parsedItem) {
         unresolvedCreativeTabItemFieldNames.add(itemField);
         continue;
       }
-
-      if (!creativeTabIdsByItemId.has(parsedItem.id)) {
-        creativeTabIdsByItemId.set(parsedItem.id, new Set<string>());
-      }
-      creativeTabIdsByItemId.get(parsedItem.id)!.add(tab.id);
     }
   }
 

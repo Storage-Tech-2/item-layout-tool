@@ -3,13 +3,16 @@ import os from "node:os";
 import path from "node:path";
 import {
   BLOCKS_CLASS_CANDIDATES,
+  BLOCK_ITEM_IDS_CLASS_CANDIDATES,
   CACHE_ROOT,
+  COLOR_COLLECTION_CLASS_CANDIDATES,
   CREATIVE_MODE_TABS_CLASS_CANDIDATES,
   CFR_JAR_PATH_OVERRIDE,
   CFR_JAR_URL,
   CFR_VERSION,
   FOODS_CLASS_CANDIDATES,
   ITEM_CLASS_CANDIDATES,
+  ITEM_IDS_CLASS_CANDIDATES,
   LOCAL_BLOCKS_JAVA_PATH,
   LOCAL_CREATIVE_MODE_TABS_JAVA_PATH,
   LOCAL_FOODS_JAVA_PATH,
@@ -18,6 +21,7 @@ import {
   TOOL_CACHE_ROOT,
   VANILLA_BLOCK_LOOT_CLASS_CANDIDATES,
   VERSION_MANIFEST_URL,
+  WEATHERING_COPPER_COLLECTION_CLASS_CANDIDATES,
   sanitizeForPath,
   toFabricManifestUrl,
 } from "./config";
@@ -316,6 +320,10 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
       foodsJavaSource,
       creativeModeTabsJavaSource,
       vanillaBlockLootJavaSource,
+      colorCollectionJavaSource: null,
+      weatheringCopperCollectionJavaSource: null,
+      blockItemIdsJavaSource: null,
+      itemIdsJavaSource: null,
       jarPath: null,
       cacheVersionRoot: null,
       minecraftVersion: null,
@@ -355,12 +363,23 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
   let foodsClassCandidates = FOODS_CLASS_CANDIDATES;
   let creativeModeTabsClassCandidates = CREATIVE_MODE_TABS_CLASS_CANDIDATES;
   let vanillaBlockLootClassCandidates = VANILLA_BLOCK_LOOT_CLASS_CANDIDATES;
+  let colorCollectionClassCandidates = COLOR_COLLECTION_CLASS_CANDIDATES;
+  let weatheringCopperCollectionClassCandidates = WEATHERING_COPPER_COLLECTION_CLASS_CANDIDATES;
+  let blockItemIdsClassCandidates = BLOCK_ITEM_IDS_CLASS_CANDIDATES;
+  let itemIdsClassCandidates = ITEM_IDS_CLASS_CANDIDATES;
 
   let itemsClassEntry = pickJarEntry(jarEntries, itemsClassCandidates);
   let blocksClassEntry = pickJarEntry(jarEntries, blocksClassCandidates);
   let foodsClassEntry = pickJarEntry(jarEntries, foodsClassCandidates);
   let creativeModeTabsClassEntry = pickJarEntry(jarEntries, creativeModeTabsClassCandidates);
   let vanillaBlockLootClassEntry = pickJarEntry(jarEntries, vanillaBlockLootClassCandidates);
+  let colorCollectionClassEntry = pickJarEntry(jarEntries, colorCollectionClassCandidates);
+  let weatheringCopperCollectionClassEntry = pickJarEntry(
+    jarEntries,
+    weatheringCopperCollectionClassCandidates,
+  );
+  let blockItemIdsClassEntry = pickJarEntry(jarEntries, blockItemIdsClassCandidates);
+  let itemIdsClassEntry = pickJarEntry(jarEntries, itemIdsClassCandidates);
 
   if (
     versionSource.source === "mojang" &&
@@ -383,12 +402,29 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
       VANILLA_BLOCK_LOOT_CLASS_CANDIDATES,
       classMappings,
     );
+    colorCollectionClassCandidates = remapClassCandidates(
+      COLOR_COLLECTION_CLASS_CANDIDATES,
+      classMappings,
+    );
+    weatheringCopperCollectionClassCandidates = remapClassCandidates(
+      WEATHERING_COPPER_COLLECTION_CLASS_CANDIDATES,
+      classMappings,
+    );
+    blockItemIdsClassCandidates = remapClassCandidates(BLOCK_ITEM_IDS_CLASS_CANDIDATES, classMappings);
+    itemIdsClassCandidates = remapClassCandidates(ITEM_IDS_CLASS_CANDIDATES, classMappings);
 
     itemsClassEntry = pickJarEntry(jarEntries, itemsClassCandidates);
     blocksClassEntry = pickJarEntry(jarEntries, blocksClassCandidates);
     foodsClassEntry = pickJarEntry(jarEntries, foodsClassCandidates);
     creativeModeTabsClassEntry = pickJarEntry(jarEntries, creativeModeTabsClassCandidates);
     vanillaBlockLootClassEntry = pickJarEntry(jarEntries, vanillaBlockLootClassCandidates);
+    colorCollectionClassEntry = pickJarEntry(jarEntries, colorCollectionClassCandidates);
+    weatheringCopperCollectionClassEntry = pickJarEntry(
+      jarEntries,
+      weatheringCopperCollectionClassCandidates,
+    );
+    blockItemIdsClassEntry = pickJarEntry(jarEntries, blockItemIdsClassCandidates);
+    itemIdsClassEntry = pickJarEntry(jarEntries, itemIdsClassCandidates);
   }
 
   if (!itemsClassEntry || !blocksClassEntry || !foodsClassEntry || !creativeModeTabsClassEntry) {
@@ -402,9 +438,19 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
   }
 
   console.log(
-    `Decompiling ${itemsClassEntry}, ${blocksClassEntry}, ${foodsClassEntry}, ${creativeModeTabsClassEntry}${vanillaBlockLootClassEntry ? `, and ${vanillaBlockLootClassEntry}` : ""}...`,
+    `Decompiling ${itemsClassEntry}, ${blocksClassEntry}, ${foodsClassEntry}, ${creativeModeTabsClassEntry}${vanillaBlockLootClassEntry ? `, ${vanillaBlockLootClassEntry}` : ""}${colorCollectionClassEntry ? `, ${colorCollectionClassEntry}` : ""}${weatheringCopperCollectionClassEntry ? `, ${weatheringCopperCollectionClassEntry}` : ""}${blockItemIdsClassEntry ? `, ${blockItemIdsClassEntry}` : ""}${itemIdsClassEntry ? `, and ${itemIdsClassEntry}` : ""}...`,
   );
-  const [itemsResult, blocksResult, foodsResult, creativeModeTabsResult, vanillaBlockLootResult] =
+  const [
+    itemsResult,
+    blocksResult,
+    foodsResult,
+    creativeModeTabsResult,
+    vanillaBlockLootResult,
+    colorCollectionResult,
+    weatheringCopperCollectionResult,
+    blockItemIdsResult,
+    itemIdsResult,
+  ] =
     await Promise.all([
       decompileClass(jarPath, itemsClassEntry, cfrJarPath, versionRoot, clientMappingsPath),
       decompileClass(jarPath, blocksClassEntry, cfrJarPath, versionRoot, clientMappingsPath),
@@ -425,6 +471,24 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
             clientMappingsPath,
           )
         : Promise.resolve(null),
+      colorCollectionClassEntry
+        ? decompileClass(jarPath, colorCollectionClassEntry, cfrJarPath, versionRoot, clientMappingsPath)
+        : Promise.resolve(null),
+      weatheringCopperCollectionClassEntry
+        ? decompileClass(
+            jarPath,
+            weatheringCopperCollectionClassEntry,
+            cfrJarPath,
+            versionRoot,
+            clientMappingsPath,
+          )
+        : Promise.resolve(null),
+      blockItemIdsClassEntry
+        ? decompileClass(jarPath, blockItemIdsClassEntry, cfrJarPath, versionRoot, clientMappingsPath)
+        : Promise.resolve(null),
+      itemIdsClassEntry
+        ? decompileClass(jarPath, itemIdsClassEntry, cfrJarPath, versionRoot, clientMappingsPath)
+        : Promise.resolve(null),
     ]);
 
   return {
@@ -433,6 +497,10 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
     foodsJavaSource: foodsResult.javaSource,
     creativeModeTabsJavaSource: creativeModeTabsResult.javaSource,
     vanillaBlockLootJavaSource: vanillaBlockLootResult?.javaSource ?? null,
+    colorCollectionJavaSource: colorCollectionResult?.javaSource ?? null,
+    weatheringCopperCollectionJavaSource: weatheringCopperCollectionResult?.javaSource ?? null,
+    blockItemIdsJavaSource: blockItemIdsResult?.javaSource ?? null,
+    itemIdsJavaSource: itemIdsResult?.javaSource ?? null,
     jarPath,
     cacheVersionRoot: versionRoot,
     minecraftVersion: versionSource.selectedVersion,
@@ -453,11 +521,19 @@ export async function loadJavaSources(): Promise<LoadedJavaSources> {
       foodsClassEntry,
       creativeModeTabsClassEntry,
       vanillaBlockLootClassEntry: vanillaBlockLootClassEntry ?? null,
+      colorCollectionClassEntry: colorCollectionClassEntry ?? null,
+      weatheringCopperCollectionClassEntry: weatheringCopperCollectionClassEntry ?? null,
+      blockItemIdsClassEntry: blockItemIdsClassEntry ?? null,
+      itemIdsClassEntry: itemIdsClassEntry ?? null,
       itemsJavaPath: itemsResult.javaPath,
       blocksJavaPath: blocksResult.javaPath,
       foodsJavaPath: foodsResult.javaPath,
       creativeModeTabsJavaPath: creativeModeTabsResult.javaPath,
       vanillaBlockLootJavaPath: vanillaBlockLootResult?.javaPath ?? null,
+      colorCollectionJavaPath: colorCollectionResult?.javaPath ?? null,
+      weatheringCopperCollectionJavaPath: weatheringCopperCollectionResult?.javaPath ?? null,
+      blockItemIdsJavaPath: blockItemIdsResult?.javaPath ?? null,
+      itemIdsJavaPath: itemIdsResult?.javaPath ?? null,
       tempDirectory: os.tmpdir(),
     },
   };

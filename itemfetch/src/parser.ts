@@ -20,6 +20,7 @@ type MethodCall = {
 
 type FieldInitializer = {
   name: string;
+  typeName: string;
   initializer: string;
 };
 
@@ -33,6 +34,8 @@ type BuilderHelper = {
   params: string[];
   returnExpression: string;
 };
+
+export type CollectionExpansionMap = Map<string, string[]>;
 
 function splitTopLevel(input: string, separator: string): string[] {
   const parts: string[] = [];
@@ -450,22 +453,30 @@ function extractStaticFieldInitializers(
   source: string,
   typeName: string,
 ): FieldInitializer[] {
+  return extractStaticFieldInitializersForTypes(source, typeName);
+}
+
+function extractStaticFieldInitializersForTypes(
+  source: string,
+  typePattern: string,
+): FieldInitializer[] {
   const fields: FieldInitializer[] = [];
   const pattern = new RegExp(
-    `public\\s+static\\s+final\\s+${typeName}\\s+([A-Z0-9_]+)\\s*=`,
+    `public\\s+static\\s+final\\s+(${typePattern})\\s+([A-Z0-9_]+)\\s*=`,
     "g",
   );
 
   let match: RegExpExecArray | null = null;
   while ((match = pattern.exec(source)) !== null) {
-    const name = match[1];
+    const typeName = match[1];
+    const name = match[2];
     const statementStart = pattern.lastIndex;
     const statementEnd = findStatementEnd(source, statementStart);
     if (statementEnd === -1) {
       throw new Error(`Unable to find end of field declaration for ${typeName} ${name}`);
     }
     const initializer = source.slice(statementStart, statementEnd).trim();
-    fields.push({ name, initializer });
+    fields.push({ name, typeName, initializer });
     pattern.lastIndex = statementEnd + 1;
   }
 
@@ -749,35 +760,52 @@ function inferBlockLoot(
   };
 }
 
-export function parseBlocks(blocksSource: string): ParsedBlock[] {
+export function parseBlocks(
+  blocksSource: string,
+  collectionExpansions: CollectionExpansionMap = new Map(),
+): ParsedBlock[] {
   const helpers = parsePropertiesHelpers(blocksSource);
-  const fields = extractStaticFieldInitializers(blocksSource, "Block");
+  const fields = extractStaticFieldInitializersForTypes(
+    blocksSource,
+    String.raw`(?:Block|ColorCollection<Block>|WeatheringCopperCollection<Block>)`,
+  );
 
   const blocks: ParsedBlock[] = [];
   for (const field of fields) {
     const outerCall = parseTopLevelCall(field.initializer);
-    let id = toSnakeCaseFromConstant(field.name);
+    let baseId = toSnakeCaseFromConstant(field.name);
     let propertiesExpression: string | null = null;
 
     if (outerCall) {
       const literalId = firstStringArgument(outerCall.args);
       if (literalId !== null) {
-        id = stripMinecraftNamespace(literalId);
+        baseId = stripMinecraftNamespace(literalId);
       }
 
       if (outerCall.name.endsWith("register")) {
         if (outerCall.args.length >= 2) {
           propertiesExpression = outerCall.args[outerCall.args.length - 1].trim();
         }
+      } else if (
+        outerCall.name.endsWith("registerBlocks") &&
+        outerCall.args.length >= 4
+      ) {
+        propertiesExpression = outerCall.args[outerCall.args.length - 1].trim();
       }
     }
 
     const loot = inferBlockLoot(propertiesExpression, helpers);
-    blocks.push({
-      fieldName: field.name,
-      id,
-      loot,
-    });
+    const expandedFieldNames = expandCollectionFieldNames(field, collectionExpansions);
+    for (const expandedFieldName of expandedFieldNames) {
+      blocks.push({
+        fieldName: expandedFieldName,
+        id:
+          expandedFieldNames.length === 1
+            ? baseId
+            : toSnakeCaseFromConstant(expandedFieldName),
+        loot,
+      });
+    }
   }
 
   return blocks;
@@ -876,10 +904,36 @@ export function parseFoods(foodsSource: string): ParsedFood[] {
   return foods;
 }
 
+function extractItemFieldReferences(source: string): string[] {
+  const itemFields = new Set<string>();
+  const itemReferencePattern = /\bItems\.([A-Z0-9_]+)\b/g;
+  let itemReferenceMatch: RegExpExecArray | null = null;
+  while ((itemReferenceMatch = itemReferencePattern.exec(source)) !== null) {
+    itemFields.add(itemReferenceMatch[1]);
+  }
+  return Array.from(itemFields);
+}
+
 export function parseCreativeModeTabs(
   creativeModeTabsSource: string,
 ): ParsedCreativeTab[] {
   const javaIdentifier = String.raw`[$A-Za-z_][$A-Za-z0-9_]*`;
+  const helperItemFields = new Map<string, string[]>();
+  const helperPattern =
+    /private\s+static\s+void\s+([A-Za-z_][A-Za-z0-9_]*)\s*\([^)]*\)\s*\{/g;
+  let helperMatch: RegExpExecArray | null = null;
+  while ((helperMatch = helperPattern.exec(creativeModeTabsSource)) !== null) {
+    const helperName = helperMatch[1];
+    const openBraceIndex = helperPattern.lastIndex - 1;
+    const closeBraceIndex = findMatchingBrace(creativeModeTabsSource, openBraceIndex);
+    if (closeBraceIndex === -1) {
+      continue;
+    }
+    const body = creativeModeTabsSource.slice(openBraceIndex + 1, closeBraceIndex);
+    helperItemFields.set(helperName, extractItemFieldReferences(body));
+    helperPattern.lastIndex = closeBraceIndex + 1;
+  }
+
   const keyFieldToId = new Map<string, string>();
   const keyPattern =
     /private\s+static\s+final\s+ResourceKey<CreativeModeTab>\s+([A-Z0-9_]+)\s*=\s*CreativeModeTabs\.createKey\(\s*"([^"]+)"\s*\)\s*;/g;
@@ -915,10 +969,21 @@ export function parseCreativeModeTabs(
       const closeBraceOffset = findMatchingBrace(statement, openBraceOffset);
       if (closeBraceOffset !== -1) {
         const body = statement.slice(openBraceOffset + 1, closeBraceOffset);
-        const itemReferencePattern = /\bItems\.([A-Z0-9_]+)\b/g;
-        let itemReferenceMatch: RegExpExecArray | null = null;
-        while ((itemReferenceMatch = itemReferencePattern.exec(body)) !== null) {
-          itemFields.add(itemReferenceMatch[1]);
+        for (const itemField of extractItemFieldReferences(body)) {
+          itemFields.add(itemField);
+        }
+
+        const helperCallPattern =
+          /\b(?:CreativeModeTabs\.)?([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+        let helperCallMatch: RegExpExecArray | null = null;
+        while ((helperCallMatch = helperCallPattern.exec(body)) !== null) {
+          const helperFields = helperItemFields.get(helperCallMatch[1]);
+          if (!helperFields) {
+            continue;
+          }
+          for (const itemField of helperFields) {
+            itemFields.add(itemField);
+          }
         }
       }
     }
@@ -955,7 +1020,170 @@ function parseRegisterItemId(rawFirstArg: string | undefined, fallbackId: string
     return stripMinecraftNamespace(defaultNamespaceMatch[1]);
   }
 
+  const blockItemIdItemMatch = /BlockItemIds\.([A-Z0-9_]+)\.item\(\)/.exec(rawFirstArg);
+  if (blockItemIdItemMatch) {
+    return toSnakeCaseFromConstant(blockItemIdItemMatch[1]);
+  }
+
+  if (/BlockItemIds\.[A-Z0-9_]+\b/.test(rawFirstArg)) {
+    return fallbackId;
+  }
+
+  const itemIdMatch = /(?:^|[^A-Za-z0-9_])ItemIds\.([A-Z0-9_]+)/.exec(rawFirstArg);
+  if (itemIdMatch) {
+    return toSnakeCaseFromConstant(itemIdMatch[1]);
+  }
+
   return fallbackId;
+}
+
+function toConstantName(id: string): string {
+  return id.toUpperCase();
+}
+
+function parseColorPrefixes(colorCollectionSource: string | null): string[] {
+  if (!colorCollectionSource) {
+    return [];
+  }
+  const valuesMatch =
+    /public\s+static\s+final\s+ColorCollection<DyeColor>\s+VALUES\s*=\s*new\s+ColorCollection<DyeColor>\(([^;]+)\);/.exec(
+      colorCollectionSource,
+    );
+  if (!valuesMatch) {
+    return [];
+  }
+
+  return splitTopLevel(valuesMatch[1], ",")
+    .map((value) => /DyeColor\.([A-Z0-9_]+)/.exec(value)?.[1] ?? null)
+    .filter((value): value is string => value !== null)
+    .map((value) => toSnakeCaseFromConstant(value));
+}
+
+function parseWeatheringPrefixes(weatheringCopperCollectionSource: string | null): string[] {
+  if (!weatheringCopperCollectionSource) {
+    return [];
+  }
+  const prefixesMatch =
+    /public\s+static\s+final\s+WeatheringCopperCollection<String>\s+PREFIXES\s*=\s*new\s+WeatheringCopperCollection<String>\(([\s\S]*?)\);/.exec(
+      weatheringCopperCollectionSource,
+    );
+  if (!prefixesMatch) {
+    return [];
+  }
+
+  return Array.from(prefixesMatch[1].matchAll(/"([^"]*)"/g), (match) => match[1]);
+}
+
+function prefixedIds(prefixes: string[], baseName: string): string[] {
+  return prefixes.map((prefix) => `${prefix}${baseName}`);
+}
+
+function parseByStateStringField(source: string, fieldName: string): string[] | null {
+  const pattern = new RegExp(
+    String.raw`WeatheringCopperCollection\.ByState<String>\s+${escapeRegex(fieldName)}\s*=\s*new\s+WeatheringCopperCollection\.ByState<String>\(([^;]+)\);`,
+  );
+  const match = pattern.exec(source);
+  if (!match) {
+    return null;
+  }
+  const values = splitTopLevel(match[1], ",")
+    .map(parseJavaStringLiteral)
+    .filter((value): value is string => value !== null);
+  return values.length > 0 ? values : null;
+}
+
+function parseReferenceCollections(
+  source: string | null,
+  colorPrefixes: string[],
+  weatheringPrefixes: string[],
+): CollectionExpansionMap {
+  const expansions: CollectionExpansionMap = new Map();
+  if (!source) {
+    return expansions;
+  }
+
+  const colorPattern =
+    /public\s+static\s+final\s+ColorCollection<[^=]+?\s+([A-Z0-9_]+)\s*=\s*[^;]*createSimpleColored\(\s*"([^"]+)"\s*\)\s*;/g;
+  let colorMatch: RegExpExecArray | null = null;
+  while ((colorMatch = colorPattern.exec(source)) !== null) {
+    const fieldName = colorMatch[1];
+    const baseName = colorMatch[2];
+    expansions.set(
+      fieldName,
+      colorPrefixes.map((prefix) => toConstantName(`${prefix}_${baseName}`)),
+    );
+  }
+
+  const copperPattern =
+    /public\s+static\s+final\s+WeatheringCopperCollection<[^=]+?\s+([A-Z0-9_]+)\s*=\s*([^;]+);/g;
+  let copperMatch: RegExpExecArray | null = null;
+  while ((copperMatch = copperPattern.exec(source)) !== null) {
+    const fieldName = copperMatch[1];
+    const initializer = copperMatch[2];
+    const simpleMatch = /createSimpleCopper\(\s*"([^"]+)"\s*\)/.exec(initializer);
+    if (simpleMatch) {
+      expansions.set(fieldName, prefixedIds(weatheringPrefixes, simpleMatch[1]).map(toConstantName));
+      continue;
+    }
+
+    const byStateFieldMatch = /same\(\s*([A-Z0-9_]+)\s*\)/.exec(initializer);
+    const byStateValues = byStateFieldMatch
+      ? parseByStateStringField(source, byStateFieldMatch[1])
+      : null;
+    if (byStateValues) {
+      expansions.set(fieldName, prefixedIds(weatheringPrefixes, "").map((prefix, index) =>
+        toConstantName(`${prefix}${byStateValues[index % byStateValues.length]}`),
+      ));
+    }
+  }
+
+  return expansions;
+}
+
+export function parseCollectionExpansions(input: {
+  colorCollectionSource: string | null;
+  weatheringCopperCollectionSource: string | null;
+  blockItemIdsSource: string | null;
+  itemIdsSource: string | null;
+}): CollectionExpansionMap {
+  const colorPrefixes = parseColorPrefixes(input.colorCollectionSource);
+  const weatheringPrefixes = parseWeatheringPrefixes(input.weatheringCopperCollectionSource);
+  return new Map([
+    ...parseReferenceCollections(input.blockItemIdsSource, colorPrefixes, weatheringPrefixes),
+    ...parseReferenceCollections(input.itemIdsSource, colorPrefixes, weatheringPrefixes),
+  ]);
+}
+
+function expandCollectionFieldNames(
+  field: FieldInitializer,
+  collectionExpansions: CollectionExpansionMap,
+): string[] {
+  return collectionExpansions.get(field.name) ?? [field.name];
+}
+
+function findNestedTopLevelCall(source: string, methodNames: string[]): TopLevelCall | null {
+  for (const methodName of methodNames) {
+    let cursor = source.indexOf(methodName);
+    while (cursor !== -1) {
+      const openIndex = source.indexOf("(", cursor + methodName.length);
+      if (openIndex === -1) {
+        break;
+      }
+      const closeIndex = findMatchingParen(source, openIndex);
+      if (closeIndex === -1) {
+        cursor = source.indexOf(methodName, cursor + methodName.length);
+        continue;
+      }
+      const expression = source.slice(cursor, closeIndex + 1);
+      const call = parseTopLevelCall(expression);
+      if (call) {
+        return call;
+      }
+      cursor = source.indexOf(methodName, closeIndex + 1);
+    }
+  }
+
+  return null;
 }
 
 function deriveSpawnEggId(rawArg: string | undefined, fallbackId: string): string {
@@ -1092,38 +1320,57 @@ function isUnstackableItemFactory(itemFactory: string | null): boolean {
   );
 }
 
-export function parseItems(itemsSource: string, blockMap: Map<string, ParsedBlock>): ParsedItem[] {
-  const fields = extractStaticFieldInitializers(itemsSource, "Item");
+export function parseItems(
+  itemsSource: string,
+  blockMap: Map<string, ParsedBlock>,
+  collectionExpansions: CollectionExpansionMap = new Map(),
+): ParsedItem[] {
+  const fields = extractStaticFieldInitializersForTypes(
+    itemsSource,
+    String.raw`(?:Item|ColorCollection<Item>|WeatheringCopperCollection<Item>)`,
+  );
   const items: ParsedItem[] = [];
 
   for (const field of fields) {
-    const outerCall = parseTopLevelCall(field.initializer);
-    const fallbackId = toSnakeCaseFromConstant(field.name);
+    const isCollectionField = field.typeName !== "Item";
+    const collectionCall = isCollectionField ? parseTopLevelCall(field.initializer) : null;
+    const outerCall = isCollectionField
+      ? findNestedTopLevelCall(field.initializer, [
+          "Items.registerBlock",
+          "Items.registerItem",
+          "Items.registerSpawnEgg",
+        ])
+      : parseTopLevelCall(field.initializer);
+    const expandedFieldNames = expandCollectionFieldNames(field, collectionExpansions);
 
     let registration: ParsedItem["registration"] = "other";
-    let id = fallbackId;
     let blockField: string | null = null;
     let itemFactory: string | null = null;
     let propertiesExpression: string | null = null;
+    let spawnEggEntityArg: string | null = null;
 
     if (outerCall) {
       const registrationName = getUnqualifiedMethodName(outerCall.name);
 
       if (registrationName === "registerBlock") {
         registration = "block";
-        blockField = parseBlockFieldReference(outerCall.args[0] ?? "") ?? null;
-        if (blockField && blockMap.has(blockField)) {
-          id = blockMap.get(blockField)!.id;
-        }
-        if (
-          outerCall.args.length >= 2 &&
-          !isPropertiesConstructorExpression(outerCall.args[1])
-        ) {
-          itemFactory = outerCall.args[1].trim();
+        const firstBlockField = parseBlockFieldReference(outerCall.args[0] ?? "");
+        const secondBlockField = parseBlockFieldReference(outerCall.args[1] ?? "");
+        blockField = firstBlockField && !/BlockItemIds\./.test(outerCall.args[0] ?? "")
+          ? firstBlockField
+          : secondBlockField ?? firstBlockField ?? null;
+        for (const arg of outerCall.args.slice(1)) {
+          if (
+            parseBlockFieldReference(arg) ||
+            isPropertiesConstructorExpression(arg)
+          ) {
+            continue;
+          }
+          itemFactory = arg.trim();
+          break;
         }
       } else if (registrationName === "registerItem") {
         registration = "item";
-        id = parseRegisterItemId(outerCall.args[0], fallbackId);
         if (
           outerCall.args.length >= 2 &&
           !isPropertiesConstructorExpression(outerCall.args[1])
@@ -1132,13 +1379,25 @@ export function parseItems(itemsSource: string, blockMap: Map<string, ParsedBloc
         }
       } else if (registrationName === "registerSpawnEgg") {
         registration = "spawn_egg";
-        id = deriveSpawnEggId(outerCall.args[0], fallbackId);
+        spawnEggEntityArg = outerCall.args[0] ?? null;
       }
 
       propertiesExpression = extractPropertiesExpressionFromRegistration(
         registrationName,
         outerCall.args,
       );
+    } else if (
+      collectionCall &&
+      getUnqualifiedMethodName(collectionCall.name) === "registerItems" &&
+      collectionCall.args.some((arg) => arg.trim() === "Items::registerBlock")
+    ) {
+      registration = "block";
+    } else if (
+      collectionCall &&
+      getUnqualifiedMethodName(collectionCall.name) === "registerBlockItems" &&
+      collectionCall.args.some((arg) => arg.includes("Items::registerBlock"))
+    ) {
+      registration = "block";
     }
 
     const propertyCalls = propertiesExpression ? extractMethodCalls(propertiesExpression) : [];
@@ -1146,33 +1405,64 @@ export function parseItems(itemsSource: string, blockMap: Map<string, ParsedBloc
     if (isUnstackableItemFactory(itemFactory) && computedProperties.maxStackSize > 1) {
       computedProperties.maxStackSize = 1;
     }
-    const blockLoot = blockField ? blockMap.get(blockField)?.loot ?? null : null;
 
-    items.push({
-      fieldName: field.name,
-      id,
-      registration,
-      blockField,
-      itemFactory,
-      propertiesExpression,
-      maxStackSize: computedProperties.maxStackSize,
-      maxDamage: computedProperties.maxDamage,
-      rarity: computedProperties.rarity,
-      fireResistant: computedProperties.fireResistant,
-      foodReference: computedProperties.foodReference,
-      propertyCalls: propertyCalls.map((call) => ({
-        name: call.name,
-        args: call.args,
-      })),
-      blockLoot,
-    });
+    for (const expandedFieldName of expandedFieldNames) {
+      const fallbackId = toSnakeCaseFromConstant(expandedFieldName);
+      const expandedBlockField =
+        field.typeName === "Item"
+          ? blockField
+          : blockMap.has(expandedFieldName)
+            ? expandedFieldName
+            : blockField;
+      const blockLoot = expandedBlockField ? blockMap.get(expandedBlockField)?.loot ?? null : null;
+      const id =
+        registration === "block" && expandedBlockField && blockMap.has(expandedBlockField)
+          ? blockMap.get(expandedBlockField)!.id
+          : registration === "spawn_egg"
+            ? deriveSpawnEggId(spawnEggEntityArg ?? undefined, fallbackId)
+          : outerCall && registration === "item" && field.typeName === "Item"
+            ? parseRegisterItemId(outerCall.args[0], fallbackId)
+            : fallbackId;
+
+      items.push({
+        fieldName: expandedFieldName,
+        collectionFieldName: isCollectionField ? field.name : null,
+        id,
+        registration,
+        blockField: expandedBlockField,
+        itemFactory,
+        propertiesExpression,
+        maxStackSize: computedProperties.maxStackSize,
+        maxDamage: computedProperties.maxDamage,
+        rarity: computedProperties.rarity,
+        fireResistant: computedProperties.fireResistant,
+        foodReference: computedProperties.foodReference,
+        propertyCalls: propertyCalls.map((call) => ({
+          name: call.name,
+          args: call.args,
+        })),
+        blockLoot,
+      });
+    }
   }
 
   return items;
 }
 
-export function parseVanillaBlockLoot(source: string): VanillaBlockLootEntry[] {
+export function parseVanillaBlockLoot(
+  source: string,
+  collectionExpansions: CollectionExpansionMap = new Map(),
+): VanillaBlockLootEntry[] {
   const entries = new Map<string, VanillaBlockLootEntry>();
+  const setCollectionEntries = (
+    collectionField: string,
+    lootMethod: VanillaBlockLootEntry["lootMethod"],
+    lootDropField: string | null = null,
+  ): void => {
+    for (const blockField of collectionExpansions.get(collectionField) ?? [collectionField]) {
+      entries.set(blockField, { blockField, lootMethod, lootDropField });
+    }
+  };
 
   const generatePattern = /protected\s+void\s+generate\s*\(\s*\)\s*\{/;
   const match = generatePattern.exec(source);
@@ -1195,9 +1485,21 @@ export function parseVanillaBlockLoot(source: string): VanillaBlockLootEntry[] {
     entries.set(m[1], { blockField: m[1], lootMethod: "drop_self", lootDropField: null });
   }
 
+  const collectionDropSelfPattern =
+    /\bBlocks\.([A-Z0-9_]+)\.forEach\([^;]*?\.dropSelf\(\s*\(Block\)[^)]+\)\s*\)/g;
+  while ((m = collectionDropSelfPattern.exec(body)) !== null) {
+    setCollectionEntries(m[1], "drop_self");
+  }
+
   const dropSilkPattern = /\bthis\.dropWhenSilkTouch\(\s*Blocks\.([A-Z0-9_]+)\s*\)/g;
   while ((m = dropSilkPattern.exec(body)) !== null) {
     entries.set(m[1], { blockField: m[1], lootMethod: "drop_when_silk_touch", lootDropField: null });
+  }
+
+  const collectionDropSilkPattern =
+    /\bBlocks\.([A-Z0-9_]+)\.forEach\([^;]*?\.dropWhenSilkTouch\(\s*\(Block\)[^)]+\)\s*\)/g;
+  while ((m = collectionDropSilkPattern.exec(body)) !== null) {
+    setCollectionEntries(m[1], "drop_when_silk_touch");
   }
 
   const otherWhenSilkTouchPattern =
@@ -1226,6 +1528,16 @@ export function parseVanillaBlockLoot(source: string): VanillaBlockLootEntry[] {
   while ((m = addPattern.exec(body)) !== null) {
     if (!entries.has(m[1])) {
       entries.set(m[1], { blockField: m[1], lootMethod: "custom", lootDropField: null });
+    }
+  }
+
+  const collectionCustomAddPattern =
+    /\bBlocks\.([A-Z0-9_]+)\.forEach\([\s\S]*?this\.add\(\s*\(Block\)block\s*,/g;
+  while ((m = collectionCustomAddPattern.exec(body)) !== null) {
+    for (const blockField of collectionExpansions.get(m[1]) ?? [m[1]]) {
+      if (!entries.has(blockField)) {
+        entries.set(blockField, { blockField, lootMethod: "custom", lootDropField: null });
+      }
     }
   }
 
